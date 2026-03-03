@@ -68,6 +68,21 @@
                     <h3>Évolution (6 derniers mois)</h3>
                     <canvas id="barChartEvolution" width="400" height="300"></canvas>
                 </div>
+                <div class="chart-box card-elegant" style="grid-column: 1 / -1;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 id="horizontalBarChartTitle" style="margin: 0;">Dépenses par catégorie (Précises)</h3>
+                        <div class="month-selector">
+                            <label for="chart-period-select" style="font-weight: bold; margin-right: 0.5rem; color: var(--text-color);">Période :</label>
+                            <select id="chart-period-select" style="padding: 0.4rem; border: 1px solid var(--border-color); border-radius: 4px; background-color: var(--input-bg); color: var(--input-text);">
+                                <option value="1">1 mois</option>
+                                <option value="3">3 mois</option>
+                                <option value="6">6 mois</option>
+                                <option value="12">1 an</option>
+                            </select>
+                        </div>
+                    </div>
+                    <canvas id="horizontalBarChartCategory" width="800" height="400" style="width: 100%; max-width: 800px; height: auto; display: block; margin: 0 auto;"></canvas>
+                </div>
             </div>
         </section>
 

@@ -225,6 +225,25 @@ function getMonthData(year, month) {
     return { income, expense, balance: income - expense, categoryExpenses };
 }
 
+function getMultiMonthCategoryData(startYear, startMonth, numberOfMonths) {
+    let combinedCategoryExpenses = {};
+
+    for (let i = 0; i < numberOfMonths; i++) {
+        let m = startMonth - i;
+        let y = startYear;
+        if (m <= 0) {
+            m += 12;
+            y -= 1;
+        }
+        const data = getMonthData(y, m);
+        for (const [catName, amount] of Object.entries(data.categoryExpenses)) {
+            combinedCategoryExpenses[catName] = (combinedCategoryExpenses[catName] || 0) + amount;
+        }
+    }
+
+    return combinedCategoryExpenses;
+}
+
 function drawPieChart(canvasId, dataObj) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
@@ -342,6 +361,87 @@ function drawBarChart(canvasId, dataArr) {
     ctx.fillText("Dépenses", padding + 115, 20);
 }
 
+function drawHorizontalBarChart(canvasId, dataObj) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    // Sort entries descending by amount
+    const entries = Object.entries(dataObj).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]);
+
+    // Auto-adjust canvas height based on number of entries to ensure bars fit nicely
+    const barHeight = 30;
+    const barSpacing = 20;
+    const topPadding = 20;
+    const bottomPadding = 30;
+    const requiredHeight = topPadding + bottomPadding + (entries.length * (barHeight + barSpacing));
+
+    // Set internal resolution height, but keep CSS max-width/height logic from HTML
+    canvas.height = Math.max(300, requiredHeight);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (entries.length === 0) {
+        ctx.fillStyle = '#999';
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText("Aucune dépense pour cette période", canvas.width/2, canvas.height/2);
+        return;
+    }
+
+    const maxVal = Math.max(...entries.map(e => e[1]));
+
+    // Label padding (left area for text)
+    const labelWidth = 150;
+    const paddingRight = 80; // space for amount text on the right
+    const width = canvas.width - labelWidth - paddingRight;
+
+    const textColor = getComputedStyle(document.body).getPropertyValue('--text-color').trim() || '#333';
+    const barColor = getComputedStyle(document.body).getPropertyValue('--accent-color').trim() || '#4299e1';
+    const borderColor = getComputedStyle(document.body).getPropertyValue('--border-color').trim() || '#e2e8f0';
+
+    // Draw vertical axis line
+    ctx.beginPath();
+    ctx.moveTo(labelWidth, topPadding);
+    ctx.lineTo(labelWidth, canvas.height - bottomPadding);
+    ctx.strokeStyle = borderColor;
+    ctx.stroke();
+
+    entries.forEach((entry, i) => {
+        const [label, val] = entry;
+        const y = topPadding + i * (barHeight + barSpacing);
+
+        // Calculate bar width based on max value
+        const currentBarWidth = (val / maxVal) * width;
+
+        // Draw category label
+        ctx.fillStyle = textColor;
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+
+        // Truncate label if too long
+        let displayLabel = label;
+        if (ctx.measureText(displayLabel).width > labelWidth - 10) {
+            displayLabel = displayLabel.substring(0, 15) + '...';
+        }
+
+        ctx.fillText(displayLabel, labelWidth - 10, y + barHeight / 2);
+
+        // Draw bar
+        ctx.fillStyle = barColor;
+        ctx.beginPath();
+        ctx.roundRect(labelWidth, y, currentBarWidth, barHeight, [0, 4, 4, 0]);
+        ctx.fill();
+
+        // Draw amount value
+        ctx.fillStyle = textColor;
+        ctx.textAlign = 'left';
+        ctx.font = 'bold 13px Arial';
+        ctx.fillText(`${val.toFixed(2)} €`, labelWidth + currentBarWidth + 10, y + barHeight / 2);
+    });
+}
+
 
 function updateDashboard() {
     let currentYear, currentMonth;
@@ -407,6 +507,24 @@ function updateDashboard() {
     }
 
     drawBarChart('barChartEvolution', last6Months);
+
+    updateHorizontalBarChart(currentYear, currentMonth);
+}
+
+function updateHorizontalBarChart(year, month) {
+    const periodSelect = document.getElementById('chart-period-select');
+    if (!periodSelect) return;
+
+    const months = parseInt(periodSelect.value, 10);
+    const multiMonthData = getMultiMonthCategoryData(year, month, months);
+    drawHorizontalBarChart('horizontalBarChartCategory', multiMonthData);
+
+    const title = document.getElementById('horizontalBarChartTitle');
+    if (title) {
+        if (months === 1) title.textContent = "Dépenses par catégorie (Ce mois)";
+        else if (months === 12) title.textContent = "Dépenses par catégorie (Cette année)";
+        else title.textContent = `Dépenses par catégorie (${months} derniers mois)`;
+    }
 }
 
 // --- INITIALIZATION ---
@@ -561,6 +679,22 @@ document.addEventListener('DOMContentLoaded', () => {
     updateDashboard(); // Initial render
 
     document.getElementById('dash-filter-month').addEventListener('change', updateDashboard);
+
+    // Period select listener for horizontal chart
+    document.getElementById('chart-period-select').addEventListener('change', () => {
+        const dashMonthFilter = document.getElementById('dash-filter-month').value;
+        let year, month;
+        if (dashMonthFilter) {
+            const parts = dashMonthFilter.split('-');
+            year = parseInt(parts[0], 10);
+            month = parseInt(parts[1], 10);
+        } else {
+            const now = new Date();
+            year = now.getFullYear();
+            month = now.getMonth() + 1;
+        }
+        updateHorizontalBarChart(year, month);
+    });
 
     // Listen to tab changes to refresh dashboard
     document.addEventListener('viewChanged', (e) => {
