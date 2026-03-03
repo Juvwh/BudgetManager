@@ -15,6 +15,7 @@
         <nav>
             <ul id="nav-menu">
                 <li><a href="#" class="nav-link active" data-target="dashboard">Tableau de bord</a></li>
+                <li><a href="#" class="nav-link" data-target="charts">Graphiques</a></li>
                 <li><a href="#" class="nav-link" data-target="transactions">Transactions</a></li>
                 <li><a href="#" class="nav-link" data-target="subscriptions">Abonnements</a></li>
                 <li><a href="#" class="nav-link" data-target="categories">Catégories</a></li>
@@ -35,34 +36,35 @@
             </div>
 
             <div class="summary-cards">
-                <div class="card bg-green">
+                <div class="card card-elegant card-income">
                     <h3>Revenus (Mois)</h3>
                     <p id="dash-income">0.00 €</p>
                 </div>
-                <div class="card bg-red">
+                <div class="card card-elegant card-expense">
                     <h3>Dépenses (Mois)</h3>
                     <p id="dash-expense">0.00 €</p>
                 </div>
-                <div class="card bg-blue">
-                    <h3>Objectif (Mois)</h3>
-                    <p id="dash-goal">0.00 €</p>
-                </div>
             </div>
 
-            <div class="card" id="goal-progress-card">
+            <div class="card card-elegant" id="goal-progress-card">
                 <h3>Progression de l'objectif de dépense</h3>
-                <div style="background-color: var(--border-color); border-radius: 8px; height: 20px; width: 100%; overflow: hidden; margin-top: 1rem;">
-                    <div id="goal-progress-bar" style="height: 100%; width: 0%; background-color: var(--success-color); transition: width 0.3s ease, background-color 0.3s ease;"></div>
+                <div class="progress-track">
+                    <div id="goal-progress-bar" class="progress-fill"></div>
                 </div>
-                <p id="goal-progress-text" style="text-align: right; margin-top: 0.5rem; font-size: 0.9rem;"></p>
+                <p id="goal-progress-text" class="progress-text"></p>
             </div>
+        </section>
+
+        <!-- SECTION GRAPHIQUES -->
+        <section id="charts" class="view-section hidden">
+            <h2 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">Graphiques</h2>
 
             <div class="charts-container">
-                <div class="chart-box">
+                <div class="chart-box card-elegant">
                     <h3>Dépenses par catégorie (Mois)</h3>
                     <canvas id="pieChartCategory" width="400" height="300"></canvas>
                 </div>
-                <div class="chart-box">
+                <div class="chart-box card-elegant">
                     <h3>Évolution (6 derniers mois)</h3>
                     <canvas id="barChartEvolution" width="400" height="300"></canvas>
                 </div>
