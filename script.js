@@ -226,8 +226,8 @@ function getMonthData(year, month) {
 }
 
 function getMultiMonthCategoryData(startYear, startMonth, numberOfMonths) {
-    let combinedCategoryExpenses = {};
-
+    // Generate valid YYYY-MM prefixes for the requested period
+    const validPrefixes = [];
     for (let i = 0; i < numberOfMonths; i++) {
         let m = startMonth - i;
         let y = startYear;
@@ -235,13 +235,24 @@ function getMultiMonthCategoryData(startYear, startMonth, numberOfMonths) {
             m += 12;
             y -= 1;
         }
-        const data = getMonthData(y, m);
-        for (const [catName, amount] of Object.entries(data.categoryExpenses)) {
-            combinedCategoryExpenses[catName] = (combinedCategoryExpenses[catName] || 0) + amount;
-        }
+        validPrefixes.push(`${y}-${String(m).padStart(2, '0')}`);
     }
 
-    return combinedCategoryExpenses;
+    // Filter transactions by these prefixes
+    const trans = appData.transactions.filter(t =>
+        validPrefixes.some(prefix => t.date.startsWith(prefix))
+    );
+
+    let detailedCategoryExpenses = {};
+
+    trans.forEach(t => {
+        if (t.type === 'expense') {
+            const catPath = getCategoryPath(t.categoryId);
+            detailedCategoryExpenses[catPath] = (detailedCategoryExpenses[catPath] || 0) + t.amount;
+        }
+    });
+
+    return detailedCategoryExpenses;
 }
 
 function drawPieChart(canvasId, dataObj) {
@@ -392,7 +403,7 @@ function drawHorizontalBarChart(canvasId, dataObj) {
     const maxVal = Math.max(...entries.map(e => e[1]));
 
     // Label padding (left area for text)
-    const labelWidth = 150;
+    const labelWidth = 250;
     const paddingRight = 80; // space for amount text on the right
     const width = canvas.width - labelWidth - paddingRight;
 
@@ -423,7 +434,7 @@ function drawHorizontalBarChart(canvasId, dataObj) {
         // Truncate label if too long
         let displayLabel = label;
         if (ctx.measureText(displayLabel).width > labelWidth - 10) {
-            displayLabel = displayLabel.substring(0, 15) + '...';
+            displayLabel = displayLabel.substring(0, 30) + '...';
         }
 
         ctx.fillText(displayLabel, labelWidth - 10, y + barHeight / 2);
