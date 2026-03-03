@@ -8,7 +8,10 @@
 </head>
 <body>
     <header>
-        <h1>Mon Budget</h1>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <h1>Mon Budget</h1>
+            <button id="theme-toggle" class="btn btn-secondary btn-small" style="background: transparent; border: 1px solid white; color: white;">Clair / Sombre</button>
+        </div>
         <nav>
             <ul id="nav-menu">
                 <li><a href="#" class="nav-link active" data-target="dashboard">Tableau de bord</a></li>
@@ -23,7 +26,13 @@
 
         <!-- SECTION TABLEAU DE BORD -->
         <section id="dashboard" class="view-section active">
-            <h2>Tableau de bord</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary-color); margin-bottom: 1rem; padding-bottom: 0.5rem;">
+                <h2 style="border: none; padding: 0; margin: 0;">Tableau de bord</h2>
+                <div class="month-selector">
+                    <label for="dash-filter-month" style="font-weight: bold; margin-right: 0.5rem; color: var(--primary-color);">Période :</label>
+                    <input type="month" id="dash-filter-month" style="padding: 0.4rem; border: 1px solid var(--border-color); border-radius: 4px;">
+                </div>
+            </div>
 
             <div class="summary-cards">
                 <div class="card bg-green">
@@ -35,9 +44,17 @@
                     <p id="dash-expense">0.00 €</p>
                 </div>
                 <div class="card bg-blue">
-                    <h3>Solde (Mois)</h3>
-                    <p id="dash-balance">0.00 €</p>
+                    <h3>Objectif (Mois)</h3>
+                    <p id="dash-goal">0.00 €</p>
                 </div>
+            </div>
+
+            <div class="card" id="goal-progress-card">
+                <h3>Progression de l'objectif de dépense</h3>
+                <div style="background-color: var(--border-color); border-radius: 8px; height: 20px; width: 100%; overflow: hidden; margin-top: 1rem;">
+                    <div id="goal-progress-bar" style="height: 100%; width: 0%; background-color: var(--success-color); transition: width 0.3s ease, background-color 0.3s ease;"></div>
+                </div>
+                <p id="goal-progress-text" style="text-align: right; margin-top: 0.5rem; font-size: 0.9rem;"></p>
             </div>
 
             <div class="charts-container">
@@ -85,7 +102,9 @@
                             <label>Note (Optionnelle)</label>
                             <input type="text" id="trans-note" placeholder="Ex: Plein d'essence">
                         </div>
-                        <button type="submit" class="btn btn-primary">Ajouter</button>
+                        <input type="hidden" id="trans-id">
+                        <button type="submit" id="btn-submit-trans" class="btn btn-primary">Ajouter</button>
+                        <button type="button" id="btn-cancel-edit-trans" class="btn btn-secondary" style="display:none;">Annuler</button>
                     </form>
                 </div>
 
@@ -227,6 +246,17 @@
         <!-- SECTION PARAMETRES -->
         <section id="settings" class="view-section hidden">
             <h2>Paramètres & Sauvegardes</h2>
+
+            <div class="card">
+                <h3>Objectif de dépense mensuel</h3>
+                <form id="form-settings-goal">
+                    <div class="form-group">
+                        <label>Objectif (€)</label>
+                        <input type="number" id="setting-spending-goal" step="1" min="0" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Enregistrer l'objectif</button>
+                </form>
+            </div>
 
             <div class="card">
                 <h3>Sauvegarde (JSON)</h3>

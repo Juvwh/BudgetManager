@@ -1,6 +1,7 @@
 // script.js
 // --- STATE MANAGEMENT ---
 let appData = {
+    spendingGoal: 600,
     transactions: [],
     subscriptions: [],
     categories: [
@@ -42,6 +43,7 @@ function loadData() {
     if (data) {
         try {
             const parsed = JSON.parse(data);
+            if(parsed.spendingGoal) appData.spendingGoal = parsed.spendingGoal;
             if(parsed.transactions) appData.transactions = parsed.transactions;
             if(parsed.subscriptions) appData.subscriptions = parsed.subscriptions;
             if(parsed.categories) appData.categories = parsed.categories;
@@ -80,7 +82,10 @@ function renderTransactions() {
             <td>${catName}</td>
             <td>${t.note || ''}</td>
             <td class="${t.type === 'income' ? 'text-green' : 'text-red'}">${t.type === 'income' ? '+' : '-'}${t.amount.toFixed(2)} €</td>
-            <td><button class="btn btn-danger btn-small" onclick="deleteTransaction('${t.id}')">Supprimer</button></td>
+            <td>
+                <button class="btn btn-secondary btn-small" onclick="editTransaction('${t.id}')">Modifier</button>
+                <button class="btn btn-danger btn-small" onclick="deleteTransaction('${t.id}')">Supprimer</button>
+            </td>
         `;
         tbody.appendChild(tr);
     });
@@ -93,6 +98,35 @@ function deleteTransaction(id) {
         renderTransactions();
         updateDashboard();
     }
+}
+
+function editTransaction(id) {
+    const trans = appData.transactions.find(t => t.id === id);
+    if (!trans) return;
+
+    // Remplir le formulaire
+    document.getElementById('trans-id').value = trans.id;
+    document.getElementById('trans-type').value = trans.type;
+    document.getElementById('trans-type').dispatchEvent(new Event('change')); // Mettre à jour les catégories
+    document.getElementById('trans-amount').value = trans.amount;
+    document.getElementById('trans-date').value = trans.date;
+    document.getElementById('trans-category').value = trans.categoryId;
+    document.getElementById('trans-note').value = trans.note || '';
+
+    // Changer l'état des boutons
+    document.getElementById('btn-submit-trans').textContent = "Mettre à jour";
+    document.getElementById('btn-cancel-edit-trans').style.display = 'inline-block';
+}
+
+function resetTransactionForm() {
+    document.getElementById('form-transaction').reset();
+    document.getElementById('trans-id').value = '';
+    document.getElementById('trans-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('trans-type').value = 'expense';
+    document.getElementById('trans-type').dispatchEvent(new Event('change'));
+
+    document.getElementById('btn-submit-trans').textContent = "Ajouter";
+    document.getElementById('btn-cancel-edit-trans').style.display = 'none';
 }
 
 // --- SUBSCRIPTIONS MANAGEMENT ---
@@ -231,7 +265,11 @@ function drawPieChart(canvasId, dataObj) {
         const textX = cx + Math.cos(middleAngle) * (radius + 15);
         const textY = cy + Math.sin(middleAngle) * (radius + 15);
 
-        ctx.fillStyle = '#333';
+        // Get text color from CSS variable for dark mode support
+        const computedStyle = getComputedStyle(document.body);
+        const textColor = computedStyle.getPropertyValue('--text-color').trim() || '#333';
+
+        ctx.fillStyle = textColor;
         ctx.font = '12px Arial';
         ctx.textAlign = Math.cos(middleAngle) > 0 ? 'left' : 'right';
         ctx.textBaseline = 'middle';
@@ -264,56 +302,92 @@ function drawBarChart(canvasId, dataArr) {
     ctx.moveTo(padding, padding);
     ctx.lineTo(padding, canvas.height - padding);
     ctx.lineTo(canvas.width - padding, canvas.height - padding);
-    ctx.strokeStyle = '#ccc';
+    ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--border-color').trim() || '#ccc';
     ctx.stroke();
 
     const barGroupWidth = width / dataArr.length;
     const barWidth = barGroupWidth * 0.35;
+    const textColor = getComputedStyle(document.body).getPropertyValue('--text-color').trim() || '#333';
 
     dataArr.forEach((d, i) => {
         const x = padding + i * barGroupWidth + barGroupWidth * 0.15;
 
         // Income Bar (Green)
         const incomeH = (d.income / maxVal) * height;
-        ctx.fillStyle = '#2ecc71';
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--success-color').trim() || '#2ecc71';
         ctx.fillRect(x, canvas.height - padding - incomeH, barWidth, incomeH);
 
         // Expense Bar (Red)
         const expenseH = (d.expense / maxVal) * height;
-        ctx.fillStyle = '#e74c3c';
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--danger-color').trim() || '#e74c3c';
         ctx.fillRect(x + barWidth, canvas.height - padding - expenseH, barWidth, expenseH);
 
         // Month label
-        ctx.fillStyle = '#333';
+        ctx.fillStyle = textColor;
         ctx.font = '12px Arial';
         ctx.textAlign = 'center';
         ctx.fillText(d.label, x + barWidth, canvas.height - padding + 15);
     });
 
     // Legend
-    ctx.fillStyle = '#2ecc71';
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--success-color').trim() || '#2ecc71';
     ctx.fillRect(padding + 10, 10, 10, 10);
-    ctx.fillStyle = '#333';
+    ctx.fillStyle = textColor;
     ctx.textAlign = 'left';
     ctx.fillText("Revenus", padding + 25, 20);
 
-    ctx.fillStyle = '#e74c3c';
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--danger-color').trim() || '#e74c3c';
     ctx.fillRect(padding + 100, 10, 10, 10);
-    ctx.fillStyle = '#333';
+    ctx.fillStyle = textColor;
     ctx.fillText("Dépenses", padding + 115, 20);
 }
 
 
 function updateDashboard() {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
+    let currentYear, currentMonth;
+
+    const dashMonthFilter = document.getElementById('dash-filter-month').value;
+    if (dashMonthFilter) {
+        const parts = dashMonthFilter.split('-');
+        currentYear = parseInt(parts[0], 10);
+        currentMonth = parseInt(parts[1], 10);
+    } else {
+        const now = new Date();
+        currentYear = now.getFullYear();
+        currentMonth = now.getMonth() + 1;
+        document.getElementById('dash-filter-month').value = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+    }
 
     // Update current month summary cards
     const currentData = getMonthData(currentYear, currentMonth);
     document.getElementById('dash-income').textContent = currentData.income.toFixed(2) + ' €';
     document.getElementById('dash-expense').textContent = currentData.expense.toFixed(2) + ' €';
-    document.getElementById('dash-balance').textContent = currentData.balance.toFixed(2) + ' €';
+    document.getElementById('dash-goal').textContent = appData.spendingGoal.toFixed(2) + ' €';
+
+    // Update Goal Progress Bar
+    const progressBar = document.getElementById('goal-progress-bar');
+    const progressText = document.getElementById('goal-progress-text');
+    const goal = appData.spendingGoal;
+    const spent = currentData.expense;
+
+    let percentage = 0;
+    if (goal > 0) {
+        percentage = (spent / goal) * 100;
+    }
+
+    // Cap at 100% for display purposes if wanted, but going over 100% is fine, just cap width at 100%
+    progressBar.style.width = Math.min(percentage, 100) + '%';
+
+    // Change color based on percentage
+    if (percentage < 75) {
+        progressBar.style.backgroundColor = 'var(--success-color)';
+    } else if (percentage < 100) {
+        progressBar.style.backgroundColor = 'var(--warning-color)'; // Needs definition in CSS
+    } else {
+        progressBar.style.backgroundColor = 'var(--danger-color)';
+    }
+
+    progressText.textContent = `${spent.toFixed(2)} € dépénsés sur ${goal.toFixed(2)} € (${percentage.toFixed(1)}%)`;
 
     // Draw Pie Chart for Categories
     drawPieChart('pieChartCategory', currentData.categoryExpenses);
@@ -338,11 +412,18 @@ function updateDashboard() {
 
 // --- INITIALIZATION ---
 // --- CATEGORIES MANAGEMENT ---
-function getCategoryPath(catId) {
+function getCategoryPath(catId, visited = new Set()) {
     const cat = appData.categories.find(c => c.id === catId);
     if (!cat) return 'Inconnu';
+
+    // Check for circular dependency
+    if (visited.has(catId)) {
+        return cat.name + " (Erreur: Boucle détectée)";
+    }
+    visited.add(catId);
+
     if (cat.parentId) {
-        return getCategoryPath(cat.parentId) + ' > ' + cat.name;
+        return getCategoryPath(cat.parentId, visited) + ' > ' + cat.name;
     }
     return cat.name;
 }
@@ -380,11 +461,11 @@ function updateCategorySelects() {
         });
     };
 
-    // Populate Parent Category Select (only main categories)
-    appData.categories.filter(c => !c.parentId).forEach(c => {
+    // Populate Parent Category Select (all categories allowed)
+    appData.categories.forEach(c => {
         const opt = document.createElement('option');
         opt.value = c.id;
-        opt.textContent = c.name + (c.type === 'income' ? ' (Revenu)' : ' (Dépense)');
+        opt.textContent = getCategoryPath(c.id) + (c.type === 'income' ? ' (Revenu)' : ' (Dépense)');
         parentSelect.appendChild(opt);
     });
 
@@ -449,9 +530,38 @@ function deleteCategory(id) {
 
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Theme switching logic
+    const themeToggleBtn = document.getElementById('theme-toggle');
+
+    // Load saved theme or check OS preference
+    const savedTheme = localStorage.getItem('budget_app_theme');
+    if (savedTheme) {
+        document.body.setAttribute('data-theme', savedTheme);
+    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.setAttribute('data-theme', 'dark');
+    }
+
+    themeToggleBtn.addEventListener('click', () => {
+        if (document.body.getAttribute('data-theme') === 'dark') {
+            document.body.removeAttribute('data-theme');
+            localStorage.setItem('budget_app_theme', 'light');
+        } else {
+            document.body.setAttribute('data-theme', 'dark');
+            localStorage.setItem('budget_app_theme', 'dark');
+        }
+        updateDashboard(); // Redraw charts with new colors
+    });
+
     // 1. Load data
     loadData();
+
+    // Set default dashboard month to current
+    const now = new Date();
+    document.getElementById('dash-filter-month').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
     updateDashboard(); // Initial render
+
+    document.getElementById('dash-filter-month').addEventListener('change', updateDashboard);
 
     // Listen to tab changes to refresh dashboard
     document.addEventListener('viewChanged', (e) => {
@@ -534,30 +644,41 @@ document.addEventListener('DOMContentLoaded', () => {
         const date = document.getElementById('trans-date').value;
         const categoryId = document.getElementById('trans-category').value;
         const note = document.getElementById('trans-note').value;
+        const transId = document.getElementById('trans-id').value;
 
-        const newTrans = {
-            id: 'trans-' + generateId(),
-            type,
-            amount,
-            date,
-            categoryId,
-            note
-        };
+        if (transId) {
+            // Update
+            const transIndex = appData.transactions.findIndex(t => t.id === transId);
+            if (transIndex !== -1) {
+                appData.transactions[transIndex] = {
+                    id: transId,
+                    type,
+                    amount,
+                    date,
+                    categoryId,
+                    note
+                };
+            }
+        } else {
+            // Add new
+            const newTrans = {
+                id: 'trans-' + generateId(),
+                type,
+                amount,
+                date,
+                categoryId,
+                note
+            };
+            appData.transactions.push(newTrans);
+        }
 
-        appData.transactions.push(newTrans);
         saveData();
-
-        document.getElementById('form-transaction').reset();
-        document.getElementById('trans-date').value = new Date().toISOString().split('T')[0]; // Reset date to today
-
-        // Re-populate categories correctly after reset
-        document.getElementById('trans-type').value = 'expense';
-        document.getElementById('trans-type').dispatchEvent(new Event('change'));
-
+        resetTransactionForm();
         renderTransactions();
         updateDashboard();
     });
 
+    document.getElementById('btn-cancel-edit-trans').addEventListener('click', resetTransactionForm);
     document.getElementById('filter-month').addEventListener('change', renderTransactions);
     // Set default date to today
     document.getElementById('trans-date').value = new Date().toISOString().split('T')[0];
@@ -605,7 +726,19 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('sub-start-date').value = new Date().toISOString().split('T')[0];
 
 
-    // 7. Settings - Export / Import / Reset
+    // 7. Settings - Spending Goal
+    const goalInput = document.getElementById('setting-spending-goal');
+    goalInput.value = appData.spendingGoal;
+
+    document.getElementById('form-settings-goal').addEventListener('submit', (e) => {
+        e.preventDefault();
+        appData.spendingGoal = parseFloat(goalInput.value);
+        saveData();
+        updateDashboard();
+        alert("Objectif de dépense mis à jour !");
+    });
+
+    // 8. Settings - Export / Import / Reset
     document.getElementById('btn-export').addEventListener('click', () => {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData, null, 2));
         const downloadAnchorNode = document.createElement('a');
