@@ -362,7 +362,6 @@ function updateDashboard() {
     const currentData = getMonthData(currentYear, currentMonth);
     document.getElementById('dash-income').textContent = currentData.income.toFixed(2) + ' €';
     document.getElementById('dash-expense').textContent = currentData.expense.toFixed(2) + ' €';
-    document.getElementById('dash-goal').textContent = appData.spendingGoal.toFixed(2) + ' €';
 
     // Update Goal Progress Bar
     const progressBar = document.getElementById('goal-progress-bar');
@@ -565,7 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Listen to tab changes to refresh dashboard
     document.addEventListener('viewChanged', (e) => {
-        if(e.detail === 'dashboard') {
+        if(e.detail === 'dashboard' || e.detail === 'charts') {
             updateDashboard();
         } else if(e.detail === 'transactions') {
             renderTransactions();

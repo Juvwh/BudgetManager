@@ -3,9 +3,9 @@
     --primary-color: #1a365d;
     --secondary-color: #2b6cb0;
     --accent-color: #4299e1;
-    --success-color: #48bb78;
-    --warning-color: #ed8936;
-    --danger-color: #f56565;
+    --success-color: #2e8b57; /* Softer emerald green */
+    --warning-color: #d97706;
+    --danger-color: #cd5c5c; /* Softer coral/indian red */
     --bg-color: #f7fafc;
     --card-bg: #ffffff;
     --text-color: #2d3748;
@@ -18,9 +18,9 @@
     --primary-color: #2d3748;
     --secondary-color: #4a5568;
     --accent-color: #63b3ed;
-    --success-color: #68d391;
-    --warning-color: #f6ad55;
-    --danger-color: #fc8181;
+    --success-color: #3cb371; /* Medium sea green */
+    --warning-color: #f59e0b;
+    --danger-color: #e06666; /* Softer, muted red */
     --bg-color: #1a202c;
     --card-bg: #2d3748;
     --text-color: #e2e8f0;
@@ -123,14 +123,14 @@ h2 {
 }
 
 .summary-cards .card {
-    color: white;
     text-align: center;
 }
 
 .summary-cards h3 {
     margin: 0 0 0.5rem 0;
     font-size: 1.1rem;
-    opacity: 0.9;
+    color: var(--text-color);
+    opacity: 0.8;
 }
 
 .summary-cards p {
@@ -139,9 +139,62 @@ h2 {
     font-weight: bold;
 }
 
-.bg-green { background-color: var(--success-color); }
-.bg-red { background-color: var(--danger-color); }
-.bg-blue { background-color: var(--accent-color); }
+/* Elegant Cards */
+.card-elegant {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-elegant:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+.card-income {
+    border-top: 4px solid var(--success-color);
+}
+
+.card-income p {
+    color: var(--success-color);
+}
+
+.card-expense {
+    border-top: 4px solid var(--danger-color);
+}
+
+.card-expense p {
+    color: var(--danger-color);
+}
+
+/* Progress Bar Elegant Styles */
+.progress-track {
+    background-color: var(--border-color);
+    border-radius: 10px;
+    height: 16px;
+    width: 100%;
+    overflow: hidden;
+    margin-top: 1rem;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.progress-fill {
+    height: 100%;
+    width: 0%;
+    background-color: var(--success-color);
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.4s ease;
+    border-radius: 10px;
+}
+
+.progress-text {
+    text-align: right;
+    margin-top: 0.6rem;
+    font-size: 0.9rem;
+    color: var(--text-color);
+    opacity: 0.8;
+}
 
 /* Charts */
 .charts-container {
