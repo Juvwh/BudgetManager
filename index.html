@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion de Budget</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Mon Budget</h1>
+        <nav>
+            <ul id="nav-menu">
+                <li><a href="#" class="nav-link active" data-target="dashboard">Tableau de bord</a></li>
+                <li><a href="#" class="nav-link" data-target="transactions">Transactions</a></li>
+                <li><a href="#" class="nav-link" data-target="subscriptions">Abonnements</a></li>
+                <li><a href="#" class="nav-link" data-target="categories">Catégories</a></li>
+                <li><a href="#" class="nav-link" data-target="settings">Paramètres</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main id="app-content">
+
+        <!-- SECTION TABLEAU DE BORD -->
+        <section id="dashboard" class="view-section active">
+            <h2>Tableau de bord</h2>
+
+            <div class="summary-cards">
+                <div class="card bg-green">
+                    <h3>Revenus (Mois)</h3>
+                    <p id="dash-income">0.00 €</p>
+                </div>
+                <div class="card bg-red">
+                    <h3>Dépenses (Mois)</h3>
+                    <p id="dash-expense">0.00 €</p>
+                </div>
+                <div class="card bg-blue">
+                    <h3>Solde (Mois)</h3>
+                    <p id="dash-balance">0.00 €</p>
+                </div>
+            </div>
+
+            <div class="charts-container">
+                <div class="chart-box">
+                    <h3>Dépenses par catégorie (Mois)</h3>
+                    <canvas id="pieChartCategory" width="400" height="300"></canvas>
+                </div>
+                <div class="chart-box">
+                    <h3>Évolution (6 derniers mois)</h3>
+                    <canvas id="barChartEvolution" width="400" height="300"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION TRANSACTIONS -->
+        <section id="transactions" class="view-section hidden">
+            <h2>Transactions</h2>
+
+            <div class="split-layout">
+                <div class="form-panel card">
+                    <h3>Ajouter une transaction</h3>
+                    <form id="form-transaction">
+                        <div class="form-group">
+                            <label>Type</label>
+                            <select id="trans-type" required>
+                                <option value="expense">Dépense</option>
+                                <option value="income">Revenu</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Montant (€)</label>
+                            <input type="number" id="trans-amount" step="0.01" min="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Date</label>
+                            <input type="date" id="trans-date" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Catégorie</label>
+                            <select id="trans-category" required>
+                                <!-- Injected by JS -->
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Note (Optionnelle)</label>
+                            <input type="text" id="trans-note" placeholder="Ex: Plein d'essence">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Ajouter</button>
+                    </form>
+                </div>
+
+                <div class="list-panel card">
+                    <h3>Historique des transactions</h3>
+                    <div class="filters">
+                        <input type="month" id="filter-month">
+                    </div>
+                    <div class="table-container">
+                        <table id="table-transactions">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Catégorie</th>
+                                    <th>Note</th>
+                                    <th>Montant</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Injected by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION ABONNEMENTS -->
+        <section id="subscriptions" class="view-section hidden">
+            <h2>Abonnements et Récurrences</h2>
+            <p>Ces abonnements génèrent automatiquement des transactions à chaque échéance.</p>
+
+            <div class="split-layout">
+                <div class="form-panel card">
+                    <h3>Ajouter un abonnement</h3>
+                    <form id="form-subscription">
+                        <div class="form-group">
+                            <label>Type</label>
+                            <select id="sub-type" required>
+                                <option value="expense">Dépense</option>
+                                <option value="income">Revenu</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Nom</label>
+                            <input type="text" id="sub-name" placeholder="Ex: Assurance Auto" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Montant (€)</label>
+                            <input type="number" id="sub-amount" step="0.01" min="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Catégorie</label>
+                            <select id="sub-category" required>
+                                <!-- Injected by JS -->
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Fréquence</label>
+                            <select id="sub-frequency" required>
+                                <option value="weekly">Hebdomadaire</option>
+                                <option value="monthly">Mensuelle</option>
+                                <option value="yearly">Annuelle</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Date de début</label>
+                            <input type="date" id="sub-start-date" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Ajouter</button>
+                    </form>
+                </div>
+
+                <div class="list-panel card">
+                    <h3>Liste des abonnements</h3>
+                    <div class="table-container">
+                        <table id="table-subscriptions">
+                            <thead>
+                                <tr>
+                                    <th>Nom</th>
+                                    <th>Type</th>
+                                    <th>Fréquence</th>
+                                    <th>Montant</th>
+                                    <th>Prochaine date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Injected by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION CATEGORIES -->
+        <section id="categories" class="view-section hidden">
+            <h2>Gestion des Catégories</h2>
+
+            <div class="split-layout">
+                <div class="form-panel card">
+                    <h3>Ajouter une catégorie</h3>
+                    <form id="form-category">
+                        <div class="form-group">
+                            <label>Nom de la catégorie</label>
+                            <input type="text" id="cat-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Type</label>
+                            <select id="cat-type" required>
+                                <option value="expense">Dépense</option>
+                                <option value="income">Revenu</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Catégorie Parente (Optionnelle)</label>
+                            <select id="cat-parent">
+                                <option value="">-- Aucune (Catégorie principale) --</option>
+                                <!-- Injected by JS -->
+                            </select>
+                            <small>S'il y a un parent, c'est une sous-catégorie.</small>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Ajouter</button>
+                    </form>
+                </div>
+
+                <div class="list-panel card">
+                    <h3>Arborescence des catégories</h3>
+                    <div id="category-tree">
+                        <!-- Injected by JS -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION PARAMETRES -->
+        <section id="settings" class="view-section hidden">
+            <h2>Paramètres & Sauvegardes</h2>
+
+            <div class="card">
+                <h3>Sauvegarde (JSON)</h3>
+                <p>Vos données sont sauvegardées automatiquement sur votre navigateur. Vous pouvez également les exporter vers un fichier JSON pour les sécuriser, ou les importer depuis un autre appareil.</p>
+
+                <div class="settings-actions">
+                    <button id="btn-export" class="btn btn-primary">Exporter en JSON</button>
+
+                    <div class="import-group">
+                        <input type="file" id="file-import" accept=".json">
+                        <button id="btn-import" class="btn btn-secondary">Importer</button>
+                    </div>
+                </div>
+
+                <div class="danger-zone">
+                    <h3>Zone dangereuse</h3>
+                    <button id="btn-reset" class="btn btn-danger">Effacer toutes les données</button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+    <script src="script.js"></script>
+</body>
+</html>
