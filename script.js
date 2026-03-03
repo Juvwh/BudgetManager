@@ -502,6 +502,10 @@ function updateDashboard() {
     // Draw Pie Chart for Categories
     drawPieChart('pieChartCategory', currentData.categoryExpenses);
 
+    // Draw Detailed Category Bar Chart for Dashboard (Current month)
+    const dashboardDetailedData = getMultiMonthCategoryData(currentYear, currentMonth, 1);
+    drawHorizontalBarChart('dashboardBarChartCategory', dashboardDetailedData);
+
     // Prepare data for 6-months bar chart
     const last6Months = [];
     for (let i = 5; i >= 0; i--) {
