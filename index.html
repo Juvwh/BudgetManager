@@ -23,7 +23,37 @@
             </ul>
         </nav>
     </header>
-    <main id="app-content">
+    <!-- ECRAN DE CONNEXION -->
+    <div id="login-overlay" class="login-overlay active">
+        <div class="login-card card card-elegant">
+            <h2>Connexion</h2>
+            <p>Veuillez entrer votre mot de passe pour accéder à vos données.</p>
+            <form id="form-login">
+                <div class="form-group">
+                    <label for="login-password">Mot de passe</label>
+                    <input type="password" id="login-password" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Se connecter</button>
+            </form>
+            <p id="login-error" class="text-red" style="display: none; margin-top: 1rem;"></p>
+        </div>
+    </div>
+
+    <!-- ECRAN DE MIGRATION -->
+    <div id="migration-overlay" class="login-overlay">
+        <div class="login-card card card-elegant">
+            <h2>Nouvelle sauvegarde en ligne</h2>
+            <p>Des données locales (non sauvegardées en ligne) ont été détectées sur cet appareil.</p>
+            <p>Voulez-vous les transférer vers la nouvelle base de données en ligne ?</p>
+            <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                <button id="btn-migrate-yes" class="btn btn-primary" style="flex: 1;">Oui, transférer</button>
+                <button id="btn-migrate-no" class="btn btn-secondary" style="flex: 1;">Non, effacer</button>
+            </div>
+            <p id="migration-status" style="display: none; margin-top: 1rem; font-weight: bold;"></p>
+        </div>
+    </div>
+
+    <main id="app-content" style="display: none;">
 
         <!-- SECTION TABLEAU DE BORD -->
         <section id="dashboard" class="view-section active">
@@ -301,6 +331,6 @@
         </section>
 
     </main>
-    <script src="script.js"></script>
+    <script type="module" src="script.js"></script>
 </body>
 </html>

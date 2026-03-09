@@ -82,6 +82,33 @@ main {
     margin: 0 auto;
 }
 
+/* Overylays / Login */
+.login-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: var(--bg-color);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.login-overlay.active {
+    display: flex;
+}
+
+.login-card {
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+    padding: 2rem;
+}
+
+.login-card h2 {
+    border-bottom: none;
+    margin-top: 0;
+}
+
 /* Sections */
 .view-section {
     display: none;

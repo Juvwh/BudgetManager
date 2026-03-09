@@ -1,4 +1,26 @@
 // script.js
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyAequVMpWw5LnZ6fpq3_17o4ojBsfwbGUA",
+  authDomain: "monbudget-51ab6.firebaseapp.com",
+  projectId: "monbudget-51ab6",
+  storageBucket: "monbudget-51ab6.firebasestorage.app",
+  messagingSenderId: "37724778417",
+  appId: "1:37724778417:web:289aa4478da7c67b0d9790"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// L'email caché utilisé pour s'authentifier
+const ADMIN_EMAIL = "admin@monbudget.app";
+
 // --- STATE MANAGEMENT ---
 let appData = {
     spendingGoal: 600,
@@ -34,24 +56,48 @@ let appData = {
 
 const STORAGE_KEY = 'budget_app_data';
 
-function saveData() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+// Variable pour savoir si on est connecté ou non
+let isAuthenticated = false;
+
+async function saveData() {
+    if (!isAuthenticated) return; // Ne pas sauvegarder si pas connecté
+
+    try {
+        const userDocRef = doc(db, "users", "admin");
+        await setDoc(userDocRef, {
+            spendingGoal: appData.spendingGoal,
+            transactions: appData.transactions,
+            subscriptions: appData.subscriptions,
+            categories: appData.categories,
+            updatedAt: new Date().toISOString()
+        });
+        console.log("Données sauvegardées sur Firestore avec succès.");
+    } catch (error) {
+        console.error("Erreur lors de la sauvegarde sur Firestore :", error);
+        alert("Erreur lors de la sauvegarde de vos données. Vérifiez votre connexion internet.");
+    }
 }
 
-function loadData() {
-    const data = localStorage.getItem(STORAGE_KEY);
-    if (data) {
-        try {
-            const parsed = JSON.parse(data);
+async function loadData() {
+    if (!isAuthenticated) return;
+
+    try {
+        const userDocRef = doc(db, "users", "admin");
+        const docSnap = await getDoc(userDocRef);
+
+        if (docSnap.exists()) {
+            const parsed = docSnap.data();
             if(parsed.spendingGoal) appData.spendingGoal = parsed.spendingGoal;
             if(parsed.transactions) appData.transactions = parsed.transactions;
             if(parsed.subscriptions) appData.subscriptions = parsed.subscriptions;
             if(parsed.categories) appData.categories = parsed.categories;
-        } catch(e) {
-            console.error("Erreur de chargement des données", e);
+        } else {
+            console.log("Aucune donnée Firestore trouvée. Initialisation avec les valeurs par défaut.");
+            await saveData(); // Sauvegarde les valeurs par défaut
         }
-    } else {
-        saveData(); // Save defaults
+    } catch (error) {
+        console.error("Erreur lors du chargement depuis Firestore :", error);
+        alert("Impossible de charger vos données. Veuillez réessayer plus tard.");
     }
 }
 
@@ -91,10 +137,10 @@ function renderTransactions() {
     });
 }
 
-function deleteTransaction(id) {
+async function deleteTransaction(id) {
     if (confirm("Supprimer cette transaction ?")) {
         appData.transactions = appData.transactions.filter(t => t.id !== id);
-        saveData();
+        await saveData();
         renderTransactions();
         updateDashboard();
     }
@@ -138,7 +184,7 @@ function getNextDate(dateStr, frequency) {
     return d.toISOString().split('T')[0];
 }
 
-function processSubscriptions() {
+async function processSubscriptions() {
     let hasNewTransactions = false;
     const today = new Date().toISOString().split('T')[0];
 
@@ -164,7 +210,7 @@ function processSubscriptions() {
     });
 
     if (hasNewTransactions) {
-        saveData();
+        await saveData();
         renderTransactions();
         updateDashboard();
     }
@@ -190,10 +236,10 @@ function renderSubscriptions() {
     });
 }
 
-function deleteSubscription(id) {
+async function deleteSubscription(id) {
     if (confirm("Supprimer cet abonnement ? Les transactions déjà générées ne seront pas supprimées.")) {
         appData.subscriptions = appData.subscriptions.filter(s => s.id !== id);
-        saveData();
+        await saveData();
         renderSubscriptions();
     }
 }
@@ -637,7 +683,7 @@ function renderCategoryTree() {
     buildTree(null, 0);
 }
 
-function deleteCategory(id) {
+async function deleteCategory(id) {
     // Check if used
     const inTrans = appData.transactions.some(t => t.categoryId === id);
     const inSub = appData.subscriptions.some(s => s.categoryId === id);
@@ -654,14 +700,148 @@ function deleteCategory(id) {
 
     if (confirm("Supprimer cette catégorie ?")) {
         appData.categories = appData.categories.filter(c => c.id !== id);
-        saveData();
+        await saveData();
         updateCategorySelects();
         renderCategoryTree();
     }
 }
 
 
+// --- AUTHENTICATION & INITIALIZATION ---
+
+function showLoginScreen() {
+    document.getElementById('login-overlay').classList.add('active');
+    document.getElementById('app-content').style.display = 'none';
+}
+
+function hideLoginScreen() {
+    document.getElementById('login-overlay').classList.remove('active');
+    document.getElementById('app-content').style.display = 'block';
+}
+
+async function checkLocalDataForMigration() {
+    const localDataStr = localStorage.getItem(STORAGE_KEY);
+    const hasLocalData = localDataStr !== null;
+    const hasBeenMigrated = localStorage.getItem('budget_app_migrated') === 'true';
+
+    if (hasLocalData && !hasBeenMigrated) {
+        // Demander si on veut migrer
+        document.getElementById('migration-overlay').classList.add('active');
+
+        return new Promise((resolve) => {
+            document.getElementById('btn-migrate-yes').onclick = async () => {
+                document.getElementById('migration-status').style.display = 'block';
+                document.getElementById('migration-status').textContent = 'Migration en cours...';
+                document.getElementById('migration-status').className = 'text-green';
+
+                try {
+                    const parsedLocal = JSON.parse(localDataStr);
+                    // Remplacer appData courant (celui de firestore s'il y en avait, mais logiquement on migre vers un compte vide)
+                    if(parsedLocal.spendingGoal) appData.spendingGoal = parsedLocal.spendingGoal;
+                    if(parsedLocal.transactions) appData.transactions = parsedLocal.transactions;
+                    if(parsedLocal.subscriptions) appData.subscriptions = parsedLocal.subscriptions;
+                    if(parsedLocal.categories) appData.categories = parsedLocal.categories;
+
+                    await saveData(); // Sauvegarder sur Firebase
+
+                    localStorage.setItem('budget_app_migrated', 'true');
+                    document.getElementById('migration-overlay').classList.remove('active');
+                    alert("Migration terminée avec succès !");
+                    resolve();
+                } catch(e) {
+                    console.error("Erreur de migration", e);
+                    document.getElementById('migration-status').textContent = "Erreur pendant la migration.";
+                    document.getElementById('migration-status').className = 'text-red';
+                }
+            };
+
+            document.getElementById('btn-migrate-no').onclick = () => {
+                if(confirm("Toutes les données locales seront ignorées et effacées. Êtes-vous sûr ?")) {
+                    localStorage.removeItem(STORAGE_KEY);
+                    localStorage.setItem('budget_app_migrated', 'true'); // On le marque migré pour ne plus demander
+                    document.getElementById('migration-overlay').classList.remove('active');
+                    resolve();
+                }
+            };
+        });
+    }
+}
+
+async function initializeAppAfterAuth() {
+    await loadData(); // Load from Firestore
+    await checkLocalDataForMigration();
+
+    // Set default dashboard month to current
+    const now = new Date();
+    document.getElementById('dash-filter-month').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    updateDashboard(); // Initial render
+
+    // Refresh all views based on new data
+    renderTransactions();
+    renderSubscriptions();
+    processSubscriptions();
+    updateCategorySelects();
+    renderCategoryTree();
+
+    const goalInput = document.getElementById('setting-spending-goal');
+    goalInput.value = appData.spendingGoal;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    // Auth Listener
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            // User is signed in
+            isAuthenticated = true;
+            hideLoginScreen();
+            await initializeAppAfterAuth();
+        } else {
+            // User is signed out
+            isAuthenticated = false;
+            showLoginScreen();
+        }
+    });
+
+    // Login Form Submit
+    const loginForm = document.getElementById('form-login');
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const pwd = document.getElementById('login-password').value;
+        const errP = document.getElementById('login-error');
+        errP.style.display = 'none';
+
+        try {
+            // Tentative de connexion avec l'email administrateur caché
+            await signInWithEmailAndPassword(auth, ADMIN_EMAIL, pwd);
+        } catch (error) {
+            // Si l'utilisateur n'existe pas, on le crée (c'est la première connexion)
+            if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+                 try {
+                     await createUserWithEmailAndPassword(auth, ADMIN_EMAIL, pwd);
+                 } catch (createError) {
+                     console.error("Erreur de création de compte", createError);
+                     errP.style.display = 'block';
+                     if (createError.code === 'auth/weak-password') {
+                         errP.textContent = "Le mot de passe doit faire au moins 6 caractères.";
+                     } else if(createError.code === 'auth/operation-not-allowed') {
+                         errP.textContent = "L'authentification Email/Mot de passe n'est pas activée sur Firebase.";
+                     } else {
+                        errP.textContent = "Erreur lors de la création. " + createError.message;
+                     }
+                 }
+            } else {
+                console.error("Erreur de connexion", error);
+                errP.style.display = 'block';
+                if (error.code === 'auth/wrong-password') {
+                    errP.textContent = "Mot de passe incorrect.";
+                } else {
+                    errP.textContent = "Erreur de connexion. " + error.message;
+                }
+            }
+        }
+    });
+
     // Theme switching logic
     const themeToggleBtn = document.getElementById('theme-toggle');
 
@@ -683,15 +863,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         updateDashboard(); // Redraw charts with new colors
     });
-
-    // 1. Load data
-    loadData();
-
-    // Set default dashboard month to current
-    const now = new Date();
-    document.getElementById('dash-filter-month').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-    updateDashboard(); // Initial render
 
     document.getElementById('dash-filter-month').addEventListener('change', updateDashboard);
 
@@ -747,12 +918,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // 3. Init Categories View
-    updateCategorySelects();
-    renderCategoryTree();
-
     // 4. Handle Category Form
-    document.getElementById('form-category').addEventListener('submit', (e) => {
+    document.getElementById('form-category').addEventListener('submit', async (e) => {
         e.preventDefault();
 
         const name = document.getElementById('cat-name').value;
@@ -773,7 +940,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         appData.categories.push(newCat);
-        saveData();
+        await saveData();
 
         document.getElementById('form-category').reset();
         updateCategorySelects();
@@ -782,9 +949,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // 5. Handle Transactions
-    renderTransactions();
-
-    document.getElementById('form-transaction').addEventListener('submit', (e) => {
+    document.getElementById('form-transaction').addEventListener('submit', async (e) => {
         e.preventDefault();
 
         const type = document.getElementById('trans-type').value;
@@ -820,7 +985,7 @@ document.addEventListener('DOMContentLoaded', () => {
             appData.transactions.push(newTrans);
         }
 
-        saveData();
+        await saveData();
         resetTransactionForm();
         renderTransactions();
         updateDashboard();
@@ -833,10 +998,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // 6. Handle Subscriptions
-    renderSubscriptions();
-    processSubscriptions();
-
-    document.getElementById('form-subscription').addEventListener('submit', (e) => {
+    document.getElementById('form-subscription').addEventListener('submit', async (e) => {
         e.preventDefault();
 
         const type = document.getElementById('sub-type').value;
@@ -858,7 +1020,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         appData.subscriptions.push(newSub);
-        saveData();
+        await saveData();
 
         document.getElementById('form-subscription').reset();
         document.getElementById('sub-start-date').value = new Date().toISOString().split('T')[0];
@@ -875,13 +1037,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // 7. Settings - Spending Goal
-    const goalInput = document.getElementById('setting-spending-goal');
-    goalInput.value = appData.spendingGoal;
-
-    document.getElementById('form-settings-goal').addEventListener('submit', (e) => {
+    document.getElementById('form-settings-goal').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const goalInput = document.getElementById('setting-spending-goal');
         appData.spendingGoal = parseFloat(goalInput.value);
-        saveData();
+        await saveData();
         updateDashboard();
         alert("Objectif de dépense mis à jour !");
     });
@@ -905,12 +1065,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const file = fileInput.files[0];
         const reader = new FileReader();
-        reader.onload = function(e) {
+        reader.onload = async function(e) {
             try {
                 const importedData = JSON.parse(e.target.result);
                 if(importedData.categories && importedData.transactions) {
                     appData = importedData;
-                    saveData();
+                    await saveData();
                     alert("Données importées avec succès ! L'application va se recharger.");
                     location.reload();
                 } else {
@@ -923,10 +1083,25 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsText(file);
     });
 
-    document.getElementById('btn-reset').addEventListener('click', () => {
+    document.getElementById('btn-reset').addEventListener('click', async () => {
         if(confirm("Êtes-vous sûr de vouloir tout effacer ? Cette action est irréversible.")) {
+            // Effacer localStorage
             localStorage.removeItem(STORAGE_KEY);
+            // Remettre à zéro Firestore
+            appData = {
+                spendingGoal: 600,
+                transactions: [],
+                subscriptions: [],
+                categories: []
+            };
+            await saveData();
             location.reload();
         }
     });
 });
+
+// Exposer les fonctions au contexte global (car module)
+window.deleteTransaction = deleteTransaction;
+window.editTransaction = editTransaction;
+window.deleteSubscription = deleteSubscription;
+window.deleteCategory = deleteCategory;
