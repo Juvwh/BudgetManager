@@ -1,33 +1,15 @@
-Starting up http-server, serving .
-
-http-server version: 14.1.1
-
-http-server settings:
-CORS: disabled
-Cache: 3600 seconds
-Connection Timeout: 120 seconds
-Directory Listings: visible
-AutoIndex: visible
-Serve GZIP Files: false
-Serve Brotli Files: false
-Default File Extension: none
-
-Available on:
-  http://127.0.0.1:8080
-  http://192.168.0.2:8080
-Hit CTRL-C to stop the server
-
-[2026-03-09T14:08:06.583Z]  "GET /" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/143.0.7499.4 Safari/537.36"
-(node:2056) [DEP0066] DeprecationWarning: OutgoingMessage.prototype._headers is deprecated
-(Use `node --trace-deprecation ...` to show where the warning was created)
-[2026-03-09T14:08:06.668Z]  "GET /style.css" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/143.0.7499.4 Safari/537.36"
-[2026-03-09T14:08:06.673Z]  "GET /script.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/143.0.7499.4 Safari/537.36"
-[2026-03-09T14:09:16.376Z]  "GET /" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/143.0.7499.4 Safari/537.36"
-[2026-03-09T14:09:16.387Z]  "GET /style.css" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/143.0.7499.4 Safari/537.36"
-[2026-03-09T14:09:16.388Z]  "GET /script.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/143.0.7499.4 Safari/537.36"
-[2026-03-09T14:09:34.701Z]  "GET /" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/143.0.7499.4 Safari/537.36"
-[2026-03-09T14:09:34.712Z]  "GET /style.css" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/143.0.7499.4 Safari/537.36"
-[2026-03-09T14:09:34.713Z]  "GET /script.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/143.0.7499.4 Safari/537.36"
-[2026-03-09T14:14:08.673Z]  "GET /" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/143.0.7499.4 Safari/537.36"
-[2026-03-09T14:14:08.702Z]  "GET /style.css" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/143.0.7499.4 Safari/537.36"
-[2026-03-09T14:14:08.706Z]  "GET /script.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/143.0.7499.4 Safari/537.36"
+127.0.0.1 - - [09/Mar/2026 17:55:30] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [09/Mar/2026 17:55:30] "GET /script.js HTTP/1.1" 200 -
+127.0.0.1 - - [09/Mar/2026 17:55:30] "GET /style.css HTTP/1.1" 200 -
+127.0.0.1 - - [09/Mar/2026 17:56:05] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [09/Mar/2026 17:56:05] "GET /style.css HTTP/1.1" 200 -
+127.0.0.1 - - [09/Mar/2026 17:56:05] "GET /script.js HTTP/1.1" 200 -
+127.0.0.1 - - [09/Mar/2026 17:56:24] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [09/Mar/2026 17:56:24] "GET /style.css HTTP/1.1" 200 -
+127.0.0.1 - - [09/Mar/2026 17:56:24] "GET /script.js HTTP/1.1" 200 -
+127.0.0.1 - - [09/Mar/2026 17:57:01] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [09/Mar/2026 17:57:01] "GET /style.css HTTP/1.1" 200 -
+127.0.0.1 - - [09/Mar/2026 17:57:01] "GET /script.js HTTP/1.1" 200 -
+127.0.0.1 - - [09/Mar/2026 17:57:35] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [09/Mar/2026 17:57:35] "GET /style.css HTTP/1.1" 200 -
+127.0.0.1 - - [09/Mar/2026 17:57:35] "GET /script.js HTTP/1.1" 200 -

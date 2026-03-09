@@ -335,6 +335,45 @@ h2 {
     font-size: 0.85rem;
 }
 
+/* Filter Chips */
+.filter-chip {
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 0.3rem 0.8rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.filter-chip:hover {
+    background-color: var(--border-color);
+}
+
+.filter-chip.active {
+    background-color: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
+
+/* Clickable elements */
+.clickable-row {
+    cursor: pointer;
+}
+
+.clickable-row:hover {
+    background-color: rgba(0,0,0,0.05);
+}
+
+[data-theme="dark"] .clickable-row:hover {
+    background-color: rgba(255,255,255,0.05);
+}
+
+canvas {
+    cursor: pointer;
+}
+
 /* Tables */
 .table-container {
     overflow-x: auto;
