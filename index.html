@@ -53,6 +53,35 @@
         </div>
     </div>
 
+    <!-- MODALE GENERIQUE (Transactions par catégorie, mois, abonnement) -->
+    <div id="data-modal-overlay" class="login-overlay">
+        <div class="login-card card card-elegant" style="max-width: 800px; width: 95%;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem; margin-bottom: 1rem;">
+                <h2 id="data-modal-title" style="border: none; margin: 0; padding: 0;">Détails</h2>
+                <button id="btn-close-modal" class="btn btn-secondary btn-small" style="font-size: 1.2rem; padding: 0.2rem 0.6rem; border-radius: 50%;">&times;</button>
+            </div>
+            <div style="text-align: left; margin-bottom: 1rem;">
+                <h3 style="margin: 0; color: var(--text-color);">Total : <span id="data-modal-total" class="text-red">0.00 €</span></h3>
+            </div>
+            <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                <table id="table-modal-transactions">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Catégorie</th>
+                            <th>Note</th>
+                            <th>Montant</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Injected by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <main id="app-content" style="display: none;">
 
         <!-- SECTION TABLEAU DE BORD -->
@@ -161,9 +190,15 @@
                 </div>
 
                 <div class="list-panel card">
-                    <h3>Historique des transactions</h3>
-                    <div class="filters">
+                    <h3>Historique des transactions <small style="font-size: 0.8rem; font-weight: normal; color: var(--text-color); opacity: 0.7;">(Double-clic pour modifier)</small></h3>
+                    <div class="filters" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                         <input type="month" id="filter-month">
+                        <div id="quick-filters" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <button class="btn btn-small filter-chip active" data-filter="all">Toutes</button>
+                            <button class="btn btn-small filter-chip" data-filter="income" style="background-color: var(--success-color); color: white;">Revenus</button>
+                            <button class="btn btn-small filter-chip" data-filter="expense" style="background-color: var(--danger-color); color: white;">Dépenses</button>
+                            <!-- Top categories injected by JS -->
+                        </div>
                     </div>
                     <div class="table-container">
                         <table id="table-transactions">
@@ -228,7 +263,15 @@
                             <label>Date de début</label>
                             <input type="date" id="sub-start-date" required>
                         </div>
-                        <button type="submit" class="btn btn-primary">Ajouter</button>
+
+                        <div class="form-group" id="sub-apply-past-container" style="display: none; align-items: center; gap: 0.5rem; margin-top: 1rem;">
+                            <input type="checkbox" id="sub-apply-past" style="width: auto;">
+                            <label for="sub-apply-past" style="margin: 0; font-weight: normal; cursor: pointer;">Appliquer les modifications de montant/nom/catégorie aux anciennes transactions (sans changer leurs dates)</label>
+                        </div>
+
+                        <input type="hidden" id="sub-id">
+                        <button type="submit" id="btn-submit-sub" class="btn btn-primary">Ajouter</button>
+                        <button type="button" id="btn-cancel-edit-sub" class="btn btn-secondary" style="display:none;">Annuler</button>
                     </form>
                 </div>
 
