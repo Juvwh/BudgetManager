@@ -1063,28 +1063,151 @@ function renderCategoryTree() {
     const container = document.getElementById('category-tree');
     container.innerHTML = '';
 
-    const buildTree = (parentId, level) => {
+    // --- DRAG AND DROP START ---
+    let draggedCategoryId = null;
+
+    // Check if a category is a descendant of another
+    const isDescendant = (parentId, childId) => {
+        if (parentId === childId) return true;
+        const child = appData.categories.find(c => c.id === childId);
+        if (!child || !child.parentId) return false;
+        return isDescendant(parentId, child.parentId);
+    };
+
+    const handleDragStart = (e, catId) => {
+        draggedCategoryId = catId;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', catId);
+        setTimeout(() => e.target.classList.add('dragging'), 0);
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+
+        // Add visual cue
+        const dropTarget = e.target.closest('.cat-dropzone');
+        if (dropTarget) {
+            const targetId = dropTarget.dataset.id;
+            // Prevent dropping into itself or its descendants
+            if (targetId === draggedCategoryId || isDescendant(draggedCategoryId, targetId)) {
+                dropTarget.classList.add('drop-invalid');
+            } else {
+                dropTarget.classList.add('drop-hover');
+            }
+        }
+    };
+
+    const handleDragLeave = (e) => {
+        const dropTarget = e.target.closest('.cat-dropzone');
+        if (dropTarget) {
+            dropTarget.classList.remove('drop-hover');
+            dropTarget.classList.remove('drop-invalid');
+        }
+    };
+
+    const handleDrop = async (e, targetId) => {
+        e.preventDefault();
+        const dropTarget = e.target.closest('.cat-dropzone');
+        if (dropTarget) {
+            dropTarget.classList.remove('drop-hover');
+            dropTarget.classList.remove('drop-invalid');
+        }
+
+        const draggedId = e.dataTransfer.getData('text/plain');
+        if (!draggedId || draggedId === targetId) return;
+
+        // Prevent dropping a parent into its own child
+        if (targetId && isDescendant(draggedId, targetId)) {
+            alert("Action impossible : vous ne pouvez pas déplacer une catégorie dans l'une de ses propres sous-catégories.");
+            return;
+        }
+
+        const cat = appData.categories.find(c => c.id === draggedId);
+        if (!cat) return;
+
+        // Set new parent, targetId is null if dropped in root dropzone
+        cat.parentId = targetId;
+
+        // If it becomes a sub-category, it must adopt the parent's type
+        if (targetId) {
+            const parentCat = appData.categories.find(c => c.id === targetId);
+            if (parentCat) {
+                cat.type = parentCat.type;
+            }
+        }
+
+        await saveData();
+        updateCategorySelects();
+        renderCategoryTree();
+        renderTransactions(); // Refresh UI in case type changed
+        updateDashboard();
+    };
+
+    const handleDragEnd = (e) => {
+        e.target.classList.remove('dragging');
+        draggedCategoryId = null;
+    };
+    // --- DRAG AND DROP END ---
+
+    // Add root dropzone
+    const rootDropzone = document.createElement('div');
+    rootDropzone.className = 'cat-dropzone root-dropzone';
+    rootDropzone.textContent = 'Déposer ici pour mettre à la racine';
+    rootDropzone.dataset.id = ''; // null equivalent
+
+    rootDropzone.addEventListener('dragover', handleDragOver);
+    rootDropzone.addEventListener('dragleave', handleDragLeave);
+    rootDropzone.addEventListener('drop', (e) => handleDrop(e, null));
+
+    container.appendChild(rootDropzone);
+
+    const buildTree = (parentId, parentElement) => {
         const children = appData.categories.filter(c => c.parentId === parentId);
 
+        if (children.length === 0) return;
+
+        const childrenContainer = document.createElement('div');
+        if (parentId) {
+            childrenContainer.className = 'cat-children-container';
+        }
+
         children.forEach(cat => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'cat-wrapper';
+
             const el = document.createElement('div');
-            el.className = 'cat-item' + (parentId ? ' cat-children' : '');
+            el.className = 'cat-item cat-dropzone';
+            el.draggable = true;
+            el.dataset.id = cat.id;
+
+            el.addEventListener('dragstart', (e) => handleDragStart(e, cat.id));
+            el.addEventListener('dragend', handleDragEnd);
+            el.addEventListener('dragover', handleDragOver);
+            el.addEventListener('dragleave', handleDragLeave);
+            el.addEventListener('drop', (e) => handleDrop(e, cat.id));
 
             const badge = `<span class="cat-type-badge ${cat.type === 'income' ? 'badge-income' : 'badge-expense'}">${cat.type === 'income' ? 'Revenu' : 'Dépense'}</span>`;
 
             el.innerHTML = `
                 <div>
+                    <span class="drag-handle">☰</span>
                     <strong>${cat.name}</strong> ${!parentId ? badge : ''}
                 </div>
                 <button class="btn btn-danger btn-small" onclick="deleteCategory('${cat.id}')">Supprimer</button>
             `;
-            container.appendChild(el);
 
-            buildTree(cat.id, level + 1);
+            wrapper.appendChild(el);
+            childrenContainer.appendChild(wrapper);
+
+            // Recursively build children inside this wrapper
+            buildTree(cat.id, wrapper);
         });
+
+        parentElement.appendChild(childrenContainer);
     };
 
-    buildTree(null, 0);
+    buildTree(null, container);
 }
 
 async function deleteCategory(id) {
@@ -1249,22 +1372,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Theme switching logic
     const themeToggleBtn = document.getElementById('theme-toggle');
+    const themeIconLight = document.getElementById('theme-icon-light');
+    const themeIconDark = document.getElementById('theme-icon-dark');
+
+    function updateThemeIcons(theme) {
+        if (theme === 'dark') {
+            themeIconLight.style.display = 'block';
+            themeIconDark.style.display = 'none';
+        } else {
+            themeIconLight.style.display = 'none';
+            themeIconDark.style.display = 'block';
+        }
+    }
 
     // Load saved theme or check OS preference
     const savedTheme = localStorage.getItem('budget_app_theme');
     if (savedTheme) {
         document.body.setAttribute('data-theme', savedTheme);
+        updateThemeIcons(savedTheme);
     } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
         document.body.setAttribute('data-theme', 'dark');
+        updateThemeIcons('dark');
+    } else {
+        updateThemeIcons('light');
     }
 
     themeToggleBtn.addEventListener('click', () => {
         if (document.body.getAttribute('data-theme') === 'dark') {
             document.body.removeAttribute('data-theme');
             localStorage.setItem('budget_app_theme', 'light');
+            updateThemeIcons('light');
         } else {
             document.body.setAttribute('data-theme', 'dark');
             localStorage.setItem('budget_app_theme', 'dark');
+            updateThemeIcons('dark');
         }
         updateDashboard(); // Redraw charts with new colors
     });
