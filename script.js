@@ -913,8 +913,8 @@ function updateDashboard() {
 
     // Update current month summary cards
     const currentData = getMonthData(currentYear, currentMonth);
-    document.getElementById('dash-income').textContent = currentData.income.toFixed(2) + ' €';
-    document.getElementById('dash-expense').textContent = currentData.expense.toFixed(2) + ' €';
+    document.getElementById('dash-income').textContent = '+' + currentData.income.toFixed(2) + ' €';
+    document.getElementById('dash-expense').textContent = '-' + currentData.expense.toFixed(2) + ' €';
 
     // Update Goal Progress Bar
     const progressBar = document.getElementById('goal-progress-bar');
@@ -1567,7 +1567,8 @@ function openDataModal(title, transactions, totalAmount, totalType = 'expense') 
     document.getElementById('data-modal-title').textContent = title;
 
     const totalSpan = document.getElementById('data-modal-total');
-    totalSpan.textContent = totalAmount.toFixed(2) + ' €';
+    const prefixStr = totalType === 'income' ? '+' : '-';
+    totalSpan.textContent = prefixStr + totalAmount.toFixed(2) + ' €';
     totalSpan.className = totalType === 'income' ? 'text-green' : 'text-red';
 
     const tbody = document.querySelector('#table-modal-transactions tbody');
