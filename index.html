@@ -22,6 +22,8 @@
                 <li><a href="#" class="nav-link" data-target="savings">Économies</a></li>
             </ul>
         </nav>
+
+        <!-- Navigation Mobile (Barre en bas) -->
         <div class="header-right">
             <button id="theme-toggle" class="icon-btn" aria-label="Changer le thème">
                 <svg id="theme-icon-light" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
@@ -32,6 +34,17 @@
             </a>
         </div>
     </header>
+
+    <!-- Navigation Mobile (Barre en bas) -->
+    <nav id="mobile-nav">
+        <a href="#" class="nav-link active" data-target="dashboard" aria-label="Tableau de bord">🏠</a>
+        <a href="#" class="nav-link" data-target="transactions" aria-label="Transactions">💳</a>
+        <a href="#" class="nav-link" data-target="subscriptions" aria-label="Abonnements">🔁</a>
+        <a href="#" class="nav-link" data-target="categories" aria-label="Catégories">📂</a>
+        <a href="#" class="nav-link" data-target="tags" aria-label="Tags">🏷️</a>
+        <a href="#" class="nav-link" data-target="savings" aria-label="Économies">🐖</a>
+    </nav>
+
     <!-- ECRAN DE CONNEXION -->
     <div id="login-overlay" class="login-overlay active">
         <div class="login-card card card-elegant">
@@ -90,6 +103,20 @@
             </div>
         </div>
     </div>
+
+    <!-- MODALE MOBILE POUR AJOUTER/EDITER -->
+    <div id="mobile-form-modal" class="mobile-modal">
+        <div class="mobile-modal-header">
+            <h2 id="mobile-modal-title" style="border: none; margin: 0; padding: 0;">Ajouter</h2>
+            <button id="btn-close-mobile-modal" class="btn btn-secondary btn-small" style="font-size: 1.2rem; padding: 0.2rem 0.6rem; border-radius: 50%;">&times;</button>
+        </div>
+        <div id="mobile-form-container">
+            <!-- Le formulaire sera déplacé ici via JS quand on est sur mobile -->
+        </div>
+    </div>
+
+    <!-- BOUTON FAB POUR MOBILE -->
+    <button id="fab-add" class="fab-btn" aria-label="Ajouter">+</button>
 
     <main id="app-content" style="display: none;">
 

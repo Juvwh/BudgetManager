@@ -213,6 +213,11 @@ main {
     display: block;
 }
 
+/* Cacher la barre mobile sur desktop par défaut */
+nav#mobile-nav {
+    display: none;
+}
+
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
@@ -359,12 +364,252 @@ h3 {
         grid-template-columns: 1fr;
     }
     header {
+        flex-direction: row;
+        justify-content: space-between;
+        padding: 1rem;
+        position: sticky; /* Always sticky top */
+        top: 0;
+    }
+
+    .header-center {
+        display: none; /* Masquer la navigation de l'en-tête sur mobile */
+    }
+
+    nav#mobile-nav {
+        display: flex !important;
+        position: fixed !important;
+        bottom: 0 !important;
+        top: auto !important;
+        left: 0;
+        right: 0;
+        background-color: var(--header-bg);
+        border-top: 1px solid var(--border-color);
+        padding: 0.5rem 0;
+        justify-content: space-around;
+        z-index: 1000;
+        backdrop-filter: blur(20px) saturate(180%);
+        -webkit-backdrop-filter: blur(20px) saturate(180%);
+        padding-bottom: env(safe-area-inset-bottom, 0.5rem);
+        margin: 0;
+    }
+
+    nav#mobile-nav a {
+        display: flex;
         flex-direction: column;
+        align-items: center;
+        font-size: 1.5rem; /* Taille de l'émoji */
+        color: var(--text-color);
+        opacity: 0.6;
+        text-decoration: none;
+        padding: 0.5rem;
+        transition: opacity 0.2s;
+    }
+
+    nav#mobile-nav a.active {
+        opacity: 1;
+        transform: scale(1.1);
+    }
+
+    nav#mobile-nav a.active::after {
+        display: none; /* Pas de soulignement sur les émojis */
+    }
+
+    /* Ne pas afficher le lien graphiques sur mobile */
+    nav#mobile-nav a[data-target="charts"] {
+        display: none !important;
+    }
+
+    main {
+        padding: 1rem;
+        padding-bottom: 5rem; /* Espace pour la barre de navigation en bas */
+    }
+
+    /* Cacher les sections graphiques sur mobile */
+    #charts, #dashboard-category-chart-card {
+        display: none !important;
+    }
+
+    /* Bouton d'ajout flottant */
+    .fab-btn {
+        display: flex !important;
+    }
+
+    /* Transformer les tableaux en cartes sur mobile (Transactions et Abonnements principalement) */
+    .table-container {
+        border: none;
+    }
+
+    #table-transactions thead, #table-subscriptions thead, #table-modal-transactions thead {
+        display: none; /* Cacher les en-têtes */
+    }
+
+    #table-transactions tbody tr, #table-subscriptions tbody tr, #table-modal-transactions tbody tr {
+        display: flex;
+        flex-direction: column;
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        margin-bottom: 1rem;
+        padding: 1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+        position: relative;
+    }
+
+    #table-transactions tbody td, #table-subscriptions tbody td, #table-modal-transactions tbody td {
+        border-bottom: none;
+        padding: 0.3rem 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        text-align: right; /* Le texte des valeurs à droite */
+    }
+
+    #table-transactions tbody td::before, #table-subscriptions tbody td::before, #table-modal-transactions tbody td::before {
+        /* Pseudo-élément pour jouer le rôle d'en-tête (label) sur la gauche */
+        content: attr(data-label);
+        font-weight: 500;
+        color: var(--text-color);
+        opacity: 0.7;
+        text-align: left;
+    }
+
+    /* Styles spécifiques pour le layout de la carte Transaction */
+    #table-transactions tbody td:nth-child(3), /* Catégorie (Titre principal) */
+    #table-subscriptions tbody td:nth-child(1) { /* Nom d'abonnement */
+        font-weight: bold;
+        font-size: 1.1rem;
+        justify-content: flex-start;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        margin-bottom: 0.5rem;
+    }
+    #table-transactions tbody td:nth-child(3)::before,
+    #table-subscriptions tbody td:nth-child(1)::before {
+        display: none; /* Pas de label pour le titre principal */
+    }
+
+    #table-transactions tbody td:nth-child(6), /* Montant */
+    #table-subscriptions tbody td:nth-child(4) { /* Montant abbo */
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        font-size: 1.1rem;
+        font-weight: bold;
+        padding: 0;
+    }
+    #table-transactions tbody td:nth-child(6)::before,
+    #table-subscriptions tbody td:nth-child(4)::before {
+        display: none; /* Pas de label pour le montant en haut à droite */
+    }
+
+    /* Actions à la fin de la carte */
+    #table-transactions tbody td:last-child,
+    #table-subscriptions tbody td:last-child {
+        justify-content: flex-end;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+        padding-top: 0.5rem;
+        border-top: 1px dashed var(--border-color);
+    }
+    #table-transactions tbody td:last-child::before,
+    #table-subscriptions tbody td:last-child::before {
+        display: none;
+    }
+
+    /* Autres tables (Tags, Économies) en cartes aussi */
+    #table-tags-overview thead, #table-savings-history thead {
+        display: none;
+    }
+
+    #table-tags-overview tbody tr, #table-savings-history tbody tr {
+        display: flex;
+        flex-direction: column;
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        margin-bottom: 1rem;
+        padding: 1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+        position: relative;
+    }
+
+    #table-tags-overview tbody td, #table-savings-history tbody td {
+        border-bottom: none;
+        padding: 0.3rem 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        text-align: right;
+    }
+
+    #table-tags-overview tbody td::before, #table-savings-history tbody td::before {
+        content: attr(data-label);
+        font-weight: 500;
+        color: var(--text-color);
+        opacity: 0.7;
+        text-align: left;
+    }
+
+    /* Titre des tags */
+    #table-tags-overview tbody td:nth-child(1) {
+        font-weight: bold;
+        justify-content: flex-start;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        margin-bottom: 0.5rem;
+    }
+    #table-tags-overview tbody td:nth-child(1)::before {
+        display: none;
+    }
+
+    /* Actions tags */
+    #table-tags-overview tbody td:last-child {
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+        padding-top: 0.5rem;
+        border-top: 1px dashed var(--border-color);
+    }
+    #table-tags-overview tbody td:last-child::before {
+        display: none;
+    }
+
+    /* Ajustement vue catégories */
+    #categories .split-layout {
+        display: flex;
+        flex-direction: column-reverse; /* Liste des catégories en haut, ajout en bas sur mobile */
+    }
+
+    /* Éviter que les cartes soient trop larges et collées au bord */
+    .card {
+        padding: 1.2rem;
+    }
+
+    .summary-cards {
         gap: 1rem;
     }
-    nav ul {
-        flex-wrap: wrap;
-        justify-content: center;
+
+    .summary-cards .card {
+        padding: 1.5rem 1rem;
+    }
+
+    /* Le panneau form (Ajout) est caché par défaut dans l'onglet transactions et abonnements sur mobile pour être remplacé par la modale */
+    #transactions .form-panel, #subscriptions .form-panel {
+        display: none;
+    }
+
+    /* Sauf s'il est utilisé à l'intérieur de la modale pleine page, on l'affichera */
+    .mobile-modal .form-panel {
+        display: block;
+        box-shadow: none;
+        border: none;
+        padding: 0;
+    }
+
+    .mobile-modal form {
+        display: flex;
+        flex-direction: column;
     }
 }
 
@@ -561,6 +806,63 @@ input[type="color"]::-webkit-color-swatch {
 
 [data-theme="dark"] .clickable-row:hover {
     background-color: rgba(255,255,255,0.05);
+}
+
+/* FAB Button for mobile */
+.fab-btn {
+    display: none;
+    position: fixed;
+    bottom: 5.5rem; /* Juste au dessus de la barre de navigation mobile */
+    right: 1.5rem;
+    width: 60px;
+    height: 60px;
+    background-color: var(--accent-color);
+    color: white;
+    border-radius: 50%;
+    font-size: 2rem;
+    border: none;
+    box-shadow: 0 4px 12px rgba(0, 102, 204, 0.4);
+    cursor: pointer;
+    z-index: 900;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s, background-color 0.2s;
+}
+
+.fab-btn:active {
+    transform: scale(0.95);
+}
+
+[data-theme="dark"] .fab-btn {
+    box-shadow: 0 4px 12px rgba(10, 132, 255, 0.4);
+}
+
+/* Modal pour mobile (ex: formulaire d'ajout) */
+.mobile-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--bg-color);
+    z-index: 1050; /* Au dessus de la nav bar */
+    overflow-y: auto;
+    padding: 1rem;
+    display: none;
+    flex-direction: column;
+}
+
+.mobile-modal.active {
+    display: flex;
+}
+
+.mobile-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
 }
 
 canvas {
