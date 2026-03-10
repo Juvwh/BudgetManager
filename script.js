@@ -27,6 +27,7 @@ let appData = {
     monthlyGoals: {},
     transactions: [],
     subscriptions: [],
+    tags: [],
     categories: [
         // Default categories
         { id: 'cat-inc-1', name: 'Salaire', type: 'income', parentId: null },
@@ -70,6 +71,7 @@ async function saveData() {
             monthlyGoals: appData.monthlyGoals || {},
             transactions: appData.transactions,
             subscriptions: appData.subscriptions,
+            tags: appData.tags || [],
             categories: appData.categories,
             updatedAt: new Date().toISOString()
         });
@@ -91,8 +93,9 @@ async function loadData() {
             const parsed = docSnap.data();
             if(parsed.spendingGoal) appData.spendingGoal = parsed.spendingGoal;
             if(parsed.monthlyGoals) appData.monthlyGoals = parsed.monthlyGoals;
-            if(parsed.transactions) appData.transactions = parsed.transactions;
+            if(parsed.transactions) appData.transactions = parsed.transactions.map(t => ({ ...t, tagIds: t.tagIds || [] }));
             if(parsed.subscriptions) appData.subscriptions = parsed.subscriptions;
+            if(parsed.tags) appData.tags = parsed.tags;
             if(parsed.categories) appData.categories = parsed.categories;
         } else {
             console.log("Aucune donnée Firestore trouvée. Initialisation avec les valeurs par défaut.");
@@ -110,6 +113,18 @@ function generateId() {
 
 // --- TRANSACTIONS MANAGEMENT ---
 let currentTransactionFilter = 'all';
+let currentTransactionTagFilters = [];
+
+function toggleTransactionTagFilter(tagId) {
+    if (currentTransactionTagFilters.includes(tagId)) {
+        currentTransactionTagFilters = currentTransactionTagFilters.filter(id => id !== tagId);
+    } else {
+        currentTransactionTagFilters.push(tagId);
+    }
+    renderTransactions();
+    updateFilterChips();
+}
+window.toggleTransactionTagFilter = toggleTransactionTagFilter;
 
 function renderTransactions() {
     const tbody = document.querySelector('#table-transactions tbody');
@@ -135,6 +150,14 @@ function renderTransactions() {
         });
     }
 
+    if (currentTransactionTagFilters.length > 0) {
+        filteredTrans = filteredTrans.filter(t => {
+            if (!t.tagIds) return false;
+            // Retourne true si la transaction possède au moins un des tags sélectionnés (OU logique)
+            return currentTransactionTagFilters.some(filterTagId => t.tagIds.includes(filterTagId));
+        });
+    }
+
     filteredTrans.forEach(t => {
         const tr = document.createElement('tr');
         tr.className = 'clickable-row'; // Visual cue
@@ -142,11 +165,23 @@ function renderTransactions() {
 
         const catName = getCategoryPath(t.categoryId);
 
+        // Tags HTML
+        let tagsHtml = '';
+        if (t.tagIds && t.tagIds.length > 0) {
+            t.tagIds.forEach(tagId => {
+                const tag = appData.tags.find(g => g.id === tagId);
+                if (tag) {
+                    tagsHtml += `<span class="tag-chip tag-display"><span class="tag-dot" style="background-color: ${tag.color};"></span>${tag.name}</span>`;
+                }
+            });
+        }
+
         tr.innerHTML = `
             <td>${t.date}</td>
             <td><span class="${t.type === 'income' ? 'text-green' : 'text-red'}">${t.type === 'income' ? 'Revenu' : 'Dépense'}</span></td>
             <td>${catName}</td>
             <td>${t.note || ''}</td>
+            <td><div style="display: flex; gap: 4px; flex-wrap: wrap;">${tagsHtml}</div></td>
             <td class="${t.type === 'income' ? 'text-green' : 'text-red'}">${t.type === 'income' ? '+' : '-'}${t.amount.toFixed(2)} €</td>
             <td>
                 <button class="btn btn-secondary btn-small" onclick="editTransaction('${t.id}')">Modifier</button>
@@ -185,6 +220,18 @@ function updateFilterChips() {
     });
 
     container.innerHTML = staticChipsHtml + dynChipsHtml;
+
+    // Mettre à jour les filtres de tags
+    const tagsContainer = document.getElementById('tag-filters');
+    if (!tagsContainer) return;
+
+    let tagChipsHtml = '';
+    appData.tags.forEach(tag => {
+        const isSelected = currentTransactionTagFilters.includes(tag.id);
+        const activeClass = isSelected ? 'active' : '';
+        tagChipsHtml += `<button class="btn btn-small filter-chip tag-filter-chip ${activeClass}" onclick="toggleTransactionTagFilter('${tag.id}')"><span class="tag-dot" style="background-color: ${tag.color};"></span>${tag.name}</button>`;
+    });
+    tagsContainer.innerHTML = tagChipsHtml;
 }
 
 async function deleteTransaction(id) {
@@ -209,6 +256,10 @@ function editTransaction(id) {
     document.getElementById('trans-category').value = trans.categoryId;
     document.getElementById('trans-note').value = trans.note || '';
 
+    // Gérer les tags
+    document.getElementById('trans-selected-tags').value = JSON.stringify(trans.tagIds || []);
+    renderTransactionTagsSelector();
+
     // Changer l'état des boutons
     document.getElementById('btn-submit-trans').textContent = "Mettre à jour";
     document.getElementById('btn-cancel-edit-trans').style.display = 'inline-block';
@@ -220,6 +271,9 @@ function resetTransactionForm() {
     document.getElementById('trans-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('trans-type').value = 'expense';
     document.getElementById('trans-type').dispatchEvent(new Event('change'));
+
+    document.getElementById('trans-selected-tags').value = '[]';
+    renderTransactionTagsSelector();
 
     document.getElementById('btn-submit-trans').textContent = "Ajouter";
     document.getElementById('btn-cancel-edit-trans').style.display = 'none';
@@ -911,6 +965,49 @@ function updateDashboard() {
         document.getElementById('dash-filter-month').value = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
     }
 
+// --- TAGS MANAGEMENT (UI FORM) ---
+function renderTransactionTagsSelector() {
+    const container = document.getElementById('trans-tags-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const selectedTagsStr = document.getElementById('trans-selected-tags').value;
+    let selectedTags = [];
+    try {
+        selectedTags = JSON.parse(selectedTagsStr);
+    } catch (e) { selectedTags = []; }
+
+    appData.tags.forEach(tag => {
+        const isSelected = selectedTags.includes(tag.id);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `btn btn-small filter-chip tag-filter-chip ${isSelected ? 'active' : ''}`;
+
+        btn.innerHTML = `<span class="tag-dot" style="background-color: ${tag.color};"></span>${tag.name}`;
+        btn.onclick = () => toggleTransactionTag(tag.id);
+        container.appendChild(btn);
+    });
+}
+
+function toggleTransactionTag(tagId) {
+    const input = document.getElementById('trans-selected-tags');
+    let selectedTags = [];
+    try { selectedTags = JSON.parse(input.value); } catch(e) {}
+
+    if (selectedTags.includes(tagId)) {
+        selectedTags = selectedTags.filter(id => id !== tagId);
+    } else {
+        selectedTags.push(tagId);
+    }
+
+    input.value = JSON.stringify(selectedTags);
+    renderTransactionTagsSelector();
+}
+
+window.toggleTransactionTag = toggleTransactionTag;
+
+// --- DASHBOARD & CHARTS MANAGEMENT ---
+
     // Update current month summary cards
     const currentData = getMonthData(currentYear, currentMonth);
     document.getElementById('dash-income').textContent = '+' + currentData.income.toFixed(2) + ' €';
@@ -1266,8 +1363,9 @@ async function checkLocalDataForMigration() {
                     // Remplacer appData courant (celui de firestore s'il y en avait, mais logiquement on migre vers un compte vide)
                     if(parsedLocal.spendingGoal) appData.spendingGoal = parsedLocal.spendingGoal;
                     if(parsedLocal.monthlyGoals) appData.monthlyGoals = parsedLocal.monthlyGoals;
-                    if(parsedLocal.transactions) appData.transactions = parsedLocal.transactions;
+                    if(parsedLocal.transactions) appData.transactions = parsedLocal.transactions.map(t => ({ ...t, tagIds: t.tagIds || [] }));
                     if(parsedLocal.subscriptions) appData.subscriptions = parsedLocal.subscriptions;
+                    if(parsedLocal.tags) appData.tags = parsedLocal.tags;
                     if(parsedLocal.categories) appData.categories = parsedLocal.categories;
 
                     await saveData(); // Sauvegarder sur Firebase
@@ -1439,6 +1537,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if(e.detail === 'categories') {
             updateCategorySelects();
             renderCategoryTree();
+        } else if(e.detail === 'tags') {
+            renderTagsOverview();
         } else if(e.detail === 'savings') {
             renderSavings();
         }
@@ -1496,6 +1596,42 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
 
+    // 4.5 Handle Tags creation
+    document.getElementById('btn-add-tag').addEventListener('click', async () => {
+        const nameInput = document.getElementById('trans-new-tag-name');
+        const colorInput = document.getElementById('trans-new-tag-color');
+
+        const name = nameInput.value.trim();
+        if (!name) return;
+
+        // Check if exists (case insensitive)
+        const exists = appData.tags.find(t => t.name.toLowerCase() === name.toLowerCase());
+        if (exists) {
+            alert("Ce tag existe déjà !");
+            return;
+        }
+
+        const newTag = {
+            id: 'tag-' + generateId(),
+            name: name,
+            color: colorInput.value
+        };
+
+        appData.tags.push(newTag);
+
+        // Auto select it
+        const input = document.getElementById('trans-selected-tags');
+        let selectedTags = [];
+        try { selectedTags = JSON.parse(input.value); } catch(e) {}
+        selectedTags.push(newTag.id);
+        input.value = JSON.stringify(selectedTags);
+
+        await saveData();
+
+        nameInput.value = '';
+        renderTransactionTagsSelector();
+    });
+
     // 5. Handle Transactions
     document.getElementById('form-transaction').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -1507,6 +1643,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const note = document.getElementById('trans-note').value;
         const transId = document.getElementById('trans-id').value;
 
+        let tagIds = [];
+        try {
+            tagIds = JSON.parse(document.getElementById('trans-selected-tags').value);
+        } catch(e) {}
+
         if (transId) {
             // Update
             const transIndex = appData.transactions.findIndex(t => t.id === transId);
@@ -1517,7 +1658,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     amount,
                     date,
                     categoryId,
-                    note
+                    note,
+                    tagIds
                 };
             }
         } else {
@@ -1528,7 +1670,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 amount,
                 date,
                 categoryId,
-                note
+                note,
+                tagIds
             };
             appData.transactions.push(newTrans);
         }
@@ -1695,6 +1838,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 monthlyGoals: {},
                 transactions: [],
                 subscriptions: [],
+                tags: [],
                 categories: []
             };
             await saveData();
@@ -1763,5 +1907,132 @@ window.deleteSubscription = deleteSubscription;
 window.editSubscription = editSubscription;
 window.viewSubscriptionHistory = viewSubscriptionHistory;
 window.deleteCategory = deleteCategory;
+// --- TAGS OVERVIEW ---
+function renderTagsOverview() {
+    const tbody = document.querySelector('#table-tags-overview tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (appData.tags.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Aucun tag créé pour le moment. Vous pouvez en créer un lors de l\'ajout d\'une transaction.</td></tr>';
+        return;
+    }
+
+    appData.tags.forEach(tag => {
+        let income = 0;
+        let expense = 0;
+
+        appData.transactions.forEach(t => {
+            if (t.tagIds && t.tagIds.includes(tag.id)) {
+                if (t.type === 'income') income += t.amount;
+                else expense += t.amount;
+            }
+        });
+
+        const balance = income - expense;
+        const balanceClass = balance >= 0 ? 'text-green' : 'text-red';
+        const balanceSign = balance >= 0 ? '+' : '';
+
+        const tr = document.createElement('tr');
+
+        tr.innerHTML = `
+            <td>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="color" value="${tag.color}" onchange="updateTagColor('${tag.id}', this.value)" style="width: 25px; height: 25px; padding: 0; border: none; border-radius: 4px; cursor: pointer;" title="Changer la couleur">
+                    <span class="tag-chip"><span class="tag-dot" style="background-color: ${tag.color};"></span>${tag.name}</span>
+                </div>
+            </td>
+            <td class="text-green">+${income.toFixed(2)} €</td>
+            <td class="text-red">-${expense.toFixed(2)} €</td>
+            <td class="${balanceClass}">${balanceSign}${balance.toFixed(2)} €</td>
+            <td>
+                <button class="btn btn-primary btn-small" onclick="viewTagHistory('${tag.id}')">Historique</button>
+                <button class="btn btn-secondary btn-small" onclick="renameTagPrompt('${tag.id}')">Renommer</button>
+                <button class="btn btn-danger btn-small" onclick="deleteTag('${tag.id}')">Supprimer</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function viewTagHistory(tagId) {
+    const tag = appData.tags.find(t => t.id === tagId);
+    if (!tag) return;
+
+    const trans = appData.transactions.filter(t => t.tagIds && t.tagIds.includes(tagId));
+    trans.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    let total = 0;
+    trans.forEach(t => {
+        if(t.type === 'expense') total -= t.amount;
+        else total += t.amount;
+    });
+
+    // openDataModal prend (title, transactions, totalAmount, totalType)
+    // Ici total peut être positif ou négatif, on adapte
+    const totalType = total >= 0 ? 'income' : 'expense';
+    openDataModal(`Historique du tag : ${tag.name}`, trans, Math.abs(total), totalType);
+}
+
+async function updateTagColor(tagId, newColor) {
+    const tag = appData.tags.find(t => t.id === tagId);
+    if (tag) {
+        tag.color = newColor;
+        await saveData();
+        renderTagsOverview(); // Mettre à jour la vue des tags
+        renderTransactions(); // Mettre à jour l'historique des transactions
+        renderTransactionTagsSelector(); // Mettre à jour le formulaire
+        updateFilterChips();
+    }
+}
+
+async function renameTagPrompt(tagId) {
+    const tag = appData.tags.find(t => t.id === tagId);
+    if (!tag) return;
+
+    const newName = prompt("Nouveau nom pour le tag :", tag.name);
+    if (newName && newName.trim() !== "") {
+        // Vérifier doublon
+        const exists = appData.tags.find(t => t.id !== tagId && t.name.toLowerCase() === newName.trim().toLowerCase());
+        if(exists) {
+            alert("Un autre tag porte déjà ce nom.");
+            return;
+        }
+        tag.name = newName.trim();
+        await saveData();
+        renderTagsOverview();
+        renderTransactions();
+        renderTransactionTagsSelector();
+        updateFilterChips();
+    }
+}
+
+async function deleteTag(tagId) {
+    if (confirm("Voulez-vous vraiment supprimer ce tag ? Il sera retiré de toutes les transactions (les transactions elles-mêmes ne seront pas supprimées).")) {
+        // Retirer le tag de toutes les transactions
+        appData.transactions.forEach(t => {
+            if (t.tagIds) {
+                t.tagIds = t.tagIds.filter(id => id !== tagId);
+            }
+        });
+
+        // Supprimer le tag de la liste
+        appData.tags = appData.tags.filter(t => t.id !== tagId);
+
+        // Mettre à jour les filtres si le tag supprimé était sélectionné
+        currentTransactionTagFilters = currentTransactionTagFilters.filter(id => id !== tagId);
+
+        await saveData();
+        renderTagsOverview();
+        renderTransactions();
+        renderTransactionTagsSelector();
+    }
+}
+
+window.updateTagColor = updateTagColor;
+window.renameTagPrompt = renameTagPrompt;
+window.deleteTag = deleteTag;
+window.viewTagHistory = viewTagHistory;
+
 window.openDataModal = openDataModal;
 window.setTransactionFilter = setTransactionFilter;

@@ -18,6 +18,7 @@
                 <li><a href="#" class="nav-link" data-target="transactions">Transactions</a></li>
                 <li><a href="#" class="nav-link" data-target="subscriptions">Abonnements</a></li>
                 <li><a href="#" class="nav-link" data-target="categories">Catégories</a></li>
+                <li><a href="#" class="nav-link" data-target="tags">Tags</a></li>
                 <li><a href="#" class="nav-link" data-target="savings">Économies</a></li>
             </ul>
         </nav>
@@ -188,6 +189,18 @@
                             </select>
                         </div>
                         <div class="form-group">
+                            <label>Tags</label>
+                            <div id="trans-tags-container" class="tags-container" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                <!-- Tags cliquables existants injectés par JS -->
+                            </div>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <input type="text" id="trans-new-tag-name" placeholder="Nouveau tag (ex: Londres)" style="flex: 1;">
+                                <input type="color" id="trans-new-tag-color" value="#888888" style="width: 40px; padding: 0; border-radius: 8px;">
+                                <button type="button" id="btn-add-tag" class="btn btn-secondary btn-small">Créer</button>
+                            </div>
+                            <input type="hidden" id="trans-selected-tags" value="[]">
+                        </div>
+                        <div class="form-group">
                             <label>Note (Optionnelle)</label>
                             <input type="text" id="trans-note" placeholder="Ex: Plein d'essence">
                         </div>
@@ -207,6 +220,9 @@
                             <button class="btn btn-small filter-chip" data-filter="expense" style="background-color: var(--danger-color); color: white;">Dépenses</button>
                             <!-- Top categories injected by JS -->
                         </div>
+                        <div id="tag-filters" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                            <!-- Tags injected by JS -->
+                        </div>
                     </div>
                     <div class="table-container">
                         <table id="table-transactions">
@@ -216,6 +232,7 @@
                                     <th>Type</th>
                                     <th>Catégorie</th>
                                     <th>Note</th>
+                                    <th>Tags</th>
                                     <th>Montant</th>
                                     <th>Actions</th>
                                 </tr>
@@ -342,6 +359,34 @@
                     <div id="category-tree">
                         <!-- Injected by JS -->
                     </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION TAGS -->
+        <section id="tags" class="view-section hidden">
+            <h2>Gestion des Tags</h2>
+            <p>Les tags permettent de catégoriser des transactions à travers plusieurs catégories (ex: un voyage, un projet spécifique).</p>
+
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 style="margin: 0;">Liste de vos tags</h3>
+                </div>
+                <div class="table-container">
+                    <table id="table-tags-overview">
+                        <thead>
+                            <tr>
+                                <th>Tag</th>
+                                <th>Revenus Totaux</th>
+                                <th>Dépenses Totales</th>
+                                <th>Bilan</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </section>
