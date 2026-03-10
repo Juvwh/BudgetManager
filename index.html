@@ -10,7 +10,7 @@
     <header>
         <div style="display: flex; align-items: center; gap: 1rem;">
             <h1>Mon Budget</h1>
-            <button id="theme-toggle" class="btn btn-secondary btn-small" style="background: transparent; border: 1px solid white; color: white;">Clair / Sombre</button>
+            <button id="theme-toggle" class="btn btn-secondary btn-small">Clair / Sombre</button>
         </div>
         <nav>
             <ul id="nav-menu">
@@ -19,6 +19,7 @@
                 <li><a href="#" class="nav-link" data-target="transactions">Transactions</a></li>
                 <li><a href="#" class="nav-link" data-target="subscriptions">Abonnements</a></li>
                 <li><a href="#" class="nav-link" data-target="categories">Catégories</a></li>
+                <li><a href="#" class="nav-link" data-target="savings">Économies</a></li>
                 <li><a href="#" class="nav-link" data-target="settings">Paramètres</a></li>
             </ul>
         </nav>
@@ -106,7 +107,7 @@
             </div>
 
             <div class="card card-elegant" id="goal-progress-card">
-                <h3>Progression de l'objectif de dépense</h3>
+                <h3>Progression de l'objectif de dépense (Ce mois)</h3>
                 <div class="progress-track">
                     <div id="goal-progress-bar" class="progress-fill"></div>
                 </div>
@@ -338,6 +339,36 @@
             </div>
         </section>
 
+        <!-- SECTION ECONOMIES -->
+        <section id="savings" class="view-section hidden">
+            <h2 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">Économies & Historique des objectifs</h2>
+
+            <div class="card card-elegant" style="text-align: center; max-width: 400px; margin: 0 auto 2rem auto;">
+                <h3>Total Économisé (Tous les mois)</h3>
+                <p id="savings-view-total" style="font-size: 2.5rem; font-weight: bold; margin: 0.5rem 0 0 0;">0.00 €</p>
+                <p style="color: var(--text-color); opacity: 0.8; font-size: 0.9rem;">Ce total représente la somme de l'argent non-dépensé sur vos objectifs mensuels.</p>
+            </div>
+
+            <div class="card">
+                <h3>Récapitulatif par mois</h3>
+                <div class="table-container">
+                    <table id="table-savings-history">
+                        <thead>
+                            <tr>
+                                <th>Mois</th>
+                                <th>Objectif</th>
+                                <th>Dépenses réelles</th>
+                                <th>Économie (Bilan)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
         <!-- SECTION PARAMETRES -->
         <section id="settings" class="view-section hidden">
             <h2>Paramètres & Sauvegardes</h2>
@@ -345,6 +376,11 @@
             <div class="card">
                 <h3>Objectif de dépense mensuel</h3>
                 <form id="form-settings-goal">
+                    <div class="form-group">
+                        <label>Mois (Optionnel)</label>
+                        <input type="month" id="setting-spending-month">
+                        <small>Laissez vide pour définir l'objectif par défaut pour tous les mois.</small>
+                    </div>
                     <div class="form-group">
                         <label>Objectif (€)</label>
                         <input type="number" id="setting-spending-goal" step="1" min="0" required>
