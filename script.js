@@ -823,7 +823,7 @@ function drawHorizontalBarChart(canvasId, dataObj) {
 }
 
 
-function calculateTotalSavings() {
+function renderSavings() {
     let allMonths = new Set();
 
     // Add all months with transactions
@@ -840,9 +840,16 @@ function calculateTotalSavings() {
         });
     }
 
-    let totalSavings = 0;
+    // Sort months descending (newest first)
+    const sortedMonths = Array.from(allMonths).sort().reverse();
 
-    Array.from(allMonths).forEach(monthStr => {
+    let totalSavings = 0;
+    const tbody = document.querySelector('#table-savings-history tbody');
+    tbody.innerHTML = '';
+
+    const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+
+    sortedMonths.forEach(monthStr => {
         const parts = monthStr.split('-');
         const year = parseInt(parts[0], 10);
         const month = parseInt(parts[1], 10);
@@ -854,10 +861,39 @@ function calculateTotalSavings() {
             goal = appData.monthlyGoals[monthStr];
         }
 
-        totalSavings += (goal - data.expense);
+        const savingsForMonth = goal - data.expense;
+        totalSavings += savingsForMonth;
+
+        const tr = document.createElement('tr');
+
+        const formattedMonth = `${monthNames[month - 1]} ${year}`;
+
+        // Define colors for UI
+        const savingsClass = savingsForMonth >= 0 ? 'text-green' : 'text-red';
+        const savingsSign = savingsForMonth >= 0 ? '+' : '';
+
+        tr.innerHTML = `
+            <td>${formattedMonth}</td>
+            <td>${goal.toFixed(2)} €</td>
+            <td class="text-red">-${data.expense.toFixed(2)} €</td>
+            <td class="${savingsClass}">${savingsSign}${savingsForMonth.toFixed(2)} €</td>
+        `;
+        tbody.appendChild(tr);
     });
 
-    return totalSavings;
+    if (sortedMonths.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Aucune donnée disponible.</td></tr>';
+    }
+
+    // Update Total Savings view
+    const totalSavingsElement = document.getElementById('savings-view-total');
+    if (totalSavings >= 0) {
+        totalSavingsElement.textContent = `+${totalSavings.toFixed(2)} €`;
+        totalSavingsElement.className = 'text-green';
+    } else {
+        totalSavingsElement.textContent = `${totalSavings.toFixed(2)} €`;
+        totalSavingsElement.className = 'text-red';
+    }
 }
 
 function updateDashboard() {
@@ -910,19 +946,6 @@ function updateDashboard() {
     }
 
     progressText.textContent = `${spent.toFixed(2)} € dépénsés sur ${goal.toFixed(2)} € (${percentage.toFixed(1)}%)`;
-
-    // Update Total Savings Text
-    const totalSavingsElement = document.getElementById('total-savings-text');
-    const totalSavings = calculateTotalSavings();
-
-    if (totalSavings >= 0) {
-        totalSavingsElement.textContent = `+${totalSavings.toFixed(2)} €`;
-        totalSavingsElement.className = 'text-green';
-    } else {
-        totalSavingsElement.textContent = `${totalSavings.toFixed(2)} €`;
-        totalSavingsElement.className = 'text-red';
-    }
-
 
     // Draw Pie Chart for Categories
     drawPieChart('pieChartCategory', currentData.categoryExpenses);
@@ -1275,6 +1298,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if(e.detail === 'categories') {
             updateCategorySelects();
             renderCategoryTree();
+        } else if(e.detail === 'savings') {
+            renderSavings();
         }
     });
 
