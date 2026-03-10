@@ -397,21 +397,28 @@ h3 {
         display: flex;
         flex-direction: column;
         align-items: center;
-        font-size: 1.5rem; /* Taille de l'émoji */
+        justify-content: center;
+        font-size: 0.75rem; /* Petite taille pour le texte */
+        font-weight: 500;
         color: var(--text-color);
         opacity: 0.6;
         text-decoration: none;
-        padding: 0.5rem;
-        transition: opacity 0.2s;
+        padding: 0.5rem 0.2rem;
+        transition: opacity 0.2s, transform 0.2s;
+    }
+
+    nav#mobile-nav a svg {
+        margin-bottom: 2px;
     }
 
     nav#mobile-nav a.active {
         opacity: 1;
-        transform: scale(1.1);
+        color: var(--accent-color);
+        transform: scale(1.05);
     }
 
     nav#mobile-nav a.active::after {
-        display: none; /* Pas de soulignement sur les émojis */
+        display: none; /* Pas de soulignement sur les liens texte mobile */
     }
 
     /* Ne pas afficher le lien graphiques sur mobile */
@@ -457,63 +464,111 @@ h3 {
 
     #table-transactions tbody td, #table-subscriptions tbody td, #table-modal-transactions tbody td {
         border-bottom: none;
-        padding: 0.3rem 0;
+        padding: 0.15rem 0;
         display: flex;
-        justify-content: space-between;
         align-items: center;
-        text-align: right; /* Le texte des valeurs à droite */
+        text-align: left;
+        font-size: 0.9rem;
     }
 
     #table-transactions tbody td::before, #table-subscriptions tbody td::before, #table-modal-transactions tbody td::before {
-        /* Pseudo-élément pour jouer le rôle d'en-tête (label) sur la gauche */
-        content: attr(data-label);
-        font-weight: 500;
+        display: none; /* Suppression de tous les labels */
+    }
+
+    /* Cacher les lignes "Type" car l'info est dans la couleur du montant,
+       et la ligne "Date" pour l'abonnement si elle ne sert pas de titre principal */
+    #table-transactions tbody td[data-label="Type"],
+    #table-modal-transactions tbody td[data-label="Type"],
+    #table-subscriptions tbody td[data-label="Type"] {
+        display: none;
+    }
+
+    /* Ne pas cacher la ligne date, mais la positionner en dessous */
+    #table-transactions tbody td[data-label="Date"],
+    #table-modal-transactions tbody td[data-label="Date"] {
+        order: 2;
         color: var(--text-color);
-        opacity: 0.7;
-        text-align: left;
+        opacity: 0.6;
+        font-size: 0.8rem;
     }
 
-    /* Styles spécifiques pour le layout de la carte Transaction */
-    #table-transactions tbody td:nth-child(3), /* Catégorie (Titre principal) */
-    #table-subscriptions tbody td:nth-child(1) { /* Nom d'abonnement */
-        font-weight: bold;
+    /* Catégorie / Nom (Titre principal) */
+    #table-transactions tbody td[data-label="Catégorie"],
+    #table-modal-transactions tbody td[data-label="Catégorie"],
+    #table-subscriptions tbody td[data-label="Nom"] {
+        font-weight: 600;
         font-size: 1.1rem;
-        justify-content: flex-start;
-        padding-bottom: 0.5rem;
-        border-bottom: 1px solid var(--border-color);
-        margin-bottom: 0.5rem;
-    }
-    #table-transactions tbody td:nth-child(3)::before,
-    #table-subscriptions tbody td:nth-child(1)::before {
-        display: none; /* Pas de label pour le titre principal */
+        color: var(--text-color);
+        padding-bottom: 0.2rem;
+        margin-bottom: 0.2rem;
+        order: 1; /* En haut à gauche */
+        width: calc(100% - 100px); /* Laisse la place au montant */
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
     }
 
-    #table-transactions tbody td:nth-child(6), /* Montant */
-    #table-subscriptions tbody td:nth-child(4) { /* Montant abbo */
+    /* Montant (En haut à droite) */
+    #table-transactions tbody td[data-label="Montant"],
+    #table-modal-transactions tbody td[data-label="Montant"],
+    #table-subscriptions tbody td[data-label="Montant"] {
         position: absolute;
         top: 1rem;
         right: 1rem;
-        font-size: 1.1rem;
-        font-weight: bold;
+        font-size: 1.25rem;
+        font-weight: 700;
         padding: 0;
+        text-align: right;
     }
-    #table-transactions tbody td:nth-child(6)::before,
-    #table-subscriptions tbody td:nth-child(4)::before {
-        display: none; /* Pas de label pour le montant en haut à droite */
+
+    /* Note */
+    #table-transactions tbody td[data-label="Note"],
+    #table-modal-transactions tbody td[data-label="Note"] {
+        order: 3;
+        font-size: 0.85rem;
+        color: var(--text-color);
+        opacity: 0.8;
+    }
+    #table-transactions tbody td[data-label="Note"]:empty,
+    #table-modal-transactions tbody td[data-label="Note"]:empty {
+        display: none;
+    }
+
+    /* Tags */
+    #table-transactions tbody td[data-label="Tags"],
+    #table-modal-transactions tbody td[data-label="Tags"] {
+        order: 4;
+        margin-top: 0.3rem;
+    }
+    #table-transactions tbody td[data-label="Tags"]:empty,
+    #table-modal-transactions tbody td[data-label="Tags"]:empty {
+        display: none;
+    }
+
+    /* Lignes abonnements autres que Nom et Montant */
+    #table-subscriptions tbody td[data-label="Fréquence"] {
+        order: 2;
+        opacity: 0.6;
+        font-size: 0.85rem;
+    }
+    #table-subscriptions tbody td[data-label="Prochaine date"] {
+        order: 3;
+        opacity: 0.8;
+        font-size: 0.85rem;
     }
 
     /* Actions à la fin de la carte */
-    #table-transactions tbody td:last-child,
-    #table-subscriptions tbody td:last-child {
+    #table-transactions tbody td[data-label="Actions"],
+    #table-modal-transactions tbody td[data-label="Actions"],
+    #table-subscriptions tbody td[data-label="Actions"] {
+        order: 99; /* Toujours à la fin */
         justify-content: flex-end;
         gap: 0.5rem;
-        margin-top: 0.5rem;
-        padding-top: 0.5rem;
-        border-top: 1px dashed var(--border-color);
-    }
-    #table-transactions tbody td:last-child::before,
-    #table-subscriptions tbody td:last-child::before {
-        display: none;
+        margin-top: 0.8rem;
+        padding-top: 0.8rem;
+        border-top: 1px solid var(--border-color);
+        width: 100%; /* S'assurer qu'il prend toute la largeur */
     }
 
     /* Autres tables (Tags, Économies) en cartes aussi */

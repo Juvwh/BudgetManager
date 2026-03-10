@@ -22,7 +22,7 @@ const db = getFirestore(app);
 const ADMIN_EMAIL = "admin@monbudget.app";
 
 // --- STATE MANAGEMENT ---
-let appData = {
+window.appData = window.appData || {
     spendingGoal: 600,
     monthlyGoals: {},
     transactions: [],
@@ -1584,11 +1584,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (activeSection === 'transactions') {
             modalTitle.textContent = "Ajouter une transaction";
-            mobileModalContainer.appendChild(document.getElementById('form-transaction'));
+            // On déplace le container parent '.form-panel' pour qu'il bénéficie des règles CSS
+            mobileModalContainer.appendChild(formOriginalParents['form-transaction']);
             resetTransactionForm();
         } else if (activeSection === 'subscriptions') {
             modalTitle.textContent = "Ajouter un abonnement";
-            mobileModalContainer.appendChild(document.getElementById('form-subscription'));
+            mobileModalContainer.appendChild(formOriginalParents['form-subscription']);
             resetSubscriptionForm();
         }
 
@@ -1597,12 +1598,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnCloseMobileModal.addEventListener('click', () => {
         mobileModal.classList.remove('active');
-        // Restore forms to their original locations
-        if (document.getElementById('form-transaction').parentElement === mobileModalContainer) {
-            formOriginalParents['form-transaction'].appendChild(document.getElementById('form-transaction'));
+        // Restore forms to their original locations in the split-layout
+        if (formOriginalParents['form-transaction'].parentElement === mobileModalContainer) {
+            document.querySelector('#transactions .split-layout').insertBefore(formOriginalParents['form-transaction'], document.querySelector('#transactions .list-panel'));
         }
-        if (document.getElementById('form-subscription').parentElement === mobileModalContainer) {
-            formOriginalParents['form-subscription'].appendChild(document.getElementById('form-subscription'));
+        if (formOriginalParents['form-subscription'].parentElement === mobileModalContainer) {
+            document.querySelector('#subscriptions .split-layout').insertBefore(formOriginalParents['form-subscription'], document.querySelector('#subscriptions .list-panel'));
         }
     });
 
@@ -1612,7 +1613,7 @@ document.addEventListener('DOMContentLoaded', () => {
         originalEditTransaction(id);
         if (window.innerWidth <= 768) {
             modalTitle.textContent = "Modifier la transaction";
-            mobileModalContainer.appendChild(document.getElementById('form-transaction'));
+            mobileModalContainer.appendChild(formOriginalParents['form-transaction']);
             mobileModal.classList.add('active');
         }
     };
@@ -1622,7 +1623,7 @@ document.addEventListener('DOMContentLoaded', () => {
         originalEditSubscription(id);
         if (window.innerWidth <= 768) {
             modalTitle.textContent = "Modifier l'abonnement";
-            mobileModalContainer.appendChild(document.getElementById('form-subscription'));
+            mobileModalContainer.appendChild(formOriginalParents['form-subscription']);
             mobileModal.classList.add('active');
         }
     };
@@ -2013,6 +2014,10 @@ window.deleteSubscription = deleteSubscription;
 window.editSubscription = editSubscription;
 window.viewSubscriptionHistory = viewSubscriptionHistory;
 window.deleteCategory = deleteCategory;
+window.renderTransactions = renderTransactions;
+window.renderSubscriptions = renderSubscriptions;
+window.updateCategorySelects = updateCategorySelects;
+window.renderCategoryTree = renderCategoryTree;
 // --- TAGS OVERVIEW ---
 function renderTagsOverview() {
     const tbody = document.querySelector('#table-tags-overview tbody');
