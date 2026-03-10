@@ -177,13 +177,13 @@ function renderTransactions() {
         }
 
         tr.innerHTML = `
-            <td>${t.date}</td>
-            <td><span class="${t.type === 'income' ? 'text-green' : 'text-red'}">${t.type === 'income' ? 'Revenu' : 'Dépense'}</span></td>
-            <td>${catName}</td>
-            <td>${t.note || ''}</td>
-            <td><div style="display: flex; gap: 4px; flex-wrap: wrap;">${tagsHtml}</div></td>
-            <td class="${t.type === 'income' ? 'text-green' : 'text-red'}">${t.type === 'income' ? '+' : '-'}${t.amount.toFixed(2)} €</td>
-            <td>
+            <td data-label="Date">${t.date}</td>
+            <td data-label="Type"><span class="${t.type === 'income' ? 'text-green' : 'text-red'}">${t.type === 'income' ? 'Revenu' : 'Dépense'}</span></td>
+            <td data-label="Catégorie">${catName}</td>
+            <td data-label="Note">${t.note || ''}</td>
+            <td data-label="Tags"><div style="display: flex; gap: 4px; flex-wrap: wrap;">${tagsHtml}</div></td>
+            <td data-label="Montant" class="${t.type === 'income' ? 'text-green' : 'text-red'}">${t.type === 'income' ? '+' : '-'}${t.amount.toFixed(2)} €</td>
+            <td data-label="Actions">
                 <button class="btn btn-secondary btn-small" onclick="editTransaction('${t.id}')">Modifier</button>
                 <button class="btn btn-danger btn-small" onclick="deleteTransaction('${t.id}')">Supprimer</button>
             </td>
@@ -330,12 +330,12 @@ function renderSubscriptions() {
         const freqMap = { 'weekly': 'Hebdomadaire', 'monthly': 'Mensuelle', 'yearly': 'Annuelle' };
 
         tr.innerHTML = `
-            <td>${sub.name}</td>
-            <td><span class="${sub.type === 'income' ? 'text-green' : 'text-red'}">${sub.type === 'income' ? 'Revenu' : 'Dépense'}</span></td>
-            <td>${freqMap[sub.frequency]}</td>
-            <td class="${sub.type === 'income' ? 'text-green' : 'text-red'}">${sub.amount.toFixed(2)} €</td>
-            <td>${sub.nextDate || sub.startDate}</td>
-            <td>
+            <td data-label="Nom">${sub.name}</td>
+            <td data-label="Type"><span class="${sub.type === 'income' ? 'text-green' : 'text-red'}">${sub.type === 'income' ? 'Revenu' : 'Dépense'}</span></td>
+            <td data-label="Fréquence">${freqMap[sub.frequency]}</td>
+            <td data-label="Montant" class="${sub.type === 'income' ? 'text-green' : 'text-red'}">${sub.amount.toFixed(2)} €</td>
+            <td data-label="Prochaine date">${sub.nextDate || sub.startDate}</td>
+            <td data-label="Actions">
                 <button class="btn btn-primary btn-small" onclick="viewSubscriptionHistory('${sub.id}')">Historique</button>
                 <button class="btn btn-secondary btn-small" onclick="editSubscription('${sub.id}')">Modifier</button>
                 <button class="btn btn-danger btn-small" onclick="deleteSubscription('${sub.id}')">Supprimer</button>
@@ -632,11 +632,11 @@ function showMonthDetails(year, month, label, totalIncome, totalExpense) {
             const catName = getCategoryPath(t.categoryId);
 
             tr.innerHTML = `
-                <td>${t.date}</td>
-                <td><span class="${t.type === 'income' ? 'text-green' : 'text-red'}">${t.type === 'income' ? 'Revenu' : 'Dépense'}</span></td>
-                <td>${catName}</td>
-                <td>${t.note || ''}</td>
-                <td class="${t.type === 'income' ? 'text-green' : 'text-red'}">${t.type === 'income' ? '+' : '-'}${t.amount.toFixed(2)} €</td>
+                <td data-label="Date">${t.date}</td>
+                <td data-label="Type"><span class="${t.type === 'income' ? 'text-green' : 'text-red'}">${t.type === 'income' ? 'Revenu' : 'Dépense'}</span></td>
+                <td data-label="Catégorie">${catName}</td>
+                <td data-label="Note">${t.note || ''}</td>
+                <td data-label="Montant" class="${t.type === 'income' ? 'text-green' : 'text-red'}">${t.type === 'income' ? '+' : '-'}${t.amount.toFixed(2)} €</td>
             `;
             tbody.appendChild(tr);
         });
@@ -927,10 +927,10 @@ function renderSavings() {
         const savingsSign = savingsForMonth >= 0 ? '+' : '';
 
         tr.innerHTML = `
-            <td>${formattedMonth}</td>
-            <td>${goal.toFixed(2)} €</td>
-            <td class="text-red">-${data.expense.toFixed(2)} €</td>
-            <td class="${savingsClass}">${savingsSign}${savingsForMonth.toFixed(2)} €</td>
+            <td data-label="Mois">${formattedMonth}</td>
+            <td data-label="Objectif">${goal.toFixed(2)} €</td>
+            <td data-label="Dépenses réelles" class="text-red">-${data.expense.toFixed(2)} €</td>
+            <td data-label="Économie (Bilan)" class="${savingsClass}">${savingsSign}${savingsForMonth.toFixed(2)} €</td>
         `;
         tbody.appendChild(tr);
     });
@@ -1526,22 +1526,117 @@ document.addEventListener('DOMContentLoaded', () => {
         updateHorizontalBarChart(year, month);
     });
 
+    // Handle FAB display based on current view
+    function updateFabVisibility(targetId) {
+        const fab = document.getElementById('fab-add');
+        if (targetId === 'transactions' || targetId === 'subscriptions') {
+            fab.style.display = 'flex';
+        } else {
+            fab.style.display = 'none';
+        }
+    }
+
     // Listen to tab changes to refresh dashboard
     document.addEventListener('viewChanged', (e) => {
-        if(e.detail === 'dashboard' || e.detail === 'charts') {
+        const targetId = e.detail;
+        updateFabVisibility(targetId);
+
+        if(targetId === 'dashboard' || targetId === 'charts') {
             updateDashboard();
-        } else if(e.detail === 'transactions') {
+        } else if(targetId === 'transactions') {
             renderTransactions();
-        } else if(e.detail === 'subscriptions') {
+        } else if(targetId === 'subscriptions') {
             renderSubscriptions();
-        } else if(e.detail === 'categories') {
+        } else if(targetId === 'categories') {
             updateCategorySelects();
             renderCategoryTree();
-        } else if(e.detail === 'tags') {
+        } else if(targetId === 'tags') {
             renderTagsOverview();
-        } else if(e.detail === 'savings') {
+        } else if(targetId === 'savings') {
             renderSavings();
         }
+    });
+
+    // Default FAB visibility on load
+    updateFabVisibility('dashboard');
+
+    // FAB Logic
+    const fabBtn = document.getElementById('fab-add');
+    const mobileModal = document.getElementById('mobile-form-modal');
+    const mobileModalContainer = document.getElementById('mobile-form-container');
+    const btnCloseMobileModal = document.getElementById('btn-close-mobile-modal');
+    const modalTitle = document.getElementById('mobile-modal-title');
+
+    // Store original parents to put forms back
+    const formOriginalParents = {
+        'form-transaction': document.querySelector('#transactions .form-panel'),
+        'form-subscription': document.querySelector('#subscriptions .form-panel')
+    };
+
+    fabBtn.addEventListener('click', () => {
+        // Detect current view
+        let activeSection = null;
+        document.querySelectorAll('.view-section').forEach(sec => {
+            if (sec.classList.contains('active')) {
+                activeSection = sec.id;
+            }
+        });
+
+        if (activeSection === 'transactions') {
+            modalTitle.textContent = "Ajouter une transaction";
+            mobileModalContainer.appendChild(document.getElementById('form-transaction'));
+            resetTransactionForm();
+        } else if (activeSection === 'subscriptions') {
+            modalTitle.textContent = "Ajouter un abonnement";
+            mobileModalContainer.appendChild(document.getElementById('form-subscription'));
+            resetSubscriptionForm();
+        }
+
+        mobileModal.classList.add('active');
+    });
+
+    btnCloseMobileModal.addEventListener('click', () => {
+        mobileModal.classList.remove('active');
+        // Restore forms to their original locations
+        if (document.getElementById('form-transaction').parentElement === mobileModalContainer) {
+            formOriginalParents['form-transaction'].appendChild(document.getElementById('form-transaction'));
+        }
+        if (document.getElementById('form-subscription').parentElement === mobileModalContainer) {
+            formOriginalParents['form-subscription'].appendChild(document.getElementById('form-subscription'));
+        }
+    });
+
+    // Handle Edit button click on mobile to open modal
+    const originalEditTransaction = window.editTransaction;
+    window.editTransaction = function(id) {
+        originalEditTransaction(id);
+        if (window.innerWidth <= 768) {
+            modalTitle.textContent = "Modifier la transaction";
+            mobileModalContainer.appendChild(document.getElementById('form-transaction'));
+            mobileModal.classList.add('active');
+        }
+    };
+
+    const originalEditSubscription = window.editSubscription;
+    window.editSubscription = function(id) {
+        originalEditSubscription(id);
+        if (window.innerWidth <= 768) {
+            modalTitle.textContent = "Modifier l'abonnement";
+            mobileModalContainer.appendChild(document.getElementById('form-subscription'));
+            mobileModal.classList.add('active');
+        }
+    };
+
+    // Close modal on submit
+    document.getElementById('form-transaction').addEventListener('submit', () => {
+         if(mobileModal.classList.contains('active')) {
+             btnCloseMobileModal.click();
+         }
+    });
+    document.getElementById('form-subscription').addEventListener('submit', () => {
+         if(mobileModal.classList.contains('active')) {
+             btnCloseMobileModal.click();
+         }
     });
 
     // 2. Navigation Logic
@@ -1551,11 +1646,22 @@ document.addEventListener('DOMContentLoaded', () => {
     navLinks.forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
+            // Allow settings icon click
+            const isSettingsIcon = link.getAttribute('data-target') === 'settings';
             const targetId = link.getAttribute('data-target');
 
-            // Update active link
-            navLinks.forEach(l => l.classList.remove('active'));
-            link.classList.add('active');
+            // Update active link for ALL nav links pointing to the same target (desktop + mobile)
+            // Exclude icon buttons from active styling logic, but still handle settings properly if needed
+            if (!link.classList.contains('icon-btn') || isSettingsIcon) {
+                navLinks.forEach(l => {
+                    if (l.getAttribute('data-target') === targetId) {
+                        l.classList.add('active');
+                    } else {
+                        // Don't remove active from settings icon btn if it wasn't the one clicked, wait actually we want to highlight active section.
+                        l.classList.remove('active');
+                    }
+                });
+            }
 
             // Update active section
             sections.forEach(sec => sec.classList.remove('active'));
@@ -1874,11 +1980,11 @@ function openDataModal(title, transactions, totalAmount, totalType = 'expense') 
             const catName = getCategoryPath(t.categoryId);
 
             tr.innerHTML = `
-                <td>${t.date}</td>
-                <td><span class="${t.type === 'income' ? 'text-green' : 'text-red'}">${t.type === 'income' ? 'Revenu' : 'Dépense'}</span></td>
-                <td>${catName}</td>
-                <td>${t.note || ''}</td>
-                <td class="${t.type === 'income' ? 'text-green' : 'text-red'}">${t.type === 'income' ? '+' : '-'}${t.amount.toFixed(2)} €</td>
+                <td data-label="Date">${t.date}</td>
+                <td data-label="Type"><span class="${t.type === 'income' ? 'text-green' : 'text-red'}">${t.type === 'income' ? 'Revenu' : 'Dépense'}</span></td>
+                <td data-label="Catégorie">${catName}</td>
+                <td data-label="Note">${t.note || ''}</td>
+                <td data-label="Montant" class="${t.type === 'income' ? 'text-green' : 'text-red'}">${t.type === 'income' ? '+' : '-'}${t.amount.toFixed(2)} €</td>
             `;
             tbody.appendChild(tr);
         });
@@ -1936,16 +2042,16 @@ function renderTagsOverview() {
         const tr = document.createElement('tr');
 
         tr.innerHTML = `
-            <td>
+            <td data-label="Tag">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                     <input type="color" value="${tag.color}" onchange="updateTagColor('${tag.id}', this.value)" style="width: 25px; height: 25px; padding: 0; border: none; border-radius: 4px; cursor: pointer;" title="Changer la couleur">
                     <span class="tag-chip"><span class="tag-dot" style="background-color: ${tag.color};"></span>${tag.name}</span>
                 </div>
             </td>
-            <td class="text-green">+${income.toFixed(2)} €</td>
-            <td class="text-red">-${expense.toFixed(2)} €</td>
-            <td class="${balanceClass}">${balanceSign}${balance.toFixed(2)} €</td>
-            <td>
+            <td data-label="Revenus Totaux" class="text-green">+${income.toFixed(2)} €</td>
+            <td data-label="Dépenses Totales" class="text-red">-${expense.toFixed(2)} €</td>
+            <td data-label="Bilan" class="${balanceClass}">${balanceSign}${balance.toFixed(2)} €</td>
+            <td data-label="Actions">
                 <button class="btn btn-primary btn-small" onclick="viewTagHistory('${tag.id}')">Historique</button>
                 <button class="btn btn-secondary btn-small" onclick="renameTagPrompt('${tag.id}')">Renommer</button>
                 <button class="btn btn-danger btn-small" onclick="deleteTag('${tag.id}')">Supprimer</button>
