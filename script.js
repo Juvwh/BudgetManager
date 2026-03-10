@@ -2009,9 +2009,12 @@ document.getElementById('data-modal-overlay').addEventListener('click', (e) => {
 
 // Exposer les fonctions au contexte global (car module)
 window.deleteTransaction = deleteTransaction;
-window.editTransaction = editTransaction;
+
+// Fallback: Seulement exposer les fonctions de base si la version mobile n'est pas déjà définie,
+// pour éviter d'écraser la surcharge faite dans DOMContentLoaded.
+if (typeof window.editTransaction === 'undefined') window.editTransaction = editTransaction;
 window.deleteSubscription = deleteSubscription;
-window.editSubscription = editSubscription;
+if (typeof window.editSubscription === 'undefined') window.editSubscription = editSubscription;
 window.viewSubscriptionHistory = viewSubscriptionHistory;
 window.deleteCategory = deleteCategory;
 window.renderTransactions = renderTransactions;
