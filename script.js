@@ -24,6 +24,7 @@ const ADMIN_EMAIL = "admin@monbudget.app";
 // --- STATE MANAGEMENT ---
 let appData = {
     spendingGoal: 600,
+    monthlyGoals: {},
     transactions: [],
     subscriptions: [],
     categories: [
@@ -66,6 +67,7 @@ async function saveData() {
         const userDocRef = doc(db, "users", "admin");
         await setDoc(userDocRef, {
             spendingGoal: appData.spendingGoal,
+            monthlyGoals: appData.monthlyGoals || {},
             transactions: appData.transactions,
             subscriptions: appData.subscriptions,
             categories: appData.categories,
@@ -88,6 +90,7 @@ async function loadData() {
         if (docSnap.exists()) {
             const parsed = docSnap.data();
             if(parsed.spendingGoal) appData.spendingGoal = parsed.spendingGoal;
+            if(parsed.monthlyGoals) appData.monthlyGoals = parsed.monthlyGoals;
             if(parsed.transactions) appData.transactions = parsed.transactions;
             if(parsed.subscriptions) appData.subscriptions = parsed.subscriptions;
             if(parsed.categories) appData.categories = parsed.categories;
@@ -820,6 +823,43 @@ function drawHorizontalBarChart(canvasId, dataObj) {
 }
 
 
+function calculateTotalSavings() {
+    let allMonths = new Set();
+
+    // Add all months with transactions
+    appData.transactions.forEach(t => {
+        if (t.date && t.date.length >= 7) {
+            allMonths.add(t.date.substring(0, 7));
+        }
+    });
+
+    // Add all months with specific goals
+    if (appData.monthlyGoals) {
+        Object.keys(appData.monthlyGoals).forEach(month => {
+            allMonths.add(month);
+        });
+    }
+
+    let totalSavings = 0;
+
+    Array.from(allMonths).forEach(monthStr => {
+        const parts = monthStr.split('-');
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10);
+
+        const data = getMonthData(year, month);
+
+        let goal = appData.spendingGoal;
+        if (appData.monthlyGoals && appData.monthlyGoals[monthStr] !== undefined) {
+            goal = appData.monthlyGoals[monthStr];
+        }
+
+        totalSavings += (goal - data.expense);
+    });
+
+    return totalSavings;
+}
+
 function updateDashboard() {
     let currentYear, currentMonth;
 
@@ -843,7 +883,13 @@ function updateDashboard() {
     // Update Goal Progress Bar
     const progressBar = document.getElementById('goal-progress-bar');
     const progressText = document.getElementById('goal-progress-text');
-    const goal = appData.spendingGoal;
+
+    let goal = appData.spendingGoal;
+    const monthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+    if (appData.monthlyGoals && appData.monthlyGoals[monthStr] !== undefined) {
+        goal = appData.monthlyGoals[monthStr];
+    }
+
     const spent = currentData.expense;
 
     let percentage = 0;
@@ -864,6 +910,19 @@ function updateDashboard() {
     }
 
     progressText.textContent = `${spent.toFixed(2)} € dépénsés sur ${goal.toFixed(2)} € (${percentage.toFixed(1)}%)`;
+
+    // Update Total Savings Text
+    const totalSavingsElement = document.getElementById('total-savings-text');
+    const totalSavings = calculateTotalSavings();
+
+    if (totalSavings >= 0) {
+        totalSavingsElement.textContent = `+${totalSavings.toFixed(2)} €`;
+        totalSavingsElement.className = 'text-green';
+    } else {
+        totalSavingsElement.textContent = `${totalSavings.toFixed(2)} €`;
+        totalSavingsElement.className = 'text-red';
+    }
+
 
     // Draw Pie Chart for Categories
     drawPieChart('pieChartCategory', currentData.categoryExpenses);
@@ -1060,6 +1119,7 @@ async function checkLocalDataForMigration() {
                     const parsedLocal = JSON.parse(localDataStr);
                     // Remplacer appData courant (celui de firestore s'il y en avait, mais logiquement on migre vers un compte vide)
                     if(parsedLocal.spendingGoal) appData.spendingGoal = parsedLocal.spendingGoal;
+                    if(parsedLocal.monthlyGoals) appData.monthlyGoals = parsedLocal.monthlyGoals;
                     if(parsedLocal.transactions) appData.transactions = parsedLocal.transactions;
                     if(parsedLocal.subscriptions) appData.subscriptions = parsedLocal.subscriptions;
                     if(parsedLocal.categories) appData.categories = parsedLocal.categories;
@@ -1392,13 +1452,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // 7. Settings - Spending Goal
+    const settingsMonthInput = document.getElementById('setting-spending-month');
+    const settingsGoalInput = document.getElementById('setting-spending-goal');
+
+    settingsMonthInput.addEventListener('change', () => {
+        const selectedMonth = settingsMonthInput.value;
+        if (selectedMonth && appData.monthlyGoals && appData.monthlyGoals[selectedMonth] !== undefined) {
+            settingsGoalInput.value = appData.monthlyGoals[selectedMonth];
+        } else {
+            settingsGoalInput.value = appData.spendingGoal;
+        }
+    });
+
     document.getElementById('form-settings-goal').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const goalInput = document.getElementById('setting-spending-goal');
-        appData.spendingGoal = parseFloat(goalInput.value);
+        const goalValue = parseFloat(settingsGoalInput.value);
+        const selectedMonth = settingsMonthInput.value;
+
+        if (selectedMonth) {
+            if (!appData.monthlyGoals) appData.monthlyGoals = {};
+            appData.monthlyGoals[selectedMonth] = goalValue;
+            alert(`Objectif de dépense mis à jour pour le mois de ${selectedMonth} !`);
+        } else {
+            appData.spendingGoal = goalValue;
+            alert("Objectif de dépense par défaut mis à jour !");
+        }
+
         await saveData();
         updateDashboard();
-        alert("Objectif de dépense mis à jour !");
     });
 
     // 8. Settings - Export / Import / Reset
@@ -1445,6 +1526,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Remettre à zéro Firestore
             appData = {
                 spendingGoal: 600,
+                monthlyGoals: {},
                 transactions: [],
                 subscriptions: [],
                 categories: []
