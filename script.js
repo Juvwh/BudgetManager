@@ -126,6 +126,47 @@ function toggleTransactionTagFilter(tagId) {
 }
 window.toggleTransactionTagFilter = toggleTransactionTagFilter;
 
+// --- TAGS MANAGEMENT (UI FORM) ---
+function renderTransactionTagsSelector() {
+    const container = document.getElementById('trans-tags-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const selectedTagsStr = document.getElementById('trans-selected-tags').value;
+    let selectedTags = [];
+    try {
+        selectedTags = JSON.parse(selectedTagsStr);
+    } catch (e) { selectedTags = []; }
+
+    appData.tags.forEach(tag => {
+        const isSelected = selectedTags.includes(tag.id);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `btn btn-small filter-chip tag-filter-chip ${isSelected ? 'active' : ''}`;
+
+        btn.innerHTML = `<span class="tag-dot" style="background-color: ${tag.color};"></span>${tag.name}`;
+        btn.onclick = () => toggleTransactionTag(tag.id);
+        container.appendChild(btn);
+    });
+}
+
+function toggleTransactionTag(tagId) {
+    const input = document.getElementById('trans-selected-tags');
+    let selectedTags = [];
+    try { selectedTags = JSON.parse(input.value); } catch(e) {}
+
+    if (selectedTags.includes(tagId)) {
+        selectedTags = selectedTags.filter(id => id !== tagId);
+    } else {
+        selectedTags.push(tagId);
+    }
+
+    input.value = JSON.stringify(selectedTags);
+    renderTransactionTagsSelector();
+}
+
+window.toggleTransactionTag = toggleTransactionTag;
+
 function renderTransactions() {
     const tbody = document.querySelector('#table-transactions tbody');
     tbody.innerHTML = '';
@@ -243,6 +284,44 @@ async function deleteTransaction(id) {
     }
 }
 
+// Helper to move form into edit modal
+function openEditModal(formId, title) {
+    const editModal = document.getElementById('edit-modal-overlay');
+    const editModalContainer = document.getElementById('edit-modal-container');
+    const modalTitle = document.getElementById('edit-modal-title');
+    const formElement = document.getElementById(formId);
+
+    // Save original parent
+    if (!formElement.dataset.originalParentId) {
+        formElement.dataset.originalParentId = formElement.parentElement.className;
+        formElement.originalParent = formElement.parentElement;
+    }
+
+    modalTitle.textContent = title;
+    editModalContainer.innerHTML = '';
+    editModalContainer.appendChild(formElement);
+    editModal.classList.add('active');
+}
+
+window.closeEditModal = function() {
+    const editModal = document.getElementById('edit-modal-overlay');
+    const editModalContainer = document.getElementById('edit-modal-container');
+    const formElement = editModalContainer.querySelector('form');
+
+    if (formElement && formElement.originalParent) {
+        formElement.originalParent.appendChild(formElement);
+    }
+
+    editModal.classList.remove('active');
+
+    // Reset forms after closing modal
+    if (formElement && formElement.id === 'form-transaction') {
+        resetTransactionForm();
+    } else if (formElement && formElement.id === 'form-subscription') {
+        resetSubscriptionForm();
+    }
+};
+
 function editTransaction(id) {
     const trans = appData.transactions.find(t => t.id === id);
     if (!trans) return;
@@ -262,11 +341,15 @@ function editTransaction(id) {
 
     // Changer l'état des boutons
     document.getElementById('btn-submit-trans').textContent = "Mettre à jour";
-    document.getElementById('btn-cancel-edit-trans').style.display = 'inline-block';
+    document.getElementById('btn-cancel-edit-trans').style.display = 'none'; // Pas besoin dans la modale, on a la croix
+
+    openEditModal('form-transaction', "Modifier la transaction");
 }
 
 function resetTransactionForm() {
-    document.getElementById('form-transaction').reset();
+    const form = document.getElementById('form-transaction');
+    if (!form) return;
+    form.reset();
     document.getElementById('trans-id').value = '';
     document.getElementById('trans-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('trans-type').value = 'expense';
@@ -276,7 +359,8 @@ function resetTransactionForm() {
     renderTransactionTagsSelector();
 
     document.getElementById('btn-submit-trans').textContent = "Ajouter";
-    document.getElementById('btn-cancel-edit-trans').style.display = 'none';
+    const cancelBtn = document.getElementById('btn-cancel-edit-trans');
+    if (cancelBtn) cancelBtn.style.display = 'none';
 }
 
 // --- SUBSCRIPTIONS MANAGEMENT ---
@@ -379,11 +463,15 @@ function editSubscription(id) {
     document.getElementById('sub-apply-past-container').style.display = 'flex';
     document.getElementById('sub-apply-past').checked = false;
     document.getElementById('btn-submit-sub').textContent = "Mettre à jour";
-    document.getElementById('btn-cancel-edit-sub').style.display = 'inline-block';
+    document.getElementById('btn-cancel-edit-sub').style.display = 'none'; // Pas besoin dans la modale
+
+    openEditModal('form-subscription', "Modifier l'abonnement");
 }
 
 function resetSubscriptionForm() {
-    document.getElementById('form-subscription').reset();
+    const form = document.getElementById('form-subscription');
+    if (!form) return;
+    form.reset();
     document.getElementById('sub-id').value = '';
     document.getElementById('sub-start-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('sub-type').value = 'expense';
@@ -391,7 +479,8 @@ function resetSubscriptionForm() {
 
     document.getElementById('sub-apply-past-container').style.display = 'none';
     document.getElementById('btn-submit-sub').textContent = "Ajouter";
-    document.getElementById('btn-cancel-edit-sub').style.display = 'none';
+    const cancelBtn = document.getElementById('btn-cancel-edit-sub');
+    if(cancelBtn) cancelBtn.style.display = 'none';
 }
 
 async function deleteSubscription(id) {
@@ -964,49 +1053,6 @@ function updateDashboard() {
         currentMonth = now.getMonth() + 1;
         document.getElementById('dash-filter-month').value = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
     }
-
-// --- TAGS MANAGEMENT (UI FORM) ---
-function renderTransactionTagsSelector() {
-    const container = document.getElementById('trans-tags-container');
-    if (!container) return;
-    container.innerHTML = '';
-
-    const selectedTagsStr = document.getElementById('trans-selected-tags').value;
-    let selectedTags = [];
-    try {
-        selectedTags = JSON.parse(selectedTagsStr);
-    } catch (e) { selectedTags = []; }
-
-    appData.tags.forEach(tag => {
-        const isSelected = selectedTags.includes(tag.id);
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = `btn btn-small filter-chip tag-filter-chip ${isSelected ? 'active' : ''}`;
-
-        btn.innerHTML = `<span class="tag-dot" style="background-color: ${tag.color};"></span>${tag.name}`;
-        btn.onclick = () => toggleTransactionTag(tag.id);
-        container.appendChild(btn);
-    });
-}
-
-function toggleTransactionTag(tagId) {
-    const input = document.getElementById('trans-selected-tags');
-    let selectedTags = [];
-    try { selectedTags = JSON.parse(input.value); } catch(e) {}
-
-    if (selectedTags.includes(tagId)) {
-        selectedTags = selectedTags.filter(id => id !== tagId);
-    } else {
-        selectedTags.push(tagId);
-    }
-
-    input.value = JSON.stringify(selectedTags);
-    renderTransactionTagsSelector();
-}
-
-window.toggleTransactionTag = toggleTransactionTag;
-
-// --- DASHBOARD & CHARTS MANAGEMENT ---
 
     // Update current month summary cards
     const currentData = getMonthData(currentYear, currentMonth);
@@ -1608,35 +1654,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Handle Edit button click on mobile to open modal
-    const originalEditTransaction = window.editTransaction;
-    window.editTransaction = function(id) {
-        originalEditTransaction(id);
-        if (window.innerWidth <= 768) {
-            modalTitle.textContent = "Modifier la transaction";
-            mobileModalContainer.appendChild(formOriginalParents['form-transaction']);
-            mobileModal.classList.add('active');
-        }
-    };
+    // On desktop and mobile, editTransaction now uses openEditModal.
+    // So we don't need to override editTransaction and editSubscription here anymore.
 
-    const originalEditSubscription = window.editSubscription;
-    window.editSubscription = function(id) {
-        originalEditSubscription(id);
-        if (window.innerWidth <= 768) {
-            modalTitle.textContent = "Modifier l'abonnement";
-            mobileModalContainer.appendChild(formOriginalParents['form-subscription']);
-            mobileModal.classList.add('active');
-        }
-    };
-
-    // Close modal on submit
+    // Close modals on submit
     document.getElementById('form-transaction').addEventListener('submit', () => {
          if(mobileModal.classList.contains('active')) {
              btnCloseMobileModal.click();
+         }
+         if(document.getElementById('edit-modal-overlay').classList.contains('active')) {
+             closeEditModal();
          }
     });
     document.getElementById('form-subscription').addEventListener('submit', () => {
          if(mobileModal.classList.contains('active')) {
              btnCloseMobileModal.click();
+         }
+         if(document.getElementById('edit-modal-overlay').classList.contains('active')) {
+             closeEditModal();
          }
     });
 
@@ -2007,6 +2042,15 @@ document.getElementById('data-modal-overlay').addEventListener('click', (e) => {
     }
 });
 
+document.getElementById('btn-close-edit-modal').addEventListener('click', closeEditModal);
+
+document.getElementById('edit-modal-overlay').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('edit-modal-overlay')) {
+        closeEditModal();
+    }
+});
+
+
 // Exposer les fonctions au contexte global (car module)
 window.deleteTransaction = deleteTransaction;
 
@@ -2021,6 +2065,7 @@ window.renderTransactions = renderTransactions;
 window.renderSubscriptions = renderSubscriptions;
 window.updateCategorySelects = updateCategorySelects;
 window.renderCategoryTree = renderCategoryTree;
+window.renderTransactionTagsSelector = renderTransactionTagsSelector;
 // --- TAGS OVERVIEW ---
 function renderTagsOverview() {
     const tbody = document.querySelector('#table-tags-overview tbody');
