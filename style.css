@@ -654,8 +654,8 @@ h3 {
         display: none;
     }
 
-    /* Sauf s'il est utilisé à l'intérieur de la modale pleine page, on l'affichera */
-    .mobile-modal .form-panel {
+    /* Sauf s'il est utilisé à l'intérieur d'une modale, on l'affichera */
+    .mobile-modal .form-panel, #edit-modal-overlay .form-panel {
         display: block;
         box-shadow: none;
         border: none;
