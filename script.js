@@ -1061,7 +1061,14 @@ function updateDashboard() {
 
     // Update Goal Progress Bar
     const progressBar = document.getElementById('goal-progress-bar');
-    const progressText = document.getElementById('goal-progress-text');
+    const currentMarker = document.getElementById('progress-current-marker');
+    const currentText = document.getElementById('progress-current-text');
+    const spentValueSpan = document.getElementById('progress-spent-value');
+    const spentPercentSpan = document.getElementById('progress-spent-percent');
+    const remainingText = document.getElementById('progress-remaining-text');
+    const limitText = document.getElementById('progress-limit-text');
+    const overWarning = document.getElementById('progress-over-warning');
+    const overValue = document.getElementById('progress-over-value');
 
     let goal = appData.spendingGoal;
     const monthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
@@ -1076,19 +1083,49 @@ function updateDashboard() {
         percentage = (spent / goal) * 100;
     }
 
-    // Cap at 100% for display purposes if wanted, but going over 100% is fine, just cap width at 100%
-    progressBar.style.width = Math.min(percentage, 100) + '%';
+    const displayPercentage = Math.min(percentage, 100);
 
-    // Change color based on percentage
-    if (percentage < 75) {
-        progressBar.style.backgroundColor = 'var(--success-color)';
-    } else if (percentage < 100) {
-        progressBar.style.backgroundColor = 'var(--warning-color)'; // Needs definition in CSS
+    // Apply widths and positions
+    progressBar.style.width = displayPercentage + '%';
+    currentMarker.style.left = displayPercentage + '%';
+    currentText.style.left = displayPercentage + '%';
+
+    // Update texts
+    spentValueSpan.textContent = spent.toFixed(2) + '€';
+    spentPercentSpan.textContent = percentage.toFixed(1) + '%';
+    limitText.textContent = goal.toFixed(2) + '€';
+
+    // Calculate remaining and update UI logic
+    if (spent <= goal) {
+        // Under or at goal
+        const remaining = goal - spent;
+        remainingText.textContent = remaining.toFixed(2) + '€';
+
+        // Position remaining text in the middle of the empty space
+        const remainingCenterPos = displayPercentage + ((100 - displayPercentage) / 2);
+        remainingText.style.left = remainingCenterPos + '%';
+        remainingText.style.display = 'block';
+
+        // Colors (Apple blue / accent-color)
+        progressBar.style.backgroundColor = 'var(--accent-color)';
+        currentMarker.style.backgroundColor = 'var(--accent-color)';
+        currentText.style.color = 'var(--accent-color)';
+
+        overWarning.style.display = 'none';
     } else {
-        progressBar.style.backgroundColor = 'var(--danger-color)';
-    }
+        // Over goal
+        const overAmount = spent - goal;
+        remainingText.style.display = 'none'; // Hide remaining text
 
-    progressText.textContent = `${spent.toFixed(2)} € dépénsés sur ${goal.toFixed(2)} € (${percentage.toFixed(1)}%)`;
+        // Colors (Apple Red / danger-color)
+        progressBar.style.backgroundColor = 'var(--danger-color)';
+        currentMarker.style.backgroundColor = 'var(--danger-color)';
+        currentText.style.color = 'var(--danger-color)';
+
+        // Show warning
+        overValue.textContent = overAmount.toFixed(2) + '€';
+        overWarning.style.display = 'block';
+    }
 
     // Draw Pie Chart for Categories
     drawPieChart('pieChartCategory', currentData.categoryExpenses);
@@ -2066,6 +2103,7 @@ window.renderSubscriptions = renderSubscriptions;
 window.updateCategorySelects = updateCategorySelects;
 window.renderCategoryTree = renderCategoryTree;
 window.renderTransactionTagsSelector = renderTransactionTagsSelector;
+window.updateDashboard = updateDashboard;
 // --- TAGS OVERVIEW ---
 function renderTagsOverview() {
     const tbody = document.querySelector('#table-tags-overview tbody');
@@ -2097,7 +2135,7 @@ function renderTagsOverview() {
         tr.innerHTML = `
             <td data-label="Tag">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <input type="color" value="${tag.color}" onchange="updateTagColor('${tag.id}', this.value)" style="width: 25px; height: 25px; padding: 0; border: none; border-radius: 4px; cursor: pointer;" title="Changer la couleur">
+                    <input type="color" value="${tag.color}" onchange="updateTagColor('${tag.id}', this.value)" style="width: 25px; height: 25px; padding: 0; border: none; cursor: pointer;" title="Changer la couleur">
                     <span class="tag-chip"><span class="tag-dot" style="background-color: ${tag.color};"></span>${tag.name}</span>
                 </div>
             </td>
