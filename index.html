@@ -250,11 +250,16 @@
                             <select id="trans-type" required>
                                 <option value="expense">Dépense</option>
                                 <option value="income">Revenu</option>
+                                <option value="salary">Salaire</option>
                             </select>
                         </div>
-                        <div class="form-group">
-                            <label>Montant (€)</label>
+                        <div class="form-group" id="trans-amount-group">
+                            <label id="trans-amount-label">Montant (€)</label>
                             <input type="number" id="trans-amount" step="0.01" min="0" required>
+                        </div>
+                        <div class="form-group" id="trans-savings-group" style="display: none;">
+                            <label>Montant à épargner (€)</label>
+                            <input type="number" id="trans-savings-amount" step="0.01" min="0" value="0">
                         </div>
                         <div class="form-group">
                             <label>Date</label>
@@ -295,6 +300,7 @@
                         <div id="quick-filters" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                             <button class="btn btn-small filter-chip active" data-filter="all">Toutes</button>
                             <button class="btn btn-small filter-chip" data-filter="income" style="background-color: var(--success-color); color: white;">Revenus</button>
+                            <button class="btn btn-small filter-chip" data-filter="salary" style="background-color: var(--primary-color); color: white;">Salaires</button>
                             <button class="btn btn-small filter-chip" data-filter="expense" style="background-color: var(--danger-color); color: white;">Dépenses</button>
                             <!-- Top categories injected by JS -->
                         </div>
@@ -473,10 +479,17 @@
         <section id="savings" class="view-section hidden">
             <h2 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">Économies & Historique des objectifs</h2>
 
-            <div class="card card-elegant" style="text-align: center; max-width: 400px; margin: 0 auto 2rem auto;">
-                <h3>Total Économisé (Tous les mois)</h3>
-                <p id="savings-view-total" style="font-size: 2.5rem; font-weight: bold; margin: 0.5rem 0 0 0;">0.00 €</p>
-                <p style="color: var(--text-color); opacity: 0.8; font-size: 0.9rem;">Ce total représente la somme de l'argent non-dépensé sur vos objectifs mensuels.</p>
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; margin-bottom: 2rem;">
+                <div class="card card-elegant" style="text-align: center; flex: 1; min-width: 280px; max-width: 400px;">
+                    <h3>Total Économisé (Tous les mois)</h3>
+                    <p id="savings-view-total" style="font-size: 2.5rem; font-weight: bold; margin: 0.5rem 0 0 0;">0.00 €</p>
+                    <p style="color: var(--text-color); opacity: 0.8; font-size: 0.9rem;">Somme de l'argent non-dépensé sur vos objectifs mensuels.</p>
+                </div>
+                <div class="card card-elegant" style="text-align: center; flex: 1; min-width: 280px; max-width: 400px; border-left: 4px solid var(--primary-color);">
+                    <h3>Total Épargné (Cumulé)</h3>
+                    <p id="savings-view-real-saved" style="font-size: 2.5rem; font-weight: bold; margin: 0.5rem 0 0 0; color: var(--primary-color);">0.00 €</p>
+                    <p style="color: var(--text-color); opacity: 0.8; font-size: 0.9rem;">Somme de l'épargne mise de côté lors de l'ajout de vos salaires.</p>
+                </div>
             </div>
 
             <div class="card">
@@ -486,9 +499,12 @@
                         <thead>
                             <tr>
                                 <th>Mois</th>
+                                <th>Revenus réels</th>
                                 <th>Objectif</th>
                                 <th>Dépenses réelles</th>
                                 <th>Économie (Bilan)</th>
+                                <th>Épargne du mois</th>
+                                <th>Bénéfice Réel</th>
                             </tr>
                         </thead>
                         <tbody>
