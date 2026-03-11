@@ -183,6 +183,8 @@ function renderTransactions() {
         filteredTrans = filteredTrans.filter(t => t.type === 'income');
     } else if (currentTransactionFilter === 'expense') {
         filteredTrans = filteredTrans.filter(t => t.type === 'expense');
+    } else if (currentTransactionFilter === 'salary') {
+        filteredTrans = filteredTrans.filter(t => t.type === 'salary');
     } else if (currentTransactionFilter.startsWith('cat-')) {
         // Includes subcategories
         filteredTrans = filteredTrans.filter(t => {
@@ -224,15 +226,38 @@ function renderTransactions() {
             });
         }
 
-        const formattedAmount = isCorrupted ? 'Erreur (NaN)' : `${t.type === 'income' ? '+' : '-'}${Number(t.amount).toFixed(2)} €`;
+        let formattedAmount = '';
+        if (isCorrupted) {
+            formattedAmount = 'Erreur (NaN)';
+        } else if (t.type === 'expense') {
+            formattedAmount = `-${Number(t.amount).toFixed(2)} €`;
+        } else {
+            formattedAmount = `+${Number(t.amount).toFixed(2)} €`;
+        }
+
+        let displayType = '';
+        let typeColor = '';
+        if (t.type === 'income') {
+            displayType = 'Revenu';
+            typeColor = 'text-green';
+        } else if (t.type === 'salary') {
+            displayType = 'Salaire';
+            typeColor = 'text-primary'; // Using primary color for salary
+            if (t.savedAmount) {
+                formattedAmount += ` <br><small style="color:var(--text-color);">(Épargné: ${Number(t.savedAmount).toFixed(2)} €)</small>`;
+            }
+        } else {
+            displayType = 'Dépense';
+            typeColor = 'text-red';
+        }
 
         tr.innerHTML = `
             <td data-label="Date">${t.date || 'Erreur'}</td>
-            <td data-label="Type"><span class="${t.type === 'income' ? 'text-green' : 'text-red'}">${t.type === 'income' ? 'Revenu' : 'Dépense'}</span></td>
+            <td data-label="Type"><span class="${typeColor}">${displayType}</span></td>
             <td data-label="Catégorie">${catName} ${isCorrupted ? '<span class="cat-type-badge badge-expense" style="margin-left: 5px;">Corrompu</span>' : ''}</td>
             <td data-label="Note">${t.note || ''}</td>
             <td data-label="Tags"><div style="display: flex; gap: 4px; flex-wrap: wrap;">${tagsHtml}</div></td>
-            <td data-label="Montant" class="${t.type === 'income' ? 'text-green' : 'text-red'}">${formattedAmount}</td>
+            <td data-label="Montant" class="${t.type === 'expense' ? 'text-red' : 'text-green'}">${formattedAmount}</td>
             <td data-label="Actions">
                 <button class="btn btn-secondary btn-small" onclick="editTransaction('${t.id}')">Modifier</button>
                 <button class="btn btn-danger btn-small" onclick="deleteTransaction('${t.id}')">Supprimer</button>
@@ -340,6 +365,9 @@ function editTransaction(id) {
     document.getElementById('trans-type').value = trans.type;
     document.getElementById('trans-type').dispatchEvent(new Event('change')); // Mettre à jour les catégories
     document.getElementById('trans-amount').value = trans.amount;
+    if (trans.type === 'salary') {
+        document.getElementById('trans-savings-amount').value = trans.savedAmount || 0;
+    }
     document.getElementById('trans-date').value = trans.date;
     document.getElementById('trans-category').value = trans.categoryId;
     document.getElementById('trans-note').value = trans.note || '';
@@ -516,11 +544,17 @@ function getMonthData(year, month) {
 
     let income = 0;
     let expense = 0;
+    let savings = 0;
     let categoryExpenses = {};
 
     trans.forEach(t => {
-        if (t.type === 'income') income += t.amount;
-        else {
+        if (t.type === 'income') {
+            income += t.amount;
+        } else if (t.type === 'salary') {
+            const saved = t.savedAmount || 0;
+            savings += saved;
+            income += (t.amount - saved); // Only non-saved part goes to income
+        } else {
             expense += t.amount;
             // Get main category (if it's a sub, we get its parent for high-level charts, or just use it direct. Let's group by top-level category for clarity)
             const cat = appData.categories.find(c => c.id === t.categoryId);
@@ -532,7 +566,7 @@ function getMonthData(year, month) {
         }
     });
 
-    return { income, expense, balance: income - expense, categoryExpenses };
+    return { income, expense, savings, balance: income - expense, categoryExpenses };
 }
 
 function getMultiMonthCategoryData(startYear, startMonth, numberOfMonths) {
@@ -1004,6 +1038,7 @@ function renderSavings() {
     const sortedMonths = Array.from(allMonths).sort().reverse();
 
     let totalSavings = 0;
+    let totalRealSaved = 0;
     const tbody = document.querySelector('#table-savings-history tbody');
     tbody.innerHTML = '';
 
@@ -1023,6 +1058,9 @@ function renderSavings() {
 
         const savingsForMonth = goal - data.expense;
         totalSavings += savingsForMonth;
+        totalRealSaved += data.savings;
+
+        const realProfit = data.income - data.expense;
 
         const tr = document.createElement('tr');
 
@@ -1031,18 +1069,25 @@ function renderSavings() {
         // Define colors for UI
         const savingsClass = savingsForMonth >= 0 ? 'text-green' : 'text-red';
         const savingsSign = savingsForMonth >= 0 ? '+' : '';
+        const realProfitClass = realProfit >= 0 ? 'text-green' : 'text-red';
+        const realProfitSign = realProfit >= 0 ? '+' : '';
+        const incomeColor = 'text-green';
+        const incomeSign = '+';
 
         tr.innerHTML = `
             <td data-label="Mois">${formattedMonth}</td>
+            <td data-label="Revenus réels" class="${incomeColor}">${incomeSign}${data.income.toFixed(2)} €</td>
             <td data-label="Objectif">${goal.toFixed(2)} €</td>
             <td data-label="Dépenses réelles" class="text-red">-${data.expense.toFixed(2)} €</td>
             <td data-label="Économie (Bilan)" class="${savingsClass}">${savingsSign}${savingsForMonth.toFixed(2)} €</td>
+            <td data-label="Épargne du mois" class="text-primary">${data.savings > 0 ? '+' : ''}${data.savings.toFixed(2)} €</td>
+            <td data-label="Bénéfice Réel" class="${realProfitClass}" style="font-weight: bold;">${realProfitSign}${realProfit.toFixed(2)} €</td>
         `;
         tbody.appendChild(tr);
     });
 
     if (sortedMonths.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Aucune donnée disponible.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Aucune donnée disponible.</td></tr>';
     }
 
     // Update Total Savings view
@@ -1054,6 +1099,10 @@ function renderSavings() {
         totalSavingsElement.textContent = `${totalSavings.toFixed(2)} €`;
         totalSavingsElement.className = 'text-red';
     }
+
+    // Update Real Saved view
+    const totalRealSavedElement = document.getElementById('savings-view-real-saved');
+    totalRealSavedElement.textContent = `+${totalRealSaved.toFixed(2)} €`;
 }
 
 function updateDashboard() {
@@ -1230,7 +1279,8 @@ function updateCategorySelects() {
 
     // Filter by type for transactions/subscriptions based on their selected type
     const populateTransSelect = () => {
-        const transType = document.getElementById('trans-type').value;
+        let transType = document.getElementById('trans-type').value;
+        if (transType === 'salary') transType = 'income'; // Share income categories for salary
         transSelect.innerHTML = '';
         appData.categories.filter(c => c.type === transType).forEach(c => {
             const opt = document.createElement('option');
@@ -1263,7 +1313,19 @@ function updateCategorySelects() {
     populateSubSelect();
 
     // Event listeners to update on type change
-    document.getElementById('trans-type').addEventListener('change', populateTransSelect);
+    document.getElementById('trans-type').addEventListener('change', (e) => {
+        populateTransSelect();
+        const type = e.target.value;
+        const savingsGroup = document.getElementById('trans-savings-group');
+        const amountLabel = document.getElementById('trans-amount-label');
+        if (type === 'salary') {
+            savingsGroup.style.display = 'block';
+            amountLabel.textContent = 'Montant Total du Salaire (€)';
+        } else {
+            savingsGroup.style.display = 'none';
+            amountLabel.textContent = 'Montant (€)';
+        }
+    });
     document.getElementById('sub-type').addEventListener('change', populateSubSelect);
 }
 
@@ -1831,6 +1893,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const type = document.getElementById('trans-type').value;
         const amount = parseFloat(document.getElementById('trans-amount').value);
+        const savedAmount = type === 'salary' ? parseFloat(document.getElementById('trans-savings-amount').value) || 0 : undefined;
         const date = document.getElementById('trans-date').value;
         const categoryId = document.getElementById('trans-category').value;
         const note = document.getElementById('trans-note').value;
@@ -1849,6 +1912,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     id: transId,
                     type,
                     amount,
+                    savedAmount,
                     date,
                     categoryId,
                     note,
@@ -1861,6 +1925,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 id: 'trans-' + generateId(),
                 type,
                 amount,
+                savedAmount,
                 date,
                 categoryId,
                 note,
@@ -2156,6 +2221,10 @@ function renderTagsOverview() {
         appData.transactions.forEach(t => {
             if (t.tagIds && t.tagIds.includes(tag.id)) {
                 if (t.type === 'income') income += t.amount;
+                else if (t.type === 'salary') {
+                    const saved = t.savedAmount || 0;
+                    income += (t.amount - saved);
+                }
                 else expense += t.amount;
             }
         });
