@@ -61,12 +61,34 @@ const STORAGE_KEY = 'budget_app_data';
 // Variable pour savoir si on est connecté ou non
 let isAuthenticated = false;
 
+// Helper pour retirer les valeurs undefined avant l'envoi vers Firestore
+function cleanDataForFirestore(obj) {
+    if (obj === null || typeof obj !== 'object') {
+        return obj;
+    }
+
+    if (Array.isArray(obj)) {
+        return obj.map(cleanDataForFirestore);
+    }
+
+    const cleaned = {};
+    for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            if (obj[key] !== undefined) {
+                cleaned[key] = cleanDataForFirestore(obj[key]);
+            }
+        }
+    }
+    return cleaned;
+}
+
 async function saveData() {
     if (!isAuthenticated) return; // Ne pas sauvegarder si pas connecté
 
     try {
         const userDocRef = doc(db, "users", "admin");
-        await setDoc(userDocRef, {
+
+        const dataToSave = {
             spendingGoal: appData.spendingGoal,
             monthlyGoals: appData.monthlyGoals || {},
             transactions: appData.transactions,
@@ -74,7 +96,12 @@ async function saveData() {
             tags: appData.tags || [],
             categories: appData.categories,
             updatedAt: new Date().toISOString()
-        });
+        };
+
+        // Firestore rejette les valeurs `undefined`
+        const cleanedData = cleanDataForFirestore(dataToSave);
+
+        await setDoc(userDocRef, cleanedData);
         console.log("Données sauvegardées sur Firestore avec succès.");
     } catch (error) {
         console.error("Erreur lors de la sauvegarde sur Firestore :", error);
