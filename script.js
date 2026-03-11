@@ -202,6 +202,13 @@ function renderTransactions() {
     filteredTrans.forEach(t => {
         const tr = document.createElement('tr');
         tr.className = 'clickable-row'; // Visual cue
+
+        const isCorrupted = isNaN(t.amount) || t.amount === null || t.amount === undefined || !t.date;
+        if (isCorrupted) {
+            tr.style.backgroundColor = 'rgba(255, 59, 48, 0.1)';
+            tr.style.borderLeft = '4px solid var(--danger-color)';
+        }
+
         tr.ondblclick = () => editTransaction(t.id); // Option C: Quick edit on double click
 
         const catName = getCategoryPath(t.categoryId);
@@ -217,13 +224,15 @@ function renderTransactions() {
             });
         }
 
+        const formattedAmount = isCorrupted ? 'Erreur (NaN)' : `${t.type === 'income' ? '+' : '-'}${Number(t.amount).toFixed(2)} €`;
+
         tr.innerHTML = `
-            <td data-label="Date">${t.date}</td>
+            <td data-label="Date">${t.date || 'Erreur'}</td>
             <td data-label="Type"><span class="${t.type === 'income' ? 'text-green' : 'text-red'}">${t.type === 'income' ? 'Revenu' : 'Dépense'}</span></td>
-            <td data-label="Catégorie">${catName}</td>
+            <td data-label="Catégorie">${catName} ${isCorrupted ? '<span class="cat-type-badge badge-expense" style="margin-left: 5px;">Corrompu</span>' : ''}</td>
             <td data-label="Note">${t.note || ''}</td>
             <td data-label="Tags"><div style="display: flex; gap: 4px; flex-wrap: wrap;">${tagsHtml}</div></td>
-            <td data-label="Montant" class="${t.type === 'income' ? 'text-green' : 'text-red'}">${t.type === 'income' ? '+' : '-'}${t.amount.toFixed(2)} €</td>
+            <td data-label="Montant" class="${t.type === 'income' ? 'text-green' : 'text-red'}">${formattedAmount}</td>
             <td data-label="Actions">
                 <button class="btn btn-secondary btn-small" onclick="editTransaction('${t.id}')">Modifier</button>
                 <button class="btn btn-danger btn-small" onclick="deleteTransaction('${t.id}')">Supprimer</button>
@@ -413,12 +422,20 @@ function renderSubscriptions() {
         const tr = document.createElement('tr');
         const freqMap = { 'weekly': 'Hebdomadaire', 'monthly': 'Mensuelle', 'yearly': 'Annuelle' };
 
+        const isCorrupted = isNaN(sub.amount) || sub.amount === null || sub.amount === undefined || !sub.startDate;
+        if (isCorrupted) {
+            tr.style.backgroundColor = 'rgba(255, 59, 48, 0.1)';
+            tr.style.borderLeft = '4px solid var(--danger-color)';
+        }
+
+        const formattedAmount = isCorrupted ? 'Erreur (NaN)' : `${Number(sub.amount).toFixed(2)} €`;
+
         tr.innerHTML = `
-            <td data-label="Nom">${sub.name}</td>
+            <td data-label="Nom">${sub.name || 'Sans Nom'} ${isCorrupted ? '<span class="cat-type-badge badge-expense" style="margin-left: 5px;">Corrompu</span>' : ''}</td>
             <td data-label="Type"><span class="${sub.type === 'income' ? 'text-green' : 'text-red'}">${sub.type === 'income' ? 'Revenu' : 'Dépense'}</span></td>
-            <td data-label="Fréquence">${freqMap[sub.frequency]}</td>
-            <td data-label="Montant" class="${sub.type === 'income' ? 'text-green' : 'text-red'}">${sub.amount.toFixed(2)} €</td>
-            <td data-label="Prochaine date">${sub.nextDate || sub.startDate}</td>
+            <td data-label="Fréquence">${freqMap[sub.frequency] || 'Inconnue'}</td>
+            <td data-label="Montant" class="${sub.type === 'income' ? 'text-green' : 'text-red'}">${formattedAmount}</td>
+            <td data-label="Prochaine date">${sub.nextDate || sub.startDate || 'Erreur'}</td>
             <td data-label="Actions">
                 <button class="btn btn-primary btn-small" onclick="viewSubscriptionHistory('${sub.id}')">Historique</button>
                 <button class="btn btn-secondary btn-small" onclick="editSubscription('${sub.id}')">Modifier</button>
@@ -1041,6 +1058,17 @@ function renderSavings() {
 
 function updateDashboard() {
     let currentYear, currentMonth;
+
+    const warningBanner = document.getElementById('dashboard-warning-banner');
+    if (warningBanner) {
+        const hasCorruptedTrans = appData.transactions.some(t => isNaN(t.amount) || t.amount === null || t.amount === undefined || !t.date);
+        const hasCorruptedSub = appData.subscriptions.some(s => isNaN(s.amount) || s.amount === null || s.amount === undefined || !s.startDate);
+        if (hasCorruptedTrans || hasCorruptedSub) {
+            warningBanner.style.display = 'block';
+        } else {
+            warningBanner.style.display = 'none';
+        }
+    }
 
     const dashMonthFilter = document.getElementById('dash-filter-month').value;
     if (dashMonthFilter) {
@@ -1695,22 +1723,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // So we don't need to override editTransaction and editSubscription here anymore.
 
     // Close modals on submit
-    document.getElementById('form-transaction').addEventListener('submit', () => {
-         if(mobileModal.classList.contains('active')) {
-             btnCloseMobileModal.click();
-         }
-         if(document.getElementById('edit-modal-overlay').classList.contains('active')) {
-             closeEditModal();
-         }
-    });
-    document.getElementById('form-subscription').addEventListener('submit', () => {
-         if(mobileModal.classList.contains('active')) {
-             btnCloseMobileModal.click();
-         }
-         if(document.getElementById('edit-modal-overlay').classList.contains('active')) {
-             closeEditModal();
-         }
-    });
+    // Note: This logic has been moved to the specific submit handlers for form-transaction and form-subscription
+    // to prevent closing and resetting the form *before* the data is extracted and saved.
 
     // 2. Navigation Logic
     const navLinks = document.querySelectorAll('.nav-link');
@@ -1859,6 +1873,16 @@ document.addEventListener('DOMContentLoaded', () => {
         resetTransactionForm();
         renderTransactions();
         updateDashboard();
+
+        // Close modals if active
+        const mobileModal = document.getElementById('mobile-form-modal');
+        const btnCloseMobileModal = document.getElementById('btn-close-mobile-modal');
+        if(mobileModal && mobileModal.classList.contains('active')) {
+             btnCloseMobileModal.click();
+        }
+        if(document.getElementById('edit-modal-overlay').classList.contains('active')) {
+             closeEditModal();
+        }
     });
 
     document.getElementById('btn-cancel-edit-trans').addEventListener('click', resetTransactionForm);
@@ -1933,6 +1957,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // Also refresh transactions to reflect any retroactive changes
         renderTransactions();
         updateDashboard();
+
+        // Close modals if active
+        const mobileModal = document.getElementById('mobile-form-modal');
+        const btnCloseMobileModal = document.getElementById('btn-close-mobile-modal');
+        if(mobileModal && mobileModal.classList.contains('active')) {
+             btnCloseMobileModal.click();
+        }
+        if(document.getElementById('edit-modal-overlay').classList.contains('active')) {
+             closeEditModal();
+        }
     });
 
     document.getElementById('btn-cancel-edit-sub').addEventListener('click', resetSubscriptionForm);
