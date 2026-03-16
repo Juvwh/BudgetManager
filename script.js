@@ -61,6 +61,12 @@ const STORAGE_KEY = 'budget_app_data';
 // Variable pour savoir si on est connecté ou non
 let isAuthenticated = false;
 
+// Variables pour les modes de sélection
+window.isCategorySelectionMode = false;
+window.selectedCategories = new Set();
+window.isTransactionSelectionMode = false;
+window.selectedTransactionIds = new Set();
+
 // Helper pour retirer les valeurs undefined avant l'envoi vers Firestore
 function cleanDataForFirestore(obj) {
     if (obj === null || typeof obj !== 'object') {
@@ -194,9 +200,34 @@ function toggleTransactionTag(tagId) {
 
 window.toggleTransactionTag = toggleTransactionTag;
 
+function updateTransactionSelectionTotal() {
+    const totalSpan = document.getElementById('transaction-selection-total');
+    if (!totalSpan) return;
+
+    let total = 0;
+    selectedTransactionIds.forEach(id => {
+        const t = appData.transactions.find(t => t.id === id);
+        if (t && !isNaN(t.amount)) {
+            // Expenses negative, Incomes/Salaries positive
+            if (t.type === 'expense') {
+                total -= Number(t.amount);
+            } else {
+                total += Number(t.amount);
+            }
+        }
+    });
+
+    totalSpan.textContent = total.toFixed(2);
+}
+
 function renderTransactions() {
     const tbody = document.querySelector('#table-transactions tbody');
+    const tableHeaderCheckboxCol = document.querySelector('#table-transactions thead th.col-checkbox');
     tbody.innerHTML = '';
+
+    if (tableHeaderCheckboxCol) {
+        tableHeaderCheckboxCol.style.display = isTransactionSelectionMode ? 'table-cell' : 'none';
+    }
 
     let filterMonth = document.getElementById('filter-month').value;
 
@@ -278,7 +309,14 @@ function renderTransactions() {
             typeColor = 'text-red';
         }
 
+        let checkboxHtml = '';
+        if (isTransactionSelectionMode) {
+            const isChecked = selectedTransactionIds.has(t.id) ? 'checked' : '';
+            checkboxHtml = `<td class="col-checkbox" style="width: 40px; text-align: center;"><input type="checkbox" class="transaction-checkbox" data-id="${t.id}" ${isChecked} style="cursor: pointer; transform: scale(1.2);"></td>`;
+        }
+
         tr.innerHTML = `
+            ${checkboxHtml}
             <td data-label="Date">${t.date || 'Erreur'}</td>
             <td data-label="Type"><span class="${typeColor}">${displayType}</span></td>
             <td data-label="Catégorie">${catName} ${isCorrupted ? '<span class="cat-type-badge badge-expense" style="margin-left: 5px;">Corrompu</span>' : ''}</td>
@@ -291,6 +329,20 @@ function renderTransactions() {
             </td>
         `;
         tbody.appendChild(tr);
+
+        if (isTransactionSelectionMode) {
+            const checkbox = tr.querySelector('.transaction-checkbox');
+            if (checkbox) {
+                checkbox.addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        selectedTransactionIds.add(t.id);
+                    } else {
+                        selectedTransactionIds.delete(t.id);
+                    }
+                    updateTransactionSelectionTotal();
+                });
+            }
+        }
     });
 
     updateFilterChips();
@@ -596,6 +648,24 @@ function getMonthData(year, month) {
     return { income, expense, savings, balance: income - expense, categoryExpenses };
 }
 
+function getSpecificMonthsCategoryData(monthPrefixes) {
+    // Filter transactions by these prefixes
+    const trans = appData.transactions.filter(t =>
+        monthPrefixes.some(prefix => t.date && t.date.startsWith(prefix))
+    );
+
+    const categoryTotals = {};
+    trans.forEach(t => {
+        if (t.type === 'expense') {
+            const catId = t.categoryId || 'unknown';
+            const catName = getCategoryPath(catId);
+            categoryTotals[catName] = (categoryTotals[catName] || 0) + Math.abs(t.amount);
+        }
+    });
+
+    return categoryTotals;
+}
+
 function getMultiMonthCategoryData(startYear, startMonth, numberOfMonths) {
     // Generate valid YYYY-MM prefixes for the requested period
     const validPrefixes = [];
@@ -663,7 +733,17 @@ function handleChartClick(e, canvasId) {
                 clickY >= region.y && clickY <= region.y + region.h) {
 
                 if (region.action === 'showCategory') {
-                    showCategoryDetails(region.label, region.amount);
+                    if (isCategorySelectionMode) {
+                        if (selectedCategories.has(region.label)) {
+                            selectedCategories.delete(region.label);
+                        } else {
+                            selectedCategories.add(region.label);
+                        }
+                        updateCategorySelectionTotal();
+                        updateDashboardCategoryChart(); // Re-render to show selection
+                    } else {
+                        showCategoryDetails(region.label, region.amount);
+                    }
                 } else if (region.action === 'showMonth') {
                     showMonthDetails(region.year, region.month, region.label, region.income, region.expense);
                 }
@@ -1024,10 +1104,24 @@ function drawHorizontalBarChart(canvasId, dataObj) {
         ctx.fillText(displayLabel, labelWidth - 10, y + barHeight / 2);
 
         // Draw bar
+        let isSelected = isCategorySelectionMode && selectedCategories.has(label);
+
         ctx.fillStyle = barColor;
+        if (isCategorySelectionMode && !isSelected) {
+            ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--border-color').trim() || '#e2e8f0';
+            ctx.globalAlpha = 0.5;
+        }
+
         ctx.beginPath();
         ctx.roundRect(labelWidth, y, currentBarWidth, barHeight, [0, 4, 4, 0]);
         ctx.fill();
+        ctx.globalAlpha = 1.0;
+
+        if (isSelected) {
+            ctx.strokeStyle = textColor;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
 
         // Draw amount value
         ctx.fillStyle = textColor;
@@ -1132,6 +1226,95 @@ function renderSavings() {
     totalRealSavedElement.textContent = `+${totalRealSaved.toFixed(2)} €`;
 }
 
+function updateCategorySelectionTotal() {
+    const totalSpan = document.getElementById('category-selection-total');
+    if (!totalSpan) return;
+
+    let total = 0;
+
+    // We need to re-fetch the current chart data to get the amounts for selected labels
+    const selector = document.getElementById('dashboard-category-month-selector');
+    if (!selector) return;
+
+    const selectedMonths = Array.from(selector.selectedOptions).map(opt => opt.value);
+    const chartData = selectedMonths.length === 0 ? {} : getSpecificMonthsCategoryData(selectedMonths);
+
+    selectedCategories.forEach(label => {
+        if (chartData[label]) {
+            total += chartData[label];
+        }
+    });
+
+    totalSpan.textContent = total.toFixed(2);
+}
+
+function updateDashboardCategoryMonthSelector(currentYear, currentMonth) {
+    const selector = document.getElementById('dashboard-category-month-selector');
+    if (!selector) return;
+
+    // Get all available months from transactions
+    let allMonths = new Set();
+    appData.transactions.forEach(t => {
+        if (t.date && t.date.length >= 7) {
+            allMonths.add(t.date.substring(0, 7));
+        }
+    });
+
+    // Ensure current month is always available
+    const currentMonthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+    allMonths.add(currentMonthStr);
+
+    const sortedMonths = Array.from(allMonths).sort().reverse();
+
+    // Store currently selected options to preserve them if possible
+    const currentSelections = Array.from(selector.selectedOptions).map(opt => opt.value);
+
+    selector.innerHTML = '';
+
+    sortedMonths.forEach(monthStr => {
+        const parts = monthStr.split('-');
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+        const label = `${monthNames[m - 1]} ${y}`;
+
+        const option = document.createElement('option');
+        option.value = monthStr;
+        option.textContent = label;
+
+        // Default to current month if no previous selections, else keep previous selections
+        if (currentSelections.length === 0) {
+            if (monthStr === currentMonthStr) {
+                option.selected = true;
+            }
+        } else {
+            if (currentSelections.includes(monthStr)) {
+                option.selected = true;
+            }
+        }
+
+        selector.appendChild(option);
+    });
+
+    updateDashboardCategoryChart();
+}
+
+function updateDashboardCategoryChart() {
+    const selector = document.getElementById('dashboard-category-month-selector');
+    if (!selector) return;
+
+    const selectedMonths = Array.from(selector.selectedOptions).map(opt => opt.value);
+
+    let chartData;
+    if (selectedMonths.length === 0) {
+        chartData = {}; // Empty chart
+    } else {
+        chartData = getSpecificMonthsCategoryData(selectedMonths);
+    }
+
+    drawHorizontalBarChart('dashboardBarChartCategory', chartData);
+}
+
 function updateDashboard() {
     let currentYear, currentMonth;
 
@@ -1234,9 +1417,8 @@ function updateDashboard() {
     // Draw Pie Chart for Categories
     drawPieChart('pieChartCategory', currentData.categoryExpenses);
 
-    // Draw Detailed Category Bar Chart for Dashboard (Current month)
-    const dashboardDetailedData = getMultiMonthCategoryData(currentYear, currentMonth, 1);
-    drawHorizontalBarChart('dashboardBarChartCategory', dashboardDetailedData);
+    // Update Specific Month Selector for Dashboard Category Chart
+    updateDashboardCategoryMonthSelector(currentYear, currentMonth);
 
     // Prepare data for 6-months bar chart
     const last6Months = [];
@@ -1814,6 +1996,56 @@ document.addEventListener('DOMContentLoaded', () => {
     // Close modals on submit
     // Note: This logic has been moved to the specific submit handlers for form-transaction and form-subscription
     // to prevent closing and resetting the form *before* the data is extracted and saved.
+
+    // Mode Sélection Listeners
+    const btnToggleCategorySelection = document.getElementById('btn-toggle-category-selection');
+    if (btnToggleCategorySelection) {
+        btnToggleCategorySelection.addEventListener('click', () => {
+            isCategorySelectionMode = !isCategorySelectionMode;
+            if (isCategorySelectionMode) {
+                btnToggleCategorySelection.classList.remove('btn-secondary');
+                btnToggleCategorySelection.classList.add('btn-primary');
+                document.getElementById('category-selection-total-container').style.display = 'block';
+            } else {
+                btnToggleCategorySelection.classList.remove('btn-primary');
+                btnToggleCategorySelection.classList.add('btn-secondary');
+                document.getElementById('category-selection-total-container').style.display = 'none';
+                selectedCategories.clear();
+            }
+            updateCategorySelectionTotal();
+            updateDashboardCategoryChart();
+        });
+    }
+
+    const btnToggleTransactionSelection = document.getElementById('btn-toggle-transaction-selection');
+    if (btnToggleTransactionSelection) {
+        btnToggleTransactionSelection.addEventListener('click', () => {
+            isTransactionSelectionMode = !isTransactionSelectionMode;
+            if (isTransactionSelectionMode) {
+                btnToggleTransactionSelection.classList.remove('btn-secondary');
+                btnToggleTransactionSelection.classList.add('btn-primary');
+                document.getElementById('transaction-selection-total-container').style.display = 'block';
+            } else {
+                btnToggleTransactionSelection.classList.remove('btn-primary');
+                btnToggleTransactionSelection.classList.add('btn-secondary');
+                document.getElementById('transaction-selection-total-container').style.display = 'none';
+                selectedTransactionIds.clear();
+            }
+            updateTransactionSelectionTotal();
+            renderTransactions();
+        });
+    }
+
+    // Dashboard Category Selector Listener
+    const dashCategoryMonthSelector = document.getElementById('dashboard-category-month-selector');
+    if (dashCategoryMonthSelector) {
+        dashCategoryMonthSelector.addEventListener('change', () => {
+            updateDashboardCategoryChart();
+            if (isCategorySelectionMode) {
+                updateCategorySelectionTotal();
+            }
+        });
+    }
 
     // 2. Navigation Logic
     const navLinks = document.querySelectorAll('.nav-link');
