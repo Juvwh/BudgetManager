@@ -1365,26 +1365,40 @@ function updateDashboard() {
 
     const spent = currentData.expense;
 
-    let percentage = 0;
-    if (goal > 0) {
-        percentage = (spent / goal) * 100;
-    }
-
-    const displayPercentage = Math.min(percentage, 100);
-
-    // Apply widths and positions
-    progressBar.style.width = displayPercentage + '%';
-    currentMarker.style.left = displayPercentage + '%';
-    currentText.style.left = displayPercentage + '%';
-
-    // Update texts
-    spentValueSpan.textContent = spent.toFixed(2) + '€';
-    spentPercentSpan.textContent = percentage.toFixed(1) + '%';
-    limitText.textContent = goal.toFixed(2) + '€';
-
-    // Calculate remaining and update UI logic
-    if (spent <= goal) {
+    if (goal <= 0) {
+        // Handle edge case where goal is 0 or negative
+        progressBar.style.width = '0%';
+        currentMarker.style.left = '0%';
+        currentText.style.left = '0%';
+        spentValueSpan.textContent = spent.toFixed(2) + '€';
+        spentPercentSpan.textContent = '0%';
+        limitText.textContent = '0.00€';
+        remainingText.style.display = 'none';
+        overWarning.style.display = 'none';
+    } else if (spent <= goal) {
         // Under or at goal
+        const percentage = (spent / goal) * 100;
+        const displayPercentage = Math.min(percentage, 100);
+
+        // Apply widths and positions
+        progressBar.style.width = displayPercentage + '%';
+        currentMarker.style.left = displayPercentage + '%';
+        currentText.style.left = displayPercentage + '%';
+
+        // Reset text placements (in case we came back from overbudget)
+        limitText.style.left = '100%';
+        limitText.style.top = '28px'; // Reset to bottom
+        document.getElementById('progress-limit-marker').style.left = '100%';
+
+        // Update texts
+        spentValueSpan.textContent = spent.toFixed(2) + '€';
+        spentPercentSpan.textContent = percentage.toFixed(1) + '%';
+        limitText.textContent = goal.toFixed(2) + '€';
+
+        // Reset colors
+        document.getElementById('progress-limit-marker').style.backgroundColor = 'var(--text-color)';
+        limitText.style.color = 'var(--text-color)';
+
         const remaining = goal - spent;
         remainingText.textContent = remaining.toFixed(2) + '€';
 
@@ -1404,12 +1418,40 @@ function updateDashboard() {
         const overAmount = spent - goal;
         remainingText.style.display = 'none'; // Hide remaining text
 
-        // Colors (Apple Red / danger-color)
-        progressBar.style.backgroundColor = 'var(--danger-color)';
-        currentMarker.style.backgroundColor = 'var(--danger-color)';
-        currentText.style.color = 'var(--danger-color)';
+        // Calculate the new scale (paliers)
+        const numPaliers = Math.ceil(spent / goal);
+        const scaleTotal = numPaliers * goal;
 
-        // Show warning
+        // Calculate visual percentages based on the new scale
+        const visualSpentPercentage = (spent / scaleTotal) * 100;
+        const visualGoalPercentage = (goal / scaleTotal) * 100;
+        const actualPercentageOfGoal = (spent / goal) * 100;
+
+        // The progress bar extends up to the visualSpentPercentage
+        progressBar.style.width = visualSpentPercentage + '%';
+        progressBar.style.backgroundColor = 'var(--danger-color)';
+
+        // The original marker now represents the goal, it becomes fixed at visualGoalPercentage
+        currentMarker.style.left = visualGoalPercentage + '%';
+        currentMarker.style.backgroundColor = 'var(--text-color)'; // Use neutral text color for the fixed goal marker
+
+        // The currentText moves to the goal marker, showing the goal value
+        currentText.style.left = visualGoalPercentage + '%';
+        currentText.style.color = 'var(--text-color)';
+        spentValueSpan.textContent = goal.toFixed(2) + '€';
+        spentPercentSpan.textContent = '100%';
+
+        // The limitText moves to the end of the red bar, showing the total spent value
+        limitText.style.left = visualSpentPercentage + '%';
+        limitText.style.top = '-30px'; // Move to top to avoid overlapping with goal text
+        document.getElementById('progress-limit-marker').style.left = visualSpentPercentage + '%';
+        limitText.textContent = spent.toFixed(2) + '€ / ' + actualPercentageOfGoal.toFixed(1) + '%';
+
+        // Update marker visibility to act as the right bound of the red bar
+        document.getElementById('progress-limit-marker').style.backgroundColor = 'var(--danger-color)';
+        limitText.style.color = 'var(--danger-color)';
+
+        // Show warning below
         overValue.textContent = overAmount.toFixed(2) + '€';
         overWarning.style.display = 'block';
     }
