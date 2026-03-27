@@ -436,6 +436,82 @@ h3 {
         display: none !important;
     }
 
+    /* Table simulations sur mobile */
+    #table-simulations thead {
+        display: none;
+    }
+
+    #table-simulations tbody tr {
+        display: flex;
+        flex-direction: column;
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        margin-bottom: 1rem;
+        padding: 1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+        position: relative;
+    }
+
+    #table-simulations tbody td {
+        border-bottom: none;
+        padding: 0.15rem 0;
+        display: flex;
+        align-items: center;
+        text-align: left;
+        font-size: 0.9rem;
+    }
+
+    #table-simulations tbody td::before {
+        display: none;
+    }
+
+    #table-simulations tbody td[data-label="Type"] {
+        display: none;
+    }
+
+    #table-simulations tbody td[data-label="Date début"],
+    #table-simulations tbody td[data-label="Fréquence"] {
+        order: 2;
+        color: var(--text-color);
+        opacity: 0.6;
+        font-size: 0.8rem;
+    }
+
+    #table-simulations tbody td[data-label="Nom"] {
+        font-weight: 600;
+        font-size: 1.1rem;
+        color: var(--text-color);
+        padding-bottom: 0.2rem;
+        margin-bottom: 0.2rem;
+        order: 1;
+        width: calc(100% - 100px);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+    }
+
+    #table-simulations tbody td[data-label="Montant"] {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        font-size: 1.25rem;
+        font-weight: 700;
+        padding: 0;
+        text-align: right;
+    }
+
+    #table-simulations tbody td[data-label="Actions"] {
+        order: 99;
+        justify-content: flex-end;
+        gap: 0.5rem;
+        margin-top: 0.8rem;
+        padding-top: 0.8rem;
+        border-top: 1px solid var(--border-color);
+        width: 100%;
+    }
+
     /* Bouton d'ajout flottant */
     .fab-btn {
         display: flex !important;
