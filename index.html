@@ -21,6 +21,7 @@
                 <li><a href="#" class="nav-link" data-target="categories">Catégories</a></li>
                 <li><a href="#" class="nav-link" data-target="tags">Tags</a></li>
                 <li><a href="#" class="nav-link" data-target="savings">Économies</a></li>
+                <li><a href="#" class="nav-link" data-target="prediction">Prédiction</a></li>
             </ul>
         </nav>
 
@@ -46,6 +47,9 @@
         <a href="#" class="nav-link" data-target="categories" aria-label="Catégories">Cat.</a>
         <a href="#" class="nav-link" data-target="tags" aria-label="Tags">Tags</a>
         <a href="#" class="nav-link" data-target="savings" aria-label="Économies">Éco.</a>
+        <a href="#" class="nav-link" data-target="prediction" aria-label="Prédiction">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+        </a>
     </nav>
 
     <!-- ECRAN DE CONNEXION -->
@@ -531,6 +535,85 @@
                             <!-- Injected by JS -->
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION PREDICTION -->
+        <section id="prediction" class="view-section hidden">
+            <h2 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">Prédiction (Bac à sable)</h2>
+            <p style="margin-bottom: 2rem;">Simulez des achats ou des revenus futurs pour voir leur impact à long terme sur votre solde. Ces données sont virtuelles et n'affectent pas votre vrai budget.</p>
+
+            <div class="split-layout">
+                <div class="form-panel card">
+                    <h3>Simuler une opération</h3>
+                    <form id="form-simulation">
+                        <div class="form-group">
+                            <label>Nom de la simulation</label>
+                            <input type="text" id="sim-name" placeholder="Ex: Achat Voiture, Nouveau Loyer" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Type</label>
+                            <select id="sim-type" required>
+                                <option value="expense">Dépense</option>
+                                <option value="income">Revenu</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Montant (€)</label>
+                            <input type="number" id="sim-amount" step="0.01" min="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Fréquence</label>
+                            <select id="sim-frequency" required>
+                                <option value="one-time">Ponctuelle (Une fois)</option>
+                                <option value="monthly">Mensuelle</option>
+                                <option value="yearly">Annuelle</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Date (Mois de début)</label>
+                            <input type="month" id="sim-date" required>
+                        </div>
+                        <input type="hidden" id="sim-id">
+                        <button type="submit" id="btn-submit-sim" class="btn btn-primary">Ajouter la simulation</button>
+                        <button type="button" id="btn-cancel-edit-sim" class="btn btn-secondary" style="display:none;">Annuler</button>
+                    </form>
+
+                    <div style="margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                        <div class="form-group">
+                            <label style="font-weight: bold; color: var(--accent-color);">Point de départ : Solde Actuel (€)</label>
+                            <input type="number" id="sim-current-balance" step="0.01" value="0" style="font-size: 1.2rem; font-weight: bold;">
+                            <small>Saisissez votre solde actuel pour calibrer la courbe de projection.</small>
+                        </div>
+                        <button id="btn-save-simulations" class="btn btn-secondary" style="width: 100%;">Enregistrer les simulations</button>
+                    </div>
+                </div>
+
+                <div class="list-panel card">
+                    <h3>Simulations actives</h3>
+                    <div class="table-container" style="max-height: 250px; overflow-y: auto; margin-bottom: 2rem;">
+                        <table id="table-simulations">
+                            <thead>
+                                <tr>
+                                    <th>Nom</th>
+                                    <th>Type</th>
+                                    <th>Montant</th>
+                                    <th>Fréquence</th>
+                                    <th>Date début</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Injected by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3>Projection sur 24 mois</h3>
+                    <div class="chart-box card-elegant" style="padding: 1rem; margin-top: 1rem;">
+                        <canvas id="predictionChart" width="800" height="400" style="width: 100%; max-width: 800px; height: auto; display: block; margin: 0 auto;"></canvas>
+                    </div>
                 </div>
             </div>
         </section>

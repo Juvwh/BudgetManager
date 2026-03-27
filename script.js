@@ -28,6 +28,8 @@ window.appData = window.appData || {
     transactions: [],
     subscriptions: [],
     tags: [],
+    simulations: [],
+    simulationBalance: 0,
     categories: [
         // Default categories
         { id: 'cat-inc-1', name: 'Salaire', type: 'income', parentId: null },
@@ -100,6 +102,8 @@ async function saveData() {
             transactions: appData.transactions,
             subscriptions: appData.subscriptions,
             tags: appData.tags || [],
+            simulations: appData.simulations || [],
+            simulationBalance: appData.simulationBalance || 0,
             categories: appData.categories,
             updatedAt: new Date().toISOString()
         };
@@ -129,6 +133,8 @@ async function loadData() {
             if(parsed.transactions) appData.transactions = parsed.transactions.map(t => ({ ...t, tagIds: t.tagIds || [] }));
             if(parsed.subscriptions) appData.subscriptions = parsed.subscriptions;
             if(parsed.tags) appData.tags = parsed.tags;
+            if(parsed.simulations) appData.simulations = parsed.simulations;
+            if(parsed.simulationBalance !== undefined) appData.simulationBalance = parsed.simulationBalance;
             if(parsed.categories) appData.categories = parsed.categories;
         } else {
             console.log("Aucune donnée Firestore trouvée. Initialisation avec les valeurs par défaut.");
@@ -1833,6 +1839,8 @@ async function initializeAppAfterAuth() {
     processSubscriptions();
     updateCategorySelects();
     renderCategoryTree();
+    renderSimulations();
+    updatePredictionChart();
 
     const goalInput = document.getElementById('setting-spending-goal');
     goalInput.value = appData.spendingGoal;
@@ -1931,6 +1939,51 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         updateDashboard(); // Redraw charts with new colors
     });
+
+    // --- PREDICTION LISTENERS ---
+    const simForm = document.getElementById('form-simulation');
+    if (simForm) {
+        simForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = document.getElementById('sim-id').value || generateId();
+            const name = document.getElementById('sim-name').value;
+            const type = document.getElementById('sim-type').value;
+            const amount = parseFloat(document.getElementById('sim-amount').value);
+            const frequency = document.getElementById('sim-frequency').value;
+            const startDate = document.getElementById('sim-date').value;
+
+            const sim = { id, name, type, amount, frequency, startDate };
+
+            const existingIndex = appData.simulations.findIndex(s => s.id === id);
+            if (existingIndex >= 0) {
+                appData.simulations[existingIndex] = sim;
+            } else {
+                appData.simulations.push(sim);
+            }
+
+            simForm.reset();
+            document.getElementById('sim-id').value = '';
+
+            renderSimulations();
+            updatePredictionChart();
+        });
+    }
+
+    const simBalanceInput = document.getElementById('sim-current-balance');
+    if (simBalanceInput) {
+        simBalanceInput.addEventListener('input', () => {
+            appData.simulationBalance = parseFloat(simBalanceInput.value) || 0;
+            updatePredictionChart();
+        });
+    }
+
+    const btnSaveSimulations = document.getElementById('btn-save-simulations');
+    if (btnSaveSimulations) {
+        btnSaveSimulations.addEventListener('click', async () => {
+            await saveData();
+            alert('Simulations enregistrées avec succès.');
+        });
+    }
 
     document.getElementById('dash-filter-month').addEventListener('change', updateDashboard);
 
@@ -2504,6 +2557,281 @@ window.updateCategorySelects = updateCategorySelects;
 window.renderCategoryTree = renderCategoryTree;
 window.renderTransactionTagsSelector = renderTransactionTagsSelector;
 window.updateDashboard = updateDashboard;
+
+// --- SIMULATIONS & PREDICTIONS ---
+
+let predictionChartInstance = null;
+
+function renderSimulations() {
+    const tbody = document.querySelector('#table-simulations tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    document.getElementById('sim-current-balance').value = appData.simulationBalance || 0;
+
+    appData.simulations.sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+
+    appData.simulations.forEach(sim => {
+        const tr = document.createElement('tr');
+        const amountClass = sim.type === 'income' ? 'text-green' : 'text-red';
+        const sign = sim.type === 'income' ? '+' : '-';
+
+        let freqText = 'Ponctuelle';
+        if (sim.frequency === 'monthly') freqText = 'Mensuelle';
+        if (sim.frequency === 'yearly') freqText = 'Annuelle';
+
+        tr.innerHTML = `
+            <td data-label="Nom">${sim.name}</td>
+            <td data-label="Type">${sim.type === 'income' ? 'Revenu' : 'Dépense'}</td>
+            <td data-label="Montant" class="${amountClass}">${sign}${Number(sim.amount).toFixed(2)} €</td>
+            <td data-label="Fréquence">${freqText}</td>
+            <td data-label="Date début">${sim.startDate}</td>
+            <td data-label="Actions">
+                <button class="btn btn-secondary btn-small" onclick="deleteSimulation('${sim.id}')">Supprimer</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+window.deleteSimulation = function(id) {
+    if (confirm("Supprimer cette simulation ?")) {
+        appData.simulations = appData.simulations.filter(s => s.id !== id);
+        renderSimulations();
+        updatePredictionChart();
+    }
+};
+
+function calculateAverageMonthlyTrends() {
+    // Calcul de la tendance de base : abonnements mensuels et moyenne des dépenses/revenus variables
+    const now = new Date();
+    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    let subIncome = 0;
+    let subExpense = 0;
+
+    appData.subscriptions.forEach(sub => {
+        if (sub.frequency === 'monthly') {
+            if (sub.type === 'income') subIncome += sub.amount;
+            else subExpense += sub.amount;
+        } else if (sub.frequency === 'weekly') {
+            if (sub.type === 'income') subIncome += (sub.amount * 52) / 12;
+            else subExpense += (sub.amount * 52) / 12;
+        } else if (sub.frequency === 'yearly') {
+            if (sub.type === 'income') subIncome += sub.amount / 12;
+            else subExpense += sub.amount / 12;
+        }
+    });
+
+    // Optionnel : on pourrait calculer les vraies dépenses variables des X derniers mois.
+    // Pour l'instant, utilisons uniquement les abonnements réguliers comme base,
+    // ou une moyenne simple des 3 derniers mois (hors abonnements).
+
+    // Simplification : Base = revenus fixes (abonnements) - dépenses fixes (abonnements)
+    return {
+        monthlyIncome: subIncome,
+        monthlyExpense: subExpense
+    };
+}
+
+function updatePredictionChart() {
+    const canvas = document.getElementById('predictionChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const monthsToProject = 24;
+    const labels = [];
+    const dataPoints = [];
+    const baselinePoints = []; // Sans les simulations
+
+    let currentBalance = parseFloat(document.getElementById('sim-current-balance').value) || 0;
+    appData.simulationBalance = currentBalance;
+
+    let baselineBalance = currentBalance;
+
+    const trends = calculateAverageMonthlyTrends();
+
+    const now = new Date();
+    let currentYear = now.getFullYear();
+    let currentMonth = now.getMonth() + 1; // 1-12
+
+    for (let i = 0; i < monthsToProject; i++) {
+        const monthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+        labels.push(monthStr);
+
+        // 1. Ajouter la tendance de base mensuelle
+        currentBalance += trends.monthlyIncome;
+        currentBalance -= trends.monthlyExpense;
+
+        baselineBalance += trends.monthlyIncome;
+        baselineBalance -= trends.monthlyExpense;
+
+        // 2. Ajouter les simulations pour ce mois
+        appData.simulations.forEach(sim => {
+            const [simYear, simMonth] = sim.startDate.split('-').map(Number);
+
+            let isApplicable = false;
+
+            if (sim.frequency === 'one-time' && simYear === currentYear && simMonth === currentMonth) {
+                isApplicable = true;
+            } else if (sim.frequency === 'monthly') {
+                if (currentYear > simYear || (currentYear === simYear && currentMonth >= simMonth)) {
+                    isApplicable = true;
+                }
+            } else if (sim.frequency === 'yearly') {
+                if ((currentYear > simYear || (currentYear === simYear && currentMonth >= simMonth)) && currentMonth === simMonth) {
+                    isApplicable = true;
+                }
+            }
+
+            if (isApplicable) {
+                if (sim.type === 'income') currentBalance += sim.amount;
+                else currentBalance -= sim.amount;
+            }
+        });
+
+        dataPoints.push(currentBalance);
+        baselinePoints.push(baselineBalance);
+
+        currentMonth++;
+        if (currentMonth > 12) {
+            currentMonth = 1;
+            currentYear++;
+        }
+    }
+
+    if (predictionChartInstance) {
+        predictionChartInstance.destroy();
+    }
+
+    const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
+    const textColor = isDarkMode ? '#f5f5f7' : '#1d1d1f';
+    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+
+    // Importation conditionnelle si Chart.js est dispo
+    if (typeof Chart !== 'undefined') {
+        predictionChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Projection avec Simulations',
+                        data: dataPoints,
+                        borderColor: '#0066cc',
+                        backgroundColor: 'rgba(0, 102, 204, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        borderWidth: 2
+                    },
+                    {
+                        label: 'Projection de Base (Abonnements seuls)',
+                        data: baselinePoints,
+                        borderColor: '#888888',
+                        borderDash: [5, 5],
+                        fill: false,
+                        tension: 0.3,
+                        borderWidth: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { labels: { color: textColor } }
+                },
+                scales: {
+                    x: { ticks: { color: textColor }, grid: { color: gridColor } },
+                    y: { ticks: { color: textColor }, grid: { color: gridColor } }
+                }
+            }
+        });
+    } else {
+        // Fallback si on n'utilise pas Chart.js (Le projet semble utiliser une logique custom pour les charts dans les autres sections,
+        // ou n'a pas inclus Chart.js. Je vais ajouter une implémentation canvas basique si besoin,
+        // ou vérifier si drawHorizontalBarChart est importé. Le projet utilise des canvas purs.)
+        drawCustomLineChart(ctx, labels, dataPoints, baselinePoints, textColor, gridColor);
+    }
+}
+
+function drawCustomLineChart(ctx, labels, dataPoints, baselinePoints, textColor, gridColor) {
+    const width = ctx.canvas.width;
+    const height = ctx.canvas.height;
+    ctx.clearRect(0, 0, width, height);
+
+    const padX = 50;
+    const padY = 40;
+    const chartW = width - padX * 2;
+    const chartH = height - padY * 2;
+
+    const allData = [...dataPoints, ...baselinePoints, 0];
+    const minVal = Math.min(...allData);
+    const maxVal = Math.max(...allData);
+    const range = (maxVal - minVal) || 1;
+
+    // Draw grid & Y labels
+    ctx.strokeStyle = gridColor;
+    ctx.fillStyle = textColor;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.font = '12px Inter';
+
+    const steps = 5;
+    for (let i = 0; i <= steps; i++) {
+        const yVal = maxVal - (range * (i / steps));
+        const y = padY + (chartH * (i / steps));
+
+        ctx.beginPath();
+        ctx.moveTo(padX, y);
+        ctx.lineTo(width - padX, y);
+        ctx.stroke();
+
+        ctx.fillText(`${yVal.toFixed(0)}€`, padX - 10, y);
+    }
+
+    // Zero line
+    if (minVal < 0 && maxVal > 0) {
+        const zeroY = padY + chartH - ((0 - minVal) / range * chartH);
+        ctx.strokeStyle = textColor;
+        ctx.beginPath();
+        ctx.moveTo(padX, zeroY);
+        ctx.lineTo(width - padX, zeroY);
+        ctx.stroke();
+    }
+
+    // Draw function
+    const drawLine = (data, color, isDashed = false) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        if (isDashed) ctx.setLineDash([5, 5]);
+        else ctx.setLineDash([]);
+
+        ctx.beginPath();
+        data.forEach((val, i) => {
+            const x = padX + (i / (labels.length - 1)) * chartW;
+            const y = padY + chartH - ((val - minVal) / range * chartH);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        ctx.setLineDash([]);
+    };
+
+    drawLine(baselinePoints, '#888888', true); // Baseline
+    drawLine(dataPoints, '#0066cc', false); // Simulated
+
+    // X Labels (every 3 months)
+    ctx.fillStyle = textColor;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    labels.forEach((label, i) => {
+        if (i % 3 === 0) {
+            const x = padX + (i / (labels.length - 1)) * chartW;
+            ctx.fillText(label, x, height - padY + 10);
+        }
+    });
+}
+
 // --- TAGS OVERVIEW ---
 function renderTagsOverview() {
     const tbody = document.querySelector('#table-tags-overview tbody');
