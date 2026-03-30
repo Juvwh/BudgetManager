@@ -375,8 +375,23 @@
                             <input type="text" id="sub-name" placeholder="Ex: Assurance Auto" required>
                         </div>
                         <div class="form-group">
+                            <label>Fréquence</label>
+                            <select id="sub-frequency" required>
+                                <option value="weekly">Hebdomadaire</option>
+                                <option value="monthly">Mensuelle</option>
+                                <option value="yearly">Annuelle</option>
+                                <option value="installments">Paiement en plusieurs fois</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="sub-amount-group">
                             <label>Montant (€)</label>
                             <input type="number" id="sub-amount" step="0.01" min="0" required>
+                        </div>
+                        <div class="form-group" id="sub-installments-group" style="display: none;">
+                            <label>Montant Total (€)</label>
+                            <input type="number" id="sub-total-amount" step="0.01" min="0">
+                            <label style="margin-top: 0.5rem;">Nombre de mois</label>
+                            <input type="number" id="sub-installments-count" step="1" min="2">
                         </div>
                         <div class="form-group">
                             <label>Catégorie</label>
@@ -385,16 +400,13 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Fréquence</label>
-                            <select id="sub-frequency" required>
-                                <option value="weekly">Hebdomadaire</option>
-                                <option value="monthly">Mensuelle</option>
-                                <option value="yearly">Annuelle</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
                             <label>Date de début</label>
                             <input type="date" id="sub-start-date" required>
+                        </div>
+                        <div class="form-group" id="sub-end-date-group">
+                            <label>Date de fin (Optionnelle)</label>
+                            <input type="date" id="sub-end-date">
+                            <small>Si définie, les transactions cesseront d'être générées après cette date.</small>
                         </div>
 
                         <div class="form-group" id="sub-apply-past-container" style="display: none; align-items: center; gap: 0.5rem; margin-top: 1rem;">
@@ -419,6 +431,7 @@
                                     <th>Fréquence</th>
                                     <th>Montant</th>
                                     <th>Prochaine date</th>
+                                    <th>Date de fin</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>

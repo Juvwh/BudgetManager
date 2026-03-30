@@ -1009,18 +1009,41 @@ canvas {
 /* Tables */
 .table-container {
     overflow-x: auto;
+    width: 100%;
 }
 
 table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 1rem;
+    min-width: 800px; /* Élargir le tableau par défaut */
 }
 
 th, td {
     padding: 1rem 0.8rem;
     text-align: left;
     border-bottom: 1px solid var(--border-color);
+}
+
+/* Nouvelles règles pour les colonnes des tableaux (Lisibilité) */
+/* nth-child offset by +1 due to the hidden checkbox column in transactions */
+#table-transactions th:nth-child(2), #table-transactions td[data-label="Date"],
+#table-transactions th:nth-child(3), #table-transactions td[data-label="Type"],
+#table-transactions th:nth-child(7), #table-transactions td[data-label="Montant"],
+#table-subscriptions th:nth-child(2), #table-subscriptions td[data-label="Type"],
+#table-subscriptions th:nth-child(4), #table-subscriptions td[data-label="Montant"],
+#table-modal-transactions th:nth-child(1), #table-modal-transactions td[data-label="Date"],
+#table-modal-transactions th:nth-child(2), #table-modal-transactions td[data-label="Type"],
+#table-modal-transactions th:nth-child(5), #table-modal-transactions td[data-label="Montant"] {
+    white-space: nowrap; /* Empêcher le retour à la ligne automatique */
+}
+
+/* Forcer la largeur de la colonne Note */
+#table-transactions th:nth-child(5), #table-transactions td[data-label="Note"],
+#table-modal-transactions th:nth-child(4), #table-modal-transactions td[data-label="Note"] {
+    min-width: 200px;
+    word-wrap: break-word; /* Conserver le retour à la ligne automatique */
+    white-space: normal;
 }
 
 th {

@@ -277,7 +277,7 @@ function renderTransactions() {
 
         tr.ondblclick = () => editTransaction(t.id); // Option C: Quick edit on double click
 
-        const catName = getCategoryPath(t.categoryId);
+        const catName = getCategoryPath(t.categoryId, new Set(), true);
 
         // Tags HTML
         let tagsHtml = '';
@@ -489,7 +489,7 @@ function resetTransactionForm() {
 function getNextDate(dateStr, frequency) {
     const d = new Date(dateStr);
     if (frequency === 'weekly') d.setDate(d.getDate() + 7);
-    else if (frequency === 'monthly') d.setMonth(d.getMonth() + 1);
+    else if (frequency === 'monthly' || frequency === 'installments') d.setMonth(d.getMonth() + 1);
     else if (frequency === 'yearly') d.setFullYear(d.getFullYear() + 1);
     return d.toISOString().split('T')[0];
 }
@@ -499,24 +499,51 @@ async function processSubscriptions() {
     const today = new Date().toISOString().split('T')[0];
 
     appData.subscriptions.forEach(sub => {
+        if (sub.status === 'completed') return;
+
         let nextDate = sub.nextDate || sub.startDate;
 
         while (nextDate <= today) {
+            // Check end date condition
+            if (sub.endDate && nextDate > sub.endDate) {
+                sub.status = 'completed';
+                break;
+            }
+
             // Generate a transaction
+            let note = `[Auto] ${sub.name}`;
+
+            if (sub.frequency === 'installments') {
+                const currentPaid = (sub.installmentsPaid || 0) + 1;
+                note += ` (Mois ${currentPaid}/${sub.totalInstallments})`;
+                sub.installmentsPaid = currentPaid;
+            }
+
             appData.transactions.push({
                 id: 'trans-auto-' + generateId(),
                 type: sub.type,
                 amount: sub.amount,
                 date: nextDate,
                 categoryId: sub.categoryId,
-                note: `[Auto] ${sub.name}`,
+                note: note,
                 subscriptionId: sub.id
             });
+            hasNewTransactions = true;
+
+            // Check if installments are finished
+            if (sub.frequency === 'installments' && sub.installmentsPaid >= sub.totalInstallments) {
+                 sub.status = 'completed';
+                 break; // Stop generating more for this subscription
+            }
 
             // Advance next date
             nextDate = getNextDate(nextDate, sub.frequency);
             sub.nextDate = nextDate;
-            hasNewTransactions = true;
+        }
+
+        // Final check for end date exactly matching today and we just processed it
+        if (sub.status !== 'completed' && sub.endDate && sub.nextDate > sub.endDate) {
+             sub.status = 'completed';
         }
     });
 
@@ -531,24 +558,45 @@ function renderSubscriptions() {
     const tbody = document.querySelector('#table-subscriptions tbody');
     tbody.innerHTML = '';
 
-    appData.subscriptions.forEach(sub => {
+    // Sort to put completed ones at the end
+    const sortedSubs = [...appData.subscriptions].sort((a, b) => {
+        if (a.status === 'completed' && b.status !== 'completed') return 1;
+        if (a.status !== 'completed' && b.status === 'completed') return -1;
+        return 0;
+    });
+
+    sortedSubs.forEach(sub => {
         const tr = document.createElement('tr');
-        const freqMap = { 'weekly': 'Hebdomadaire', 'monthly': 'Mensuelle', 'yearly': 'Annuelle' };
+        const freqMap = { 'weekly': 'Hebdomadaire', 'monthly': 'Mensuelle', 'yearly': 'Annuelle', 'installments': 'En plusieurs fois' };
 
         const isCorrupted = isNaN(sub.amount) || sub.amount === null || sub.amount === undefined || !sub.startDate;
+        const isCompleted = sub.status === 'completed';
+
         if (isCorrupted) {
             tr.style.backgroundColor = 'rgba(255, 59, 48, 0.1)';
             tr.style.borderLeft = '4px solid var(--danger-color)';
+        } else if (isCompleted) {
+            tr.style.opacity = '0.6';
+            tr.style.backgroundColor = 'var(--secondary-color)';
         }
 
         const formattedAmount = isCorrupted ? 'Erreur (NaN)' : `${Number(sub.amount).toFixed(2)} €`;
+        let displayName = sub.name || 'Sans Nom';
+
+        if (isCompleted) {
+            displayName += ' <span class="cat-type-badge" style="background-color: var(--text-color); margin-left: 5px;">Terminé</span>';
+        }
+        if (isCorrupted) {
+            displayName += ' <span class="cat-type-badge badge-expense" style="margin-left: 5px;">Corrompu</span>';
+        }
 
         tr.innerHTML = `
-            <td data-label="Nom">${sub.name || 'Sans Nom'} ${isCorrupted ? '<span class="cat-type-badge badge-expense" style="margin-left: 5px;">Corrompu</span>' : ''}</td>
+            <td data-label="Nom">${displayName}</td>
             <td data-label="Type"><span class="${sub.type === 'income' ? 'text-green' : 'text-red'}">${sub.type === 'income' ? 'Revenu' : 'Dépense'}</span></td>
             <td data-label="Fréquence">${freqMap[sub.frequency] || 'Inconnue'}</td>
             <td data-label="Montant" class="${sub.type === 'income' ? 'text-green' : 'text-red'}">${formattedAmount}</td>
-            <td data-label="Prochaine date">${sub.nextDate || sub.startDate || 'Erreur'}</td>
+            <td data-label="Prochaine date">${isCompleted ? '-' : (sub.nextDate || sub.startDate || 'Erreur')}</td>
+            <td data-label="Date de fin">${sub.endDate || (sub.frequency === 'installments' && isCompleted ? 'Terminé' : '-')}</td>
             <td data-label="Actions">
                 <button class="btn btn-primary btn-small" onclick="viewSubscriptionHistory('${sub.id}')">Historique</button>
                 <button class="btn btn-secondary btn-small" onclick="editSubscription('${sub.id}')">Modifier</button>
@@ -584,10 +632,20 @@ function editSubscription(id) {
     document.getElementById('sub-type').value = sub.type;
     document.getElementById('sub-type').dispatchEvent(new Event('change')); // Mettre à jour les catégories
     document.getElementById('sub-name').value = sub.name;
-    document.getElementById('sub-amount').value = sub.amount;
-    document.getElementById('sub-category').value = sub.categoryId;
+
     document.getElementById('sub-frequency').value = sub.frequency;
+    document.getElementById('sub-frequency').dispatchEvent(new Event('change')); // Mettre à jour les champs de montant
+
+    if (sub.frequency === 'installments') {
+        document.getElementById('sub-total-amount').value = sub.totalAmount;
+        document.getElementById('sub-installments-count').value = sub.totalInstallments;
+    } else {
+        document.getElementById('sub-amount').value = sub.amount;
+    }
+
+    document.getElementById('sub-category').value = sub.categoryId;
     document.getElementById('sub-start-date').value = sub.startDate; // Note: editing start date won't change nextDate unless handled explicitly
+    document.getElementById('sub-end-date').value = sub.endDate || '';
 
     // Show apply to past checkbox and change buttons
     document.getElementById('sub-apply-past-container').style.display = 'flex';
@@ -604,8 +662,12 @@ function resetSubscriptionForm() {
     form.reset();
     document.getElementById('sub-id').value = '';
     document.getElementById('sub-start-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('sub-end-date').value = '';
     document.getElementById('sub-type').value = 'expense';
     document.getElementById('sub-type').dispatchEvent(new Event('change'));
+
+    document.getElementById('sub-frequency').value = 'monthly';
+    document.getElementById('sub-frequency').dispatchEvent(new Event('change'));
 
     document.getElementById('sub-apply-past-container').style.display = 'none';
     document.getElementById('btn-submit-sub').textContent = "Ajouter";
@@ -882,7 +944,7 @@ function showMonthDetails(year, month, label, totalIncome, totalExpense) {
                 document.querySelector('.nav-link[data-target="transactions"]').click();
                 editTransaction(t.id);
             };
-            const catName = getCategoryPath(t.categoryId);
+            const catName = getCategoryPath(t.categoryId, new Set(), true);
 
             tr.innerHTML = `
                 <td data-label="Date">${t.date}</td>
@@ -1530,7 +1592,7 @@ function updateHorizontalBarChart(year, month) {
 
 // --- INITIALIZATION ---
 // --- CATEGORIES MANAGEMENT ---
-function getCategoryPath(catId, visited = new Set()) {
+function getCategoryPath(catId, visited = new Set(), forTable = false) {
     const cat = appData.categories.find(c => c.id === catId);
     if (!cat) return 'Inconnu';
 
@@ -1540,8 +1602,10 @@ function getCategoryPath(catId, visited = new Set()) {
     }
     visited.add(catId);
 
+    const separator = forTable ? ' ><br>' : ' > ';
+
     if (cat.parentId) {
-        return getCategoryPath(cat.parentId, visited) + ' > ' + cat.name;
+        return getCategoryPath(cat.parentId, visited, forTable) + separator + cat.name;
     }
     return cat.name;
 }
@@ -1556,12 +1620,19 @@ function updateCategorySelects() {
     transSelect.innerHTML = '';
     subSelect.innerHTML = '';
 
+    // Create a sorted list of categories
+    const sortedCategories = [...appData.categories].sort((a, b) => {
+        const pathA = getCategoryPath(a.id);
+        const pathB = getCategoryPath(b.id);
+        return pathA.localeCompare(pathB);
+    });
+
     // Filter by type for transactions/subscriptions based on their selected type
     const populateTransSelect = () => {
         let transType = document.getElementById('trans-type').value;
         if (transType === 'salary') transType = 'income'; // Share income categories for salary
         transSelect.innerHTML = '';
-        appData.categories.filter(c => c.type === transType).forEach(c => {
+        sortedCategories.filter(c => c.type === transType).forEach(c => {
             const opt = document.createElement('option');
             opt.value = c.id;
             opt.textContent = getCategoryPath(c.id);
@@ -1572,7 +1643,7 @@ function updateCategorySelects() {
     const populateSubSelect = () => {
         const subType = document.getElementById('sub-type').value;
         subSelect.innerHTML = '';
-        appData.categories.filter(c => c.type === subType).forEach(c => {
+        sortedCategories.filter(c => c.type === subType).forEach(c => {
             const opt = document.createElement('option');
             opt.value = c.id;
             opt.textContent = getCategoryPath(c.id);
@@ -1581,7 +1652,7 @@ function updateCategorySelects() {
     };
 
     // Populate Parent Category Select (all categories allowed)
-    appData.categories.forEach(c => {
+    sortedCategories.forEach(c => {
         const opt = document.createElement('option');
         opt.value = c.id;
         opt.textContent = getCategoryPath(c.id) + (c.type === 'income' ? ' (Revenu)' : ' (Dépense)');
@@ -2035,6 +2106,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Handle frequency change in subscription form
+    const subFrequencySelect = document.getElementById('sub-frequency');
+    if (subFrequencySelect) {
+        subFrequencySelect.addEventListener('change', (e) => {
+            const val = e.target.value;
+            const amountGroup = document.getElementById('sub-amount-group');
+            const installmentsGroup = document.getElementById('sub-installments-group');
+
+            if (val === 'installments') {
+                amountGroup.style.display = 'none';
+                installmentsGroup.style.display = 'block';
+                document.getElementById('sub-amount').required = false;
+                document.getElementById('sub-total-amount').required = true;
+                document.getElementById('sub-installments-count').required = true;
+            } else {
+                amountGroup.style.display = 'block';
+                installmentsGroup.style.display = 'none';
+                document.getElementById('sub-amount').required = true;
+                document.getElementById('sub-total-amount').required = false;
+                document.getElementById('sub-installments-count').required = false;
+            }
+        });
+    }
+
     // Listen to tab changes to refresh dashboard
     document.addEventListener('viewChanged', (e) => {
         const targetId = e.detail;
@@ -2338,10 +2433,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const type = document.getElementById('sub-type').value;
         const name = document.getElementById('sub-name').value;
-        const amount = parseFloat(document.getElementById('sub-amount').value);
-        const categoryId = document.getElementById('sub-category').value;
         const frequency = document.getElementById('sub-frequency').value;
+
+        let amount = 0;
+        let totalAmount = undefined;
+        let totalInstallments = undefined;
+
+        if (frequency === 'installments') {
+            totalAmount = parseFloat(document.getElementById('sub-total-amount').value);
+            totalInstallments = parseInt(document.getElementById('sub-installments-count').value, 10);
+            amount = totalAmount / totalInstallments;
+        } else {
+            amount = parseFloat(document.getElementById('sub-amount').value);
+        }
+
+        const categoryId = document.getElementById('sub-category').value;
         const startDate = document.getElementById('sub-start-date').value;
+        const endDate = document.getElementById('sub-end-date').value || null;
         const subId = document.getElementById('sub-id').value;
         const applyToPast = document.getElementById('sub-apply-past').checked;
 
@@ -2350,14 +2458,29 @@ document.addEventListener('DOMContentLoaded', () => {
             const subIndex = appData.subscriptions.findIndex(s => s.id === subId);
             if (subIndex !== -1) {
                 const oldName = appData.subscriptions[subIndex].name;
+                const currentStatus = appData.subscriptions[subIndex].status;
+
+                let newStatus = currentStatus;
+                if (endDate && appData.subscriptions[subIndex].nextDate > endDate) {
+                    newStatus = 'completed';
+                } else if (newStatus === 'completed' && (!endDate || appData.subscriptions[subIndex].nextDate <= endDate)) {
+                    // Si on enlève la date de fin ou la repousse, réactiver si c'était terminé
+                    if (frequency !== 'installments' || appData.subscriptions[subIndex].installmentsPaid < totalInstallments) {
+                        newStatus = 'active';
+                    }
+                }
 
                 appData.subscriptions[subIndex] = {
                     ...appData.subscriptions[subIndex],
                     type,
                     name,
                     amount,
+                    totalAmount,
+                    totalInstallments,
                     categoryId,
                     frequency,
+                    endDate,
+                    status: newStatus
                     // Note: If they changed start date and we need to retroactively change nextDate, it's tricky, we'll just leave nextDate as is or reset if they moved start date far in future
                 };
 
@@ -2368,7 +2491,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             t.type = type;
                             t.amount = amount;
                             t.categoryId = categoryId;
-                            t.note = `[Auto] ${name}`;
+                            t.note = t.note.replace(`[Auto] ${oldName}`, `[Auto] ${name}`);
                             // Dates are untouched
                         }
                     });
@@ -2381,10 +2504,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 type,
                 name,
                 amount,
+                totalAmount,
+                totalInstallments,
                 categoryId,
                 frequency,
                 startDate,
-                nextDate: startDate // Le prochain prélèvement est au démarrage
+                endDate,
+                nextDate: startDate, // Le prochain prélèvement est au démarrage
+                installmentsPaid: 0
             };
 
             appData.subscriptions.push(newSub);
@@ -2525,7 +2652,7 @@ function openDataModal(title, transactions, totalAmount, totalType = 'expense') 
                 document.querySelector('.nav-link[data-target="transactions"]').click();
                 editTransaction(t.id);
             };
-            const catName = getCategoryPath(t.categoryId);
+            const catName = getCategoryPath(t.categoryId, new Set(), true);
 
             tr.innerHTML = `
                 <td data-label="Date">${t.date}</td>
