@@ -1602,7 +1602,7 @@ function getCategoryPath(catId, visited = new Set(), forTable = false) {
     }
     visited.add(catId);
 
-    const separator = forTable ? ' ><br>' : ' > ';
+    const separator = forTable ? '&nbsp;><br>' : ' > ';
 
     if (cat.parentId) {
         return getCategoryPath(cat.parentId, visited, forTable) + separator + cat.name;
