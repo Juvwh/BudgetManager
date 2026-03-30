@@ -1164,12 +1164,17 @@ function renderSavings() {
     // Sort months descending (newest first)
     const sortedMonths = Array.from(allMonths).sort().reverse();
 
+    let totalRealProfit = 0;
+    let currentMonthRealProfit = 0;
     let totalSavings = 0;
     let totalRealSaved = 0;
     const tbody = document.querySelector('#table-savings-history tbody');
     tbody.innerHTML = '';
 
     const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+
+    const today = new Date();
+    const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 
     sortedMonths.forEach(monthStr => {
         const parts = monthStr.split('-');
@@ -1188,6 +1193,11 @@ function renderSavings() {
         totalRealSaved += data.savings;
 
         const realProfit = data.income - data.expense;
+        totalRealProfit += realProfit;
+
+        if (monthStr === currentMonthStr) {
+            currentMonthRealProfit = realProfit;
+        }
 
         const tr = document.createElement('tr');
 
@@ -1217,14 +1227,26 @@ function renderSavings() {
         tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Aucune donnée disponible.</td></tr>';
     }
 
-    // Update Total Savings view
-    const totalSavingsElement = document.getElementById('savings-view-total');
-    if (totalSavings >= 0) {
-        totalSavingsElement.textContent = `+${totalSavings.toFixed(2)} €`;
-        totalSavingsElement.className = 'text-green';
+    // Update Real Profit view (Cumul Total)
+    const totalRealProfitElement = document.getElementById('savings-view-total');
+    if (totalRealProfit >= 0) {
+        totalRealProfitElement.textContent = `+${totalRealProfit.toFixed(2)} €`;
+        totalRealProfitElement.className = 'text-green';
     } else {
-        totalSavingsElement.textContent = `${totalSavings.toFixed(2)} €`;
-        totalSavingsElement.className = 'text-red';
+        totalRealProfitElement.textContent = `${totalRealProfit.toFixed(2)} €`;
+        totalRealProfitElement.className = 'text-red';
+    }
+
+    // Update Real Profit view (Ce mois-ci)
+    const currentMonthRealProfitElement = document.getElementById('savings-view-current-month');
+    if (currentMonthRealProfitElement) {
+        if (currentMonthRealProfit >= 0) {
+            currentMonthRealProfitElement.textContent = `+${currentMonthRealProfit.toFixed(2)} €`;
+            currentMonthRealProfitElement.className = 'text-green';
+        } else {
+            currentMonthRealProfitElement.textContent = `${currentMonthRealProfit.toFixed(2)} €`;
+            currentMonthRealProfitElement.className = 'text-red';
+        }
     }
 
     // Update Real Saved view
