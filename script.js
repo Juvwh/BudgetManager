@@ -598,6 +598,7 @@ function renderSubscriptions() {
             <td data-label="Prochaine date">${isCompleted ? '-' : (sub.nextDate || sub.startDate || 'Erreur')}</td>
             <td data-label="Date de fin">${sub.endDate || (sub.frequency === 'installments' && isCompleted ? 'Terminé' : '-')}</td>
             <td data-label="Actions">
+                ${sub.frequency === 'installments' && !isCompleted ? `<button class="btn btn-small" style="background-color: var(--accent-color); color: white;" onclick="advanceSubscription('${sub.id}')">Avancer</button>` : ''}
                 <button class="btn btn-primary btn-small" onclick="viewSubscriptionHistory('${sub.id}')">Historique</button>
                 <button class="btn btn-secondary btn-small" onclick="editSubscription('${sub.id}')">Modifier</button>
                 <button class="btn btn-danger btn-small" onclick="deleteSubscription('${sub.id}')">Supprimer</button>
@@ -3114,3 +3115,56 @@ window.viewTagHistory = viewTagHistory;
 
 window.openDataModal = openDataModal;
 window.setTransactionFilter = setTransactionFilter;
+
+// --- ADVANCE SUBSCRIPTIONS ---
+async function advanceSubscription(subId) {
+    const sub = appData.subscriptions.find(s => s.id === subId);
+    if (!sub || sub.frequency !== 'installments') return;
+
+    const remainingInstallments = sub.totalInstallments - (sub.installmentsPaid || 0);
+    if (remainingInstallments <= 0) return;
+
+    const monthsToAdvanceStr = prompt(`Combien de mois souhaitez-vous avancer pour l'abonnement "${sub.name}" ? (Max: ${remainingInstallments})`, "1");
+    if (monthsToAdvanceStr === null) return; // Annulé
+
+    const monthsToAdvance = parseInt(monthsToAdvanceStr, 10);
+    if (isNaN(monthsToAdvance) || monthsToAdvance <= 0) {
+        alert("Veuillez entrer un nombre valide de mois.");
+        return;
+    }
+    if (monthsToAdvance > remainingInstallments) {
+        alert(`Vous ne pouvez pas avancer plus de ${remainingInstallments} mois.`);
+        return;
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const advanceAmount = sub.amount * monthsToAdvance;
+
+    const currentPaid = (sub.installmentsPaid || 0) + 1;
+    const endPaid = currentPaid + monthsToAdvance - 1;
+    const monthsText = monthsToAdvance === 1 ? `Mois ${currentPaid}/${sub.totalInstallments}` : `Mois ${currentPaid}-${endPaid}/${sub.totalInstallments}`;
+
+    const note = `[Auto] ${sub.name} (Avance: ${monthsText})`;
+
+    appData.transactions.push({
+        id: 'trans-auto-' + generateId(),
+        type: sub.type,
+        amount: advanceAmount,
+        date: today,
+        categoryId: sub.categoryId,
+        note: note,
+        subscriptionId: sub.id
+    });
+
+    sub.installmentsPaid = (sub.installmentsPaid || 0) + monthsToAdvance;
+
+    if (sub.installmentsPaid >= sub.totalInstallments) {
+        sub.status = 'completed';
+    }
+
+    await saveData();
+    renderSubscriptions();
+    renderTransactions();
+    updateDashboard();
+}
+window.advanceSubscription = advanceSubscription;
