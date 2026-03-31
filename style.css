@@ -166,7 +166,7 @@ nav a.active::after {
 
 main {
     padding: 2rem;
-    max-width: 1200px;
+    max-width: 1500px;
     margin: 0 auto;
 }
 
@@ -357,6 +357,10 @@ h3 {
     display: grid;
     grid-template-columns: 1fr 2fr;
     gap: 1.5rem;
+}
+
+#transactions .split-layout {
+    grid-template-columns: 1.2fr 2fr;
 }
 
 @media (max-width: 768px) {

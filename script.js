@@ -567,10 +567,17 @@ function renderSubscriptions() {
 
     sortedSubs.forEach(sub => {
         const tr = document.createElement('tr');
-        const freqMap = { 'weekly': 'Hebdomadaire', 'monthly': 'Mensuelle', 'yearly': 'Annuelle', 'installments': 'En plusieurs fois' };
-
         const isCorrupted = isNaN(sub.amount) || sub.amount === null || sub.amount === undefined || !sub.startDate;
         const isCompleted = sub.status === 'completed';
+
+        let freqText = '';
+        if (sub.frequency === 'monthly' && sub.startDate) {
+            const day = parseInt(sub.startDate.split('-')[2], 10);
+            freqText = `Tous les ${day} du mois`;
+        } else {
+            const freqMap = { 'weekly': 'Hebdomadaire', 'monthly': 'Tous les X du mois', 'yearly': 'Annuelle', 'installments': 'En plusieurs fois' };
+            freqText = freqMap[sub.frequency] || sub.frequency;
+        }
 
         if (isCorrupted) {
             tr.style.backgroundColor = 'rgba(255, 59, 48, 0.1)';
@@ -593,7 +600,7 @@ function renderSubscriptions() {
         tr.innerHTML = `
             <td data-label="Nom">${displayName}</td>
             <td data-label="Type"><span class="${sub.type === 'income' ? 'text-green' : 'text-red'}">${sub.type === 'income' ? 'Revenu' : 'Dépense'}</span></td>
-            <td data-label="Fréquence">${freqMap[sub.frequency] || 'Inconnue'}</td>
+            <td data-label="Fréquence">${freqText || 'Inconnue'}</td>
             <td data-label="Montant" class="${sub.type === 'income' ? 'text-green' : 'text-red'}">${formattedAmount}</td>
             <td data-label="Prochaine date">${isCompleted ? '-' : (sub.nextDate || sub.startDate || 'Erreur')}</td>
             <td data-label="Date de fin">${sub.endDate || (sub.frequency === 'installments' && isCompleted ? 'Terminé' : '-')}</td>
@@ -2727,7 +2734,7 @@ function renderSimulations() {
         const sign = sim.type === 'income' ? '+' : '-';
 
         let freqText = 'Ponctuelle';
-        if (sim.frequency === 'monthly') freqText = 'Mensuelle';
+        if (sim.frequency === 'monthly') freqText = 'Tous les mois';
         if (sim.frequency === 'yearly') freqText = 'Annuelle';
 
         tr.innerHTML = `
