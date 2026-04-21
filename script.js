@@ -330,8 +330,8 @@ function renderTransactions() {
             <td data-label="Tags"><div style="display: flex; gap: 4px; flex-wrap: wrap;">${tagsHtml}</div></td>
             <td data-label="Montant" class="${t.type === 'expense' ? 'text-red' : 'text-green'}">${formattedAmount}</td>
             <td data-label="Actions">
-                <button class="btn btn-secondary btn-small" onclick="editTransaction('${t.id}')">Modifier</button>
-                <button class="btn btn-danger btn-small" onclick="deleteTransaction('${t.id}')">Supprimer</button>
+                <button class="btn btn-secondary btn-small icon-btn-mobile" title="Modifier" onclick="editTransaction('${t.id}')"><span class="btn-text">Modifier</span><svg class="mobile-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
+                <button class="btn btn-danger btn-small icon-btn-mobile" title="Supprimer" onclick="deleteTransaction('${t.id}')"><span class="btn-text">Supprimer</span><svg class="mobile-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
             </td>
         `;
         tbody.appendChild(tr);
@@ -605,10 +605,10 @@ function renderSubscriptions() {
             <td data-label="Prochaine date">${isCompleted ? '-' : (sub.nextDate || sub.startDate || 'Erreur')}</td>
             <td data-label="Date de fin">${sub.endDate || (sub.frequency === 'installments' && isCompleted ? 'Terminé' : '-')}</td>
             <td data-label="Actions">
-                ${sub.frequency === 'installments' && !isCompleted ? `<button class="btn btn-small" style="background-color: var(--accent-color); color: white;" onclick="advanceSubscription('${sub.id}')">Avancer</button>` : ''}
-                <button class="btn btn-primary btn-small" onclick="viewSubscriptionHistory('${sub.id}')">Historique</button>
-                <button class="btn btn-secondary btn-small" onclick="editSubscription('${sub.id}')">Modifier</button>
-                <button class="btn btn-danger btn-small" onclick="deleteSubscription('${sub.id}')">Supprimer</button>
+                ${sub.frequency === 'installments' && !isCompleted ? `<button class="btn btn-small icon-btn-mobile" title="Avancer" style="background-color: var(--accent-color); color: white;" onclick="advanceSubscription('${sub.id}')"><span class="btn-text">Avancer</span><svg class="mobile-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5l7 7-7 7"/><path d="M4 5l7 7-7 7"/></svg></button>` : ''}
+                <button class="btn btn-primary btn-small icon-btn-mobile" title="Historique" onclick="viewSubscriptionHistory('${sub.id}')"><span class="btn-text">Historique</span><svg class="mobile-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></button>
+                <button class="btn btn-secondary btn-small icon-btn-mobile" title="Modifier" onclick="editSubscription('${sub.id}')"><span class="btn-text">Modifier</span><svg class="mobile-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
+                <button class="btn btn-danger btn-small icon-btn-mobile" title="Supprimer" onclick="deleteSubscription('${sub.id}')"><span class="btn-text">Supprimer</span><svg class="mobile-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
             </td>
         `;
         tbody.appendChild(tr);
@@ -1610,7 +1610,7 @@ function getCategoryPath(catId, visited = new Set(), forTable = false) {
     }
     visited.add(catId);
 
-    const separator = forTable ? '&nbsp;><br>' : ' > ';
+    const separator = forTable ? '<span class="cat-sep"> &gt; </span>' : ' > ';
 
     if (cat.parentId) {
         return getCategoryPath(cat.parentId, visited, forTable) + separator + cat.name;
@@ -2744,7 +2744,7 @@ function renderSimulations() {
             <td data-label="Fréquence">${freqText}</td>
             <td data-label="Date début">${sim.startDate}</td>
             <td data-label="Actions">
-                <button class="btn btn-secondary btn-small" onclick="deleteSimulation('${sim.id}')">Supprimer</button>
+                <button class="btn btn-danger btn-small icon-btn-mobile" title="Supprimer" onclick="deleteSimulation('${sim.id}')"><span class="btn-text">Supprimer</span><svg class="mobile-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
             </td>
         `;
         tbody.appendChild(tr);
