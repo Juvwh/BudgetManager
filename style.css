@@ -447,7 +447,8 @@ h3 {
 
     #table-simulations tbody tr {
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
+        flex-wrap: wrap;
         background-color: var(--card-bg);
         border: 1px solid var(--border-color);
         border-radius: 12px;
@@ -464,6 +465,7 @@ h3 {
         align-items: center;
         text-align: left;
         font-size: 0.9rem;
+        width: 100%;
     }
 
     #table-simulations tbody td::before {
@@ -474,22 +476,15 @@ h3 {
         display: none;
     }
 
-    #table-simulations tbody td[data-label="Date début"],
-    #table-simulations tbody td[data-label="Fréquence"] {
-        order: 2;
-        color: var(--text-color);
-        opacity: 0.6;
-        font-size: 0.8rem;
-    }
-
     #table-simulations tbody td[data-label="Nom"] {
-        font-weight: 600;
-        font-size: 1.1rem;
+        order: 1;
+        font-weight: normal;
+        font-size: 0.85rem;
         color: var(--text-color);
+        opacity: 0.7;
         padding-bottom: 0.2rem;
         margin-bottom: 0.2rem;
-        order: 1;
-        width: calc(100% - 100px);
+        width: 100%;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -497,13 +492,30 @@ h3 {
     }
 
     #table-simulations tbody td[data-label="Montant"] {
-        position: absolute;
-        top: 1rem;
-        right: 1rem;
+        order: 2;
         font-size: 1.25rem;
         font-weight: 700;
         padding: 0;
-        text-align: right;
+        text-align: left;
+        width: 100%;
+        margin-bottom: 0.2rem;
+    }
+
+    #table-simulations tbody td[data-label="Fréquence"] {
+        order: 3;
+        opacity: 0.6;
+        font-size: 0.8rem;
+        width: 50%;
+        margin-top: 0.3rem;
+    }
+
+    #table-simulations tbody td[data-label="Date début"] {
+        order: 4;
+        opacity: 0.8;
+        font-size: 0.8rem;
+        width: 50%;
+        justify-content: flex-end;
+        margin-top: 0.3rem;
     }
 
     #table-simulations tbody td[data-label="Actions"] {
@@ -524,6 +536,18 @@ h3 {
     /* Transformer les tableaux en cartes sur mobile (Transactions et Abonnements principalement) */
     .table-container {
         border: none;
+        overflow-x: hidden; /* Supprime le scroll horizontal restant éventuel */
+    }
+
+    /* On force les tables à prendre toute la largeur, sans min-width destructeur */
+    table {
+        min-width: 100% !important;
+        display: block;
+    }
+
+    tbody {
+        display: block;
+        width: 100%;
     }
 
     #table-transactions thead, #table-subscriptions thead, #table-modal-transactions thead {
@@ -532,7 +556,8 @@ h3 {
 
     #table-transactions tbody tr, #table-subscriptions tbody tr, #table-modal-transactions tbody tr {
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
+        flex-wrap: wrap;
         background-color: var(--card-bg);
         border: 1px solid var(--border-color);
         border-radius: 12px;
@@ -549,6 +574,7 @@ h3 {
         align-items: center;
         text-align: left;
         font-size: 0.9rem;
+        width: 100%;
     }
 
     #table-transactions tbody td::before, #table-subscriptions tbody td::before, #table-modal-transactions tbody td::before {
@@ -563,62 +589,68 @@ h3 {
         display: none;
     }
 
-    /* Ne pas cacher la ligne date, mais la positionner en dessous */
-    #table-transactions tbody td[data-label="Date"],
-    #table-modal-transactions tbody td[data-label="Date"] {
-        order: 2;
-        color: var(--text-color);
-        opacity: 0.6;
-        font-size: 0.8rem;
-    }
-
-    /* Catégorie / Nom (Titre principal) */
-    #table-transactions tbody td[data-label="Catégorie"],
-    #table-modal-transactions tbody td[data-label="Catégorie"],
-    #table-subscriptions tbody td[data-label="Nom"] {
-        font-weight: 600;
-        font-size: 1.1rem;
-        color: var(--text-color);
-        padding-bottom: 0.2rem;
-        margin-bottom: 0.2rem;
-        order: 1; /* En haut à gauche */
-        width: calc(100% - 100px); /* Laisse la place au montant */
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        display: block;
-    }
-
-    /* Montant (En haut à droite) */
-    #table-transactions tbody td[data-label="Montant"],
-    #table-modal-transactions tbody td[data-label="Montant"],
-    #table-subscriptions tbody td[data-label="Montant"] {
-        position: absolute;
-        top: 1rem;
-        right: 1rem;
-        font-size: 1.25rem;
-        font-weight: 700;
-        padding: 0;
-        text-align: right;
-    }
-
     /* Note */
     #table-transactions tbody td[data-label="Note"],
     #table-modal-transactions tbody td[data-label="Note"] {
-        order: 3;
+        order: 1;
         font-size: 0.85rem;
         color: var(--text-color);
         opacity: 0.8;
+        width: 100%;
+        margin-bottom: 0.2rem;
     }
     #table-transactions tbody td[data-label="Note"]:empty,
     #table-modal-transactions tbody td[data-label="Note"]:empty {
         display: none;
     }
 
+    /* Montant (En dessous de la note, principal) */
+    #table-transactions tbody td[data-label="Montant"],
+    #table-modal-transactions tbody td[data-label="Montant"],
+    #table-subscriptions tbody td[data-label="Montant"] {
+        order: 2;
+        font-size: 1.25rem;
+        font-weight: 700;
+        padding: 0;
+        text-align: left;
+        width: 100%;
+        margin-bottom: 0.2rem;
+    }
+
+    /* Catégorie / Nom (Titre principal) */
+    #table-transactions tbody td[data-label="Catégorie"],
+    #table-modal-transactions tbody td[data-label="Catégorie"] {
+        order: 3;
+        font-weight: normal;
+        font-size: 0.85rem;
+        color: var(--text-color);
+        opacity: 0.7; /* Plus sombre en mode sombre, plus clair en clair selon la variable --text-color */
+        padding-bottom: 0.2rem;
+        margin-bottom: 0.2rem;
+        width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+    }
+
+    /* Date */
+    #table-transactions tbody td[data-label="Date"],
+    #table-modal-transactions tbody td[data-label="Date"] {
+        order: 4;
+        color: var(--text-color);
+        opacity: 0.6;
+        font-size: 0.8rem;
+        width: 50%;
+        margin-top: 0.3rem;
+    }
+
     /* Tags */
     #table-transactions tbody td[data-label="Tags"],
     #table-modal-transactions tbody td[data-label="Tags"] {
-        order: 4;
+        order: 5;
+        width: 50%;
+        justify-content: flex-end;
         margin-top: 0.3rem;
     }
     #table-transactions tbody td[data-label="Tags"]:empty,
@@ -627,15 +659,36 @@ h3 {
     }
 
     /* Lignes abonnements autres que Nom et Montant */
-    #table-subscriptions tbody td[data-label="Fréquence"] {
-        order: 2;
-        opacity: 0.6;
+    #table-subscriptions tbody td[data-label="Nom"] {
+        /* On retire la partie "Nom" gérée dans "Catégorie" puisqu'ici elle n'a pas de Note au dessus, elle sera gérée via l'ordre 1 (Note étant absent) */
+        order: 1; /* Note est absente dans les abonnements, on met le Nom en 1 */
+        font-weight: normal;
         font-size: 0.85rem;
+        color: var(--text-color);
+        opacity: 0.7;
+        padding-bottom: 0.2rem;
+        margin-bottom: 0.2rem;
+        width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+    }
+
+    #table-subscriptions tbody td[data-label="Fréquence"] {
+        order: 4;
+        opacity: 0.6;
+        font-size: 0.8rem;
+        width: 50%;
+        margin-top: 0.3rem;
     }
     #table-subscriptions tbody td[data-label="Prochaine date"] {
-        order: 3;
+        order: 5;
         opacity: 0.8;
-        font-size: 0.85rem;
+        font-size: 0.8rem;
+        width: 50%;
+        justify-content: flex-end;
+        margin-top: 0.3rem;
     }
 
     /* Actions à la fin de la carte */
