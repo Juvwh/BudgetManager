@@ -664,10 +664,10 @@ h3 {
     /* Tags */
     #table-transactions tbody td[data-label="Tags"],
     #table-modal-transactions tbody td[data-label="Tags"] {
-        order: 5;
-        width: 50%;
-        justify-content: flex-end;
-        margin-top: 0.1rem;
+        order: 6;
+        width: 100%;
+        justify-content: flex-start;
+        margin-top: 0.5rem;
     }
     #table-transactions tbody td[data-label="Tags"]:empty,
     #table-modal-transactions tbody td[data-label="Tags"]:empty {
@@ -733,8 +733,6 @@ h3 {
     }
 
     /* Actions à la fin de la carte */
-    #table-transactions tbody td[data-label="Actions"],
-    #table-modal-transactions tbody td[data-label="Actions"],
     #table-subscriptions tbody td[data-label="Actions"] {
         order: 99; /* Toujours à la fin */
         justify-content: flex-end;
@@ -743,6 +741,18 @@ h3 {
         padding-top: 0.8rem;
         border-top: 1px solid var(--border-color);
         width: 100%; /* S'assurer qu'il prend toute la largeur */
+    }
+
+    /* Actions Transactions (sur la même ligne que la date) */
+    #table-transactions tbody td[data-label="Actions"],
+    #table-modal-transactions tbody td[data-label="Actions"] {
+        order: 5;
+        width: 50%;
+        justify-content: flex-end;
+        gap: 0.5rem;
+        margin-top: 0.1rem;
+        padding-top: 0;
+        border-top: none;
     }
 
     /* Autres tables (Tags, Économies) en cartes aussi */
