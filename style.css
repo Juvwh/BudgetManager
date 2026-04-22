@@ -549,17 +549,25 @@ h3 {
     .table-container {
         border: none;
         overflow-x: hidden; /* Supprime le scroll horizontal restant éventuel */
+        width: 100%;
+        padding: 0; /* Remove horizontal padding causing scroll */
+        box-sizing: border-box;
     }
 
     /* On force les tables à prendre toute la largeur, sans min-width destructeur */
     table {
-        min-width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
         display: block;
+        box-sizing: border-box;
+        overflow-wrap: anywhere;
     }
 
     tbody {
         display: block;
         width: 100%;
+        box-sizing: border-box;
     }
 
     #table-transactions thead, #table-subscriptions thead, #table-modal-transactions thead {
@@ -574,20 +582,22 @@ h3 {
         border: 1px solid var(--border-color);
         border-radius: 12px;
         margin-bottom: 1rem;
-        padding: 1rem;
+        padding: 0.8rem;
         box-shadow: 0 2px 8px rgba(0,0,0,0.02);
         position: relative;
         width: 100%;
+        box-sizing: border-box;
     }
 
     #table-transactions tbody td, #table-subscriptions tbody td, #table-modal-transactions tbody td {
         border-bottom: none;
-        padding: 0.15rem 0;
+        padding: 0.1rem 0;
         display: flex;
         align-items: center;
         text-align: left;
         font-size: 0.9rem;
         width: 100%;
+        box-sizing: border-box;
     }
 
     #table-transactions tbody td::before, #table-subscriptions tbody td::before, #table-modal-transactions tbody td::before {
@@ -610,7 +620,8 @@ h3 {
         color: var(--text-color);
         opacity: 0.8;
         width: 100%;
-        margin-bottom: 0rem;
+        margin-bottom: 0;
+        padding-bottom: 0;
     }
     #table-transactions tbody td[data-label="Note"]:empty,
     #table-modal-transactions tbody td[data-label="Note"]:empty {
@@ -623,8 +634,8 @@ h3 {
     #table-subscriptions tbody td[data-label="Montant"] {
         order: 2;
         position: absolute;
-        top: 1rem;
-        right: 1rem;
+        top: 0.8rem;
+        right: 0.8rem;
         font-size: 1.25rem;
         font-weight: 700;
         padding: 0;
@@ -641,8 +652,9 @@ h3 {
         font-size: 0.85rem;
         color: var(--text-color);
         opacity: 0.7; /* Plus sombre en mode sombre, plus clair en clair selon la variable --text-color */
-        padding-bottom: 0rem;
-        margin-bottom: 0rem;
+        padding-bottom: 0;
+        margin-bottom: 0;
+        padding-top: 0;
         width: 100%;
         white-space: nowrap;
         overflow: hidden;
@@ -658,7 +670,8 @@ h3 {
         opacity: 0.6;
         font-size: 0.8rem;
         width: 50%;
-        margin-top: 0.1rem;
+        margin-top: 0;
+        padding-top: 0;
     }
 
     /* Tags */
@@ -667,11 +680,13 @@ h3 {
         order: 6;
         width: 100%;
         justify-content: flex-start;
-        margin-top: 0.5rem;
+        margin-top: 0.2rem;
     }
     #table-transactions tbody td[data-label="Tags"]:empty,
     #table-modal-transactions tbody td[data-label="Tags"]:empty {
-        display: none;
+        display: none !important;
+        margin: 0;
+        padding: 0;
     }
 
     /* Lignes abonnements autres que Nom et Montant */
@@ -750,7 +765,7 @@ h3 {
         width: 50%;
         justify-content: flex-end;
         gap: 0.5rem;
-        margin-top: 0.1rem;
+        margin-top: 0;
         padding-top: 0;
         border-top: none;
     }
