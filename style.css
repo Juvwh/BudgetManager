@@ -456,6 +456,7 @@ h3 {
         padding: 1rem;
         box-shadow: 0 2px 8px rgba(0,0,0,0.02);
         position: relative;
+        width: 100%;
     }
 
     #table-simulations tbody td {
@@ -489,6 +490,14 @@ h3 {
         overflow: hidden;
         text-overflow: ellipsis;
         display: block;
+    }
+
+    .cat-sep {
+        display: inline; /* Reste sur la même ligne sur mobile */
+    }
+    .cat-sep::before {
+        content: normal; /* Annule le saut de ligne sur mobile */
+        white-space: normal;
     }
 
     #table-simulations tbody td[data-label="Montant"] {
@@ -565,6 +574,7 @@ h3 {
         padding: 1rem;
         box-shadow: 0 2px 8px rgba(0,0,0,0.02);
         position: relative;
+        width: 100%;
     }
 
     #table-transactions tbody td, #table-subscriptions tbody td, #table-modal-transactions tbody td {
@@ -604,17 +614,20 @@ h3 {
         display: none;
     }
 
-    /* Montant (En dessous de la note, principal) */
+    /* Montant (En haut à droite) */
     #table-transactions tbody td[data-label="Montant"],
     #table-modal-transactions tbody td[data-label="Montant"],
     #table-subscriptions tbody td[data-label="Montant"] {
         order: 2;
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
         font-size: 1.25rem;
         font-weight: 700;
         padding: 0;
-        text-align: left;
-        width: 100%;
-        margin-bottom: 0.2rem;
+        text-align: right;
+        width: auto;
+        margin-bottom: 0;
     }
 
     /* Catégorie / Nom (Titre principal) */
@@ -691,6 +704,31 @@ h3 {
         margin-top: 0.3rem;
     }
 
+    .icon-btn-mobile .btn-text {
+        display: none;
+    }
+
+    .icon-btn-mobile .mobile-icon {
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+    }
+
+    .icon-btn-mobile {
+        padding: 0.4rem; /* Boutons plus petits et carrés */
+        border-radius: 50%; /* Arrondi */
+        background-color: var(--secondary-color) !important;
+        color: var(--text-color) !important;
+        border: 1px solid var(--border-color);
+        box-shadow: none;
+    }
+
+    .icon-btn-mobile.btn-danger {
+        color: var(--danger-color) !important; /* Rouge pour corbeille */
+        background-color: transparent !important;
+        border-color: transparent;
+    }
+
     /* Actions à la fin de la carte */
     #table-transactions tbody td[data-label="Actions"],
     #table-modal-transactions tbody td[data-label="Actions"],
@@ -719,6 +757,7 @@ h3 {
         padding: 1rem;
         box-shadow: 0 2px 8px rgba(0,0,0,0.02);
         position: relative;
+        width: 100%;
     }
 
     #table-tags-overview tbody td, #table-savings-history tbody td {
@@ -1064,9 +1103,26 @@ canvas {
 }
 
 /* Tables */
+.mobile-icon {
+    display: none; /* Caché en desktop par défaut */
+}
+
 .table-container {
     overflow-x: auto;
     width: 100%;
+}
+
+.cat-sep {
+    display: block; /* Crée le saut de ligne par défaut (desktop) */
+}
+
+/* Évite que le chevron prenne toute une ligne en desktop */
+.cat-sep {
+    display: inline-block;
+}
+.cat-sep::before {
+    content: '\A';
+    white-space: pre;
 }
 
 table {
