@@ -1700,11 +1700,13 @@ function updateCategorySelects() {
     const parentSelect = document.getElementById('cat-parent');
     const transSelect = document.getElementById('trans-category');
     const subSelect = document.getElementById('sub-category');
+    const mvCategoriesSelect = document.getElementById('setting-meal-vouchers-categories');
 
     // Clear
     parentSelect.innerHTML = '<option value="">-- Aucune (Catégorie principale) --</option>';
     transSelect.innerHTML = '';
     subSelect.innerHTML = '';
+    if (mvCategoriesSelect) mvCategoriesSelect.innerHTML = '';
 
     // Create a sorted list of categories
     const sortedCategories = [...appData.categories].sort((a, b) => {
