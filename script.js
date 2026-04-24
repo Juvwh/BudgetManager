@@ -30,6 +30,10 @@ window.appData = window.appData || {
     tags: [],
     simulations: [],
     simulationBalance: 0,
+    mealVoucherCredits: [],
+    mealVouchersEnabled: false,
+    mealVoucherEligibleCategories: [],
+    mealVoucherExpectedMonthlyAmount: 0,
     categories: [
         // Default categories
         { id: 'cat-inc-1', name: 'Salaire', type: 'income', parentId: null },
@@ -105,6 +109,10 @@ async function saveData() {
             simulations: appData.simulations || [],
             simulationBalance: appData.simulationBalance || 0,
             categories: appData.categories,
+            mealVouchersEnabled: appData.mealVouchersEnabled || false,
+            mealVoucherEligibleCategories: appData.mealVoucherEligibleCategories || [],
+            mealVoucherExpectedMonthlyAmount: appData.mealVoucherExpectedMonthlyAmount || 0,
+            mealVoucherCredits: appData.mealVoucherCredits || [],
             updatedAt: new Date().toISOString()
         };
 
@@ -136,6 +144,11 @@ async function loadData() {
             if(parsed.simulations) appData.simulations = parsed.simulations;
             if(parsed.simulationBalance !== undefined) appData.simulationBalance = parsed.simulationBalance;
             if(parsed.categories) appData.categories = parsed.categories;
+
+            if(parsed.mealVouchersEnabled !== undefined) appData.mealVouchersEnabled = parsed.mealVouchersEnabled;
+            if(parsed.mealVoucherEligibleCategories) appData.mealVoucherEligibleCategories = parsed.mealVoucherEligibleCategories;
+            if(parsed.mealVoucherExpectedMonthlyAmount !== undefined) appData.mealVoucherExpectedMonthlyAmount = parsed.mealVoucherExpectedMonthlyAmount;
+            if(parsed.mealVoucherCredits) appData.mealVoucherCredits = parsed.mealVoucherCredits;
         } else {
             console.log("Aucune donnée Firestore trouvée. Initialisation avec les valeurs par défaut.");
             await saveData(); // Sauvegarde les valeurs par défaut
@@ -3219,6 +3232,12 @@ window.updateNavigationVisibility = function() {
                 transactions: [],
                 subscriptions: [],
                 tags: [],
+                simulations: [],
+                simulationBalance: 0,
+                mealVoucherCredits: [],
+                mealVouchersEnabled: false,
+                mealVoucherEligibleCategories: [],
+                mealVoucherExpectedMonthlyAmount: 0,
                 categories: []
             };
             await saveData();
