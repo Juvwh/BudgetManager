@@ -313,6 +313,9 @@ function renderTransactions() {
         } else {
             displayType = 'Dépense';
             typeColor = 'text-red';
+            if (t.mealVoucherPart > 0) {
+                formattedAmount = `-${Number(t.amount).toFixed(2)} € <br><small style="color:var(--accent-color);">dont ${Number(t.mealVoucherPart).toFixed(2)} € (CR)</small><br><small style="color:var(--text-color);">Reste (Argent): -${Number(t.amount - t.mealVoucherPart).toFixed(2)} €</small>`;
+            }
         }
 
         let checkboxHtml = '';
@@ -459,6 +462,13 @@ function editTransaction(id) {
     document.getElementById('trans-category').value = trans.categoryId;
     document.getElementById('trans-note').value = trans.note || '';
 
+    document.getElementById('trans-category').dispatchEvent(new Event('change')); // Mettre à jour les champs MV
+    if (trans.mealVoucherPart > 0) {
+        document.getElementById('trans-mv-part').value = trans.mealVoucherPart;
+    } else {
+        document.getElementById('trans-mv-part').value = '';
+    }
+
     // Gérer les tags
     document.getElementById('trans-selected-tags').value = JSON.stringify(trans.tagIds || []);
     renderTransactionTagsSelector();
@@ -485,6 +495,8 @@ function resetTransactionForm() {
     document.getElementById('btn-submit-trans').textContent = "Ajouter";
     const cancelBtn = document.getElementById('btn-cancel-edit-trans');
     if (cancelBtn) cancelBtn.style.display = 'none';
+    document.getElementById('trans-mv-part').value = '';
+    document.getElementById('trans-category').dispatchEvent(new Event('change'));
 }
 
 // --- SUBSCRIPTIONS MANAGEMENT ---
@@ -712,13 +724,20 @@ function getMonthData(year, month) {
             savings += saved;
             income += (t.amount - saved); // Only non-saved part goes to income
         } else {
-            expense += t.amount;
+            let actualAmount = t.amount;
+            let chartMode = window.currentChartMode || 'real';
+
+            if (chartMode === 'real' && t.mealVoucherPart > 0) {
+                actualAmount = t.amount - t.mealVoucherPart;
+            }
+
+            expense += actualAmount;
             // Get main category (if it's a sub, we get its parent for high-level charts, or just use it direct. Let's group by top-level category for clarity)
             const cat = appData.categories.find(c => c.id === t.categoryId);
             if (cat) {
                 const topLevelId = cat.parentId ? cat.parentId : cat.id;
                 const topLevelName = getCategoryPath(topLevelId).split(' > ')[0];
-                categoryExpenses[topLevelName] = (categoryExpenses[topLevelName] || 0) + t.amount;
+                categoryExpenses[topLevelName] = (categoryExpenses[topLevelName] || 0) + actualAmount;
             }
         }
     });
@@ -732,12 +751,18 @@ function getSpecificMonthsCategoryData(monthPrefixes) {
         monthPrefixes.some(prefix => t.date && t.date.startsWith(prefix))
     );
 
+    let chartMode = window.currentChartMode || 'real';
     const categoryTotals = {};
     trans.forEach(t => {
         if (t.type === 'expense') {
+            let actualAmount = Math.abs(t.amount);
+            if (chartMode === 'real' && t.mealVoucherPart > 0) {
+                actualAmount = actualAmount - t.mealVoucherPart;
+            }
+
             const catId = t.categoryId || 'unknown';
             const catName = getCategoryPath(catId);
-            categoryTotals[catName] = (categoryTotals[catName] || 0) + Math.abs(t.amount);
+            categoryTotals[catName] = (categoryTotals[catName] || 0) + actualAmount;
         }
     });
 
@@ -762,12 +787,18 @@ function getMultiMonthCategoryData(startYear, startMonth, numberOfMonths) {
         validPrefixes.some(prefix => t.date.startsWith(prefix))
     );
 
+    let chartMode = window.currentChartMode || 'real';
     let detailedCategoryExpenses = {};
 
     trans.forEach(t => {
         if (t.type === 'expense') {
+            let actualAmount = t.amount;
+            if (chartMode === 'real' && t.mealVoucherPart > 0) {
+                actualAmount = actualAmount - t.mealVoucherPart;
+            }
+
             const catPath = getCategoryPath(t.categoryId);
-            detailedCategoryExpenses[catPath] = (detailedCategoryExpenses[catPath] || 0) + t.amount;
+            detailedCategoryExpenses[catPath] = (detailedCategoryExpenses[catPath] || 0) + actualAmount;
         }
     });
 
@@ -1283,6 +1314,30 @@ function renderSavings() {
         const incomeColor = 'text-green';
         const incomeSign = '+';
 
+        // Calculate Meal Voucher Coverage Rate
+        let mvCoverageHtml = '';
+        if (appData.mealVouchersEnabled) {
+            let totalEligibleFoodSpent = 0;
+            let totalMvSpentInMonth = 0;
+
+            const transInMonth = appData.transactions.filter(t => t.date && t.date.startsWith(monthStr));
+            transInMonth.forEach(t => {
+                if (t.type === 'expense' && appData.mealVoucherEligibleCategories && appData.mealVoucherEligibleCategories.includes(t.categoryId)) {
+                    totalEligibleFoodSpent += t.amount;
+                    if (t.mealVoucherPart > 0) {
+                        totalMvSpentInMonth += t.mealVoucherPart;
+                    }
+                }
+            });
+
+            let mvRate = 0;
+            if (totalEligibleFoodSpent > 0) {
+                mvRate = (totalMvSpentInMonth / totalEligibleFoodSpent) * 100;
+            }
+            mvCoverageHtml = `<td data-label="Taux couv. alimentaire">${mvRate.toFixed(1)}%</td>`;
+        }
+
+
         tr.innerHTML = `
             <td data-label="Mois">${formattedMonth}</td>
             <td data-label="Revenus réels" class="${incomeColor}">${incomeSign}${data.income.toFixed(2)} €</td>
@@ -1291,12 +1346,29 @@ function renderSavings() {
             <td data-label="Économie (Bilan)" class="${savingsClass}">${savingsSign}${savingsForMonth.toFixed(2)} €</td>
             <td data-label="Épargne du mois" class="text-primary">${data.savings > 0 ? '+' : ''}${data.savings.toFixed(2)} €</td>
             <td data-label="Bénéfice Réel" class="${realProfitClass}" style="font-weight: bold;">${realProfitSign}${realProfit.toFixed(2)} €</td>
+            ${mvCoverageHtml}
         `;
         tbody.appendChild(tr);
     });
 
     if (sortedMonths.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Aucune donnée disponible.</td></tr>';
+        const colSpan = appData.mealVouchersEnabled ? 8 : 7;
+        tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center;">Aucune donnée disponible.</td></tr>`;
+    }
+
+    // Meal Vouchers Columns toggles
+    const mvColHeaders = document.querySelectorAll('.col-mv-rate');
+    mvColHeaders.forEach(th => {
+        th.style.display = appData.mealVouchersEnabled ? 'table-cell' : 'none';
+    });
+
+    const mvValContainer = document.getElementById('savings-view-mv-container');
+    if (appData.mealVouchersEnabled) {
+        mvValContainer.style.display = 'block';
+        const mvData = calculateMealVoucherData();
+        document.getElementById('savings-view-mv-val').textContent = '+' + mvData.spentLast12m.toFixed(2) + ' €';
+    } else {
+        mvValContainer.style.display = 'none';
     }
 
     // Update Real Profit view (Cumul Total)
@@ -1417,6 +1489,10 @@ function updateDashboardCategoryChart() {
 
 function updateDashboard() {
     let currentYear, currentMonth;
+
+    if (typeof checkMvReconciliation === 'function') {
+        checkMvReconciliation();
+    }
 
     const warningBanner = document.getElementById('dashboard-warning-banner');
     if (warningBanner) {
@@ -1637,6 +1713,27 @@ function updateCategorySelects() {
         return pathA.localeCompare(pathB);
     });
 
+    sortedCategories.forEach(cat => {
+        if (!cat.parentId) {
+            const option = document.createElement('option');
+            option.value = cat.id;
+            option.textContent = cat.name;
+            parentSelect.appendChild(option);
+        }
+
+        if (mvCategoriesSelect && cat.type === 'expense') {
+            const path = getCategoryPath(cat.id);
+            const prefix = '🔴 ';
+            const mvOption = document.createElement('option');
+            mvOption.value = cat.id;
+            mvOption.textContent = prefix + path;
+            if (appData.mealVoucherEligibleCategories && appData.mealVoucherEligibleCategories.includes(cat.id)) {
+                mvOption.selected = true;
+            }
+            mvCategoriesSelect.appendChild(mvOption);
+        }
+    });
+
     // Filter by type for transactions/subscriptions based on their selected type
     const populateTransSelect = () => {
         let transType = document.getElementById('trans-type').value;
@@ -1685,8 +1782,35 @@ function updateCategorySelects() {
             savingsGroup.style.display = 'none';
             amountLabel.textContent = 'Montant (€)';
         }
+        updateMvFormFields();
     });
+
+    document.getElementById('trans-category').addEventListener('change', updateMvFormFields);
+
     document.getElementById('sub-type').addEventListener('change', populateSubSelect);
+}
+
+function updateMvFormFields() {
+    const type = document.getElementById('trans-type').value;
+    const catId = document.getElementById('trans-category').value;
+    const mvGroup = document.getElementById('trans-mv-group');
+    const mvSuggestion = document.getElementById('trans-mv-suggestion');
+    const mvInput = document.getElementById('trans-mv-part');
+
+    if (!appData.mealVouchersEnabled || type !== 'expense' || !appData.mealVoucherEligibleCategories || !appData.mealVoucherEligibleCategories.includes(catId)) {
+        if (mvGroup) mvGroup.style.display = 'none';
+        if (mvInput) mvInput.value = '';
+        return;
+    }
+
+    if (mvGroup) mvGroup.style.display = 'block';
+
+    const { availableBalance } = calculateMealVoucherData();
+    if (availableBalance > 0 && (!mvInput.value || parseFloat(mvInput.value) === 0)) {
+        if (mvSuggestion) mvSuggestion.style.display = 'block';
+    } else {
+        if (mvSuggestion) mvSuggestion.style.display = 'none';
+    }
 }
 
 function renderCategoryTree() {
@@ -1934,6 +2058,10 @@ async function initializeAppAfterAuth() {
     const now = new Date();
     document.getElementById('dash-filter-month').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
+    if (typeof window.updateNavigationVisibility === 'function') {
+        window.updateNavigationVisibility();
+    }
+
     updateDashboard(); // Initial render
 
     // Refresh all views based on new data
@@ -1944,12 +2072,42 @@ async function initializeAppAfterAuth() {
     renderCategoryTree();
     renderSimulations();
     updatePredictionChart();
+    if (typeof window.renderMealVouchers === 'function') {
+        window.renderMealVouchers();
+    }
 
     const goalInput = document.getElementById('setting-spending-goal');
     goalInput.value = appData.spendingGoal;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    window.currentChartMode = 'real';
+
+    const dashMvToggle = document.getElementById('dashboard-mv-toggle');
+    const chartsMvToggle = document.getElementById('charts-mv-toggle');
+
+    if (dashMvToggle) {
+        dashMvToggle.addEventListener('change', (e) => {
+            window.currentChartMode = e.target.value;
+            if (chartsMvToggle) chartsMvToggle.value = e.target.value; // Sync
+            updateDashboard();
+            updateDashboardCategoryChart();
+        });
+    }
+
+    if (chartsMvToggle) {
+        chartsMvToggle.addEventListener('change', (e) => {
+            window.currentChartMode = e.target.value;
+            if (dashMvToggle) dashMvToggle.value = e.target.value; // Sync
+            // Re-render charts tab
+            const now = new Date();
+            let year = now.getFullYear();
+            let month = now.getMonth() + 1;
+            drawPieChart('pieChartCategory', getMonthData(year, month).categoryExpenses);
+            updateHorizontalBarChart(year, month);
+        });
+    }
+
     // Auth Listener
     onAuthStateChanged(auth, async (user) => {
         if (user) {
@@ -2380,6 +2538,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const note = document.getElementById('trans-note').value;
         const transId = document.getElementById('trans-id').value;
 
+        let mealVoucherPart = 0;
+        const mvInputGroup = document.getElementById('trans-mv-group');
+        if (mvInputGroup && mvInputGroup.style.display !== 'none') {
+            const mvValue = parseFloat(document.getElementById('trans-mv-part').value);
+            if (!isNaN(mvValue) && mvValue > 0) {
+                if (mvValue > amount) {
+                    alert("La part payée en chèques repas ne peut pas dépasser le montant total de la transaction.");
+                    return;
+                }
+                mealVoucherPart = mvValue;
+            }
+        }
+
         let tagIds = [];
         try {
             tagIds = JSON.parse(document.getElementById('trans-selected-tags').value);
@@ -2393,6 +2564,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     id: transId,
                     type,
                     amount,
+                    mealVoucherPart: mealVoucherPart > 0 ? mealVoucherPart : undefined,
                     savedAmount,
                     date,
                     categoryId,
@@ -2406,6 +2578,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 id: 'trans-' + generateId(),
                 type,
                 amount,
+                mealVoucherPart: mealVoucherPart > 0 ? mealVoucherPart : undefined,
                 savedAmount,
                 date,
                 categoryId,
@@ -2549,6 +2722,420 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('btn-cancel-edit-sub').addEventListener('click', resetSubscriptionForm);
     document.getElementById('sub-start-date').value = new Date().toISOString().split('T')[0];
+
+
+window.updateNavigationVisibility = function() {
+    const mealVouchersEnabled = appData.mealVouchersEnabled || false;
+    const desktopLink = document.getElementById('nav-item-meal-vouchers');
+    const mobileLink = document.getElementById('mobile-nav-meal-vouchers');
+
+    // Toggle containers
+    const chartToggleContainers = document.querySelectorAll('.mv-chart-toggle-container');
+
+    if (desktopLink) desktopLink.style.display = mealVouchersEnabled ? 'list-item' : 'none';
+    if (mobileLink) mobileLink.style.display = mealVouchersEnabled ? 'flex' : 'none';
+
+    chartToggleContainers.forEach(c => {
+        c.style.display = mealVouchersEnabled ? 'flex' : 'none';
+    });
+}
+
+    // --- MEAL VOUCHERS LOGIC ---
+    function calculateMealVoucherData() {
+        if (!appData.mealVoucherCredits) appData.mealVoucherCredits = [];
+
+        const now = new Date();
+        const twelveMonthsAgo = new Date();
+        twelveMonthsAgo.setMonth(now.getMonth() - 12);
+
+        // 1. Sort credits by receipt date (to apply FIFO correctly)
+        // Earliest received credits should be consumed first.
+        const sortedCredits = [...appData.mealVoucherCredits].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        // Create a working copy of credits to track remaining balance
+        let remainingCredits = sortedCredits.map(c => ({...c, remaining: c.amount, consumed: 0}));
+
+        // 2. Sort all MV transactions chronologically
+        const mvTransactions = appData.transactions
+            .filter(t => t.mealVoucherPart > 0 && t.type === 'expense')
+            .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        let spentLast12m = 0;
+        let receivedLast12m = 0;
+
+        // Calculate received last 12m
+        appData.mealVoucherCredits.forEach(c => {
+            if (new Date(c.date) >= twelveMonthsAgo) {
+                receivedLast12m += c.amount;
+            }
+        });
+
+        // 3. Process transactions chronologically to consume credits via FIFO
+        mvTransactions.forEach(t => {
+            if (new Date(t.date) >= twelveMonthsAgo) {
+                spentLast12m += t.mealVoucherPart;
+            }
+
+            let amountToConsume = t.mealVoucherPart;
+            const tDate = new Date(t.date);
+
+            // Find credits that were active at the time of the transaction
+            for (let i = 0; i < remainingCredits.length; i++) {
+                if (amountToConsume <= 0) break;
+
+                let credit = remainingCredits[i];
+                const creditDate = new Date(credit.date);
+                const expiryDate = new Date(credit.expiryDate);
+
+                // Credit must be received before/on trans date, and not expired before trans date
+                if (creditDate <= tDate && expiryDate >= tDate && credit.remaining > 0) {
+                    if (credit.remaining >= amountToConsume) {
+                        credit.remaining -= amountToConsume;
+                        credit.consumed += amountToConsume;
+                        amountToConsume = 0;
+                    } else {
+                        amountToConsume -= credit.remaining;
+                        credit.consumed += credit.remaining;
+                        credit.remaining = 0;
+                    }
+                }
+            }
+        });
+
+        // Calculate available balance (credits not expired TODAY and still having remaining balance)
+        let availableBalance = 0;
+        let creditsWithBalance = [];
+
+        remainingCredits.forEach(credit => {
+            const expiryDate = new Date(credit.expiryDate);
+            if (expiryDate >= now && credit.remaining > 0) {
+                availableBalance += credit.remaining;
+                creditsWithBalance.push(credit);
+            }
+        });
+
+        // 4. Recommended rate
+        let recommendedRate = 0;
+        creditsWithBalance.forEach(c => {
+            const daysToExpiry = Math.max(1, Math.ceil((new Date(c.expiryDate) - now) / (1000 * 60 * 60 * 24)));
+            recommendedRate += c.remaining / daysToExpiry;
+        });
+
+        // 5. Avoidable Loss Projection (based on avg last 3 months)
+        let totalSpentLast3m = 0;
+        const threeMonthsAgo = new Date();
+        threeMonthsAgo.setMonth(now.getMonth() - 3);
+
+        appData.transactions.forEach(t => {
+            if (t.mealVoucherPart > 0 && t.type === 'expense' && new Date(t.date) >= threeMonthsAgo) {
+                totalSpentLast3m += t.mealVoucherPart;
+            }
+        });
+
+        const dailyAvgLast3m = totalSpentLast3m / 90; // Approx 90 days
+        let avoidableLoss = 0;
+
+        let projectedRemainingSpent = 0;
+        creditsWithBalance.forEach(c => {
+             const daysToExpiry = Math.max(1, Math.ceil((new Date(c.expiryDate) - now) / (1000 * 60 * 60 * 24)));
+             const projectedConsumptionUntilExpiry = (dailyAvgLast3m * daysToExpiry) - projectedRemainingSpent;
+
+             let consumedOfThisCredit = projectedConsumptionUntilExpiry;
+             if (consumedOfThisCredit < 0) consumedOfThisCredit = 0;
+             if (consumedOfThisCredit > c.remaining) consumedOfThisCredit = c.remaining;
+
+             const loss = c.remaining - consumedOfThisCredit;
+             if (loss > 0) avoidableLoss += loss;
+
+             projectedRemainingSpent += consumedOfThisCredit;
+        });
+
+        return {
+            availableBalance,
+            spentLast12m,
+            receivedLast12m,
+            recommendedRate,
+            avoidableLoss,
+            creditsWithBalance
+        };
+    }
+
+    window.checkMvReconciliation = function() {
+        const banner = document.getElementById('dashboard-mv-reconciliation-banner');
+        if (!banner) return;
+
+        if (!appData.mealVouchersEnabled) {
+            banner.style.display = 'none';
+            return;
+        }
+
+        // Only check if they haven't dismissed it this month
+        const now = new Date();
+        const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        if (localStorage.getItem('budget_app_mv_recon_dismissed') === currentMonthKey) {
+            banner.style.display = 'none';
+            return;
+        }
+
+        // Get last month
+        let lastMonth = now.getMonth(); // 0-indexed, so getMonth() is the previous month (1-12)
+        let year = now.getFullYear();
+        if (lastMonth === 0) {
+            lastMonth = 12;
+            year -= 1;
+        }
+        const lastMonthStr = `${year}-${String(lastMonth).padStart(2, '0')}`;
+
+        const eligibleMissing = appData.transactions.filter(t => {
+            return t.type === 'expense' &&
+                   t.date && t.date.startsWith(lastMonthStr) &&
+                   appData.mealVoucherEligibleCategories &&
+                   appData.mealVoucherEligibleCategories.includes(t.categoryId) &&
+                   (!t.mealVoucherPart || t.mealVoucherPart <= 0);
+        });
+
+        if (eligibleMissing.length > 0) {
+            banner.style.display = 'block';
+        } else {
+            banner.style.display = 'none';
+        }
+    }
+
+    function openMvReconciliationModal() {
+        const modal = document.getElementById('mv-reconciliation-modal-overlay');
+        const tbody = document.querySelector('#table-mv-reconciliation tbody');
+        if (!modal || !tbody) return;
+
+        const now = new Date();
+        let lastMonth = now.getMonth();
+        let year = now.getFullYear();
+        if (lastMonth === 0) {
+            lastMonth = 12;
+            year -= 1;
+        }
+        const lastMonthStr = `${year}-${String(lastMonth).padStart(2, '0')}`;
+
+        const eligibleMissing = appData.transactions.filter(t => {
+            return t.type === 'expense' &&
+                   t.date && t.date.startsWith(lastMonthStr) &&
+                   appData.mealVoucherEligibleCategories &&
+                   appData.mealVoucherEligibleCategories.includes(t.categoryId) &&
+                   (!t.mealVoucherPart || t.mealVoucherPart <= 0);
+        }).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        tbody.innerHTML = '';
+        eligibleMissing.forEach(t => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td data-label="Date">${t.date}</td>
+                <td data-label="Description">${t.note || '-'}</td>
+                <td data-label="Catégorie">${getCategoryPath(t.categoryId, new Set(), true)}</td>
+                <td data-label="Total Achat">${t.amount.toFixed(2)} €</td>
+                <td data-label="Ajouter Part CR">
+                    <input type="number" class="recon-mv-input" data-id="${t.id}" data-max="${t.amount}" step="0.01" min="0" placeholder="0.00" style="width: 100px; padding: 0.2rem;">
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        modal.classList.add('active');
+    }
+
+    const btnOpenRecon = document.getElementById('btn-open-mv-reconciliation');
+    if (btnOpenRecon) btnOpenRecon.addEventListener('click', openMvReconciliationModal);
+
+    const btnCloseRecon = document.getElementById('btn-close-mv-reconciliation');
+    if (btnCloseRecon) btnCloseRecon.addEventListener('click', () => {
+        const now = new Date();
+        const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        localStorage.setItem('budget_app_mv_recon_dismissed', currentMonthKey);
+        document.getElementById('dashboard-mv-reconciliation-banner').style.display = 'none';
+    });
+
+    const btnCloseReconModal = document.getElementById('btn-close-mv-reconciliation-modal');
+    if (btnCloseReconModal) btnCloseReconModal.addEventListener('click', () => {
+        document.getElementById('mv-reconciliation-modal-overlay').classList.remove('active');
+    });
+
+    const btnSaveRecon = document.getElementById('btn-save-mv-reconciliation');
+    if (btnSaveRecon) {
+        btnSaveRecon.addEventListener('click', async () => {
+            const inputs = document.querySelectorAll('.recon-mv-input');
+            let updated = false;
+
+            inputs.forEach(input => {
+                const val = parseFloat(input.value);
+                const max = parseFloat(input.getAttribute('data-max'));
+                const id = input.getAttribute('data-id');
+
+                if (!isNaN(val) && val > 0) {
+                    if (val > max) {
+                        alert(`Montant invalide pour la transaction du ${id}: ne peut dépasser ${max} €`);
+                        return;
+                    }
+                    const transIndex = appData.transactions.findIndex(t => t.id === id);
+                    if (transIndex !== -1) {
+                        appData.transactions[transIndex].mealVoucherPart = val;
+                        updated = true;
+                    }
+                }
+            });
+
+            if (updated) {
+                await saveData();
+                updateDashboard();
+                renderTransactions();
+                if (typeof renderMealVouchers === 'function') renderMealVouchers();
+                alert('Parts Chèques Repas ajoutées avec succès.');
+                document.getElementById('mv-reconciliation-modal-overlay').classList.remove('active');
+                window.checkMvReconciliation();
+            } else {
+                document.getElementById('mv-reconciliation-modal-overlay').classList.remove('active');
+            }
+        });
+    }
+
+    window.renderMealVouchers = function() {
+        if (!appData.mealVouchersEnabled) return;
+
+        const data = calculateMealVoucherData();
+
+        document.getElementById('mv-available-balance').textContent = data.availableBalance.toFixed(2) + ' €';
+        document.getElementById('mv-avoidable-loss').textContent = data.avoidableLoss.toFixed(2) + ' €';
+        document.getElementById('mv-received-12m').textContent = data.receivedLast12m.toFixed(2) + ' €';
+        document.getElementById('mv-spent-12m').textContent = data.spentLast12m.toFixed(2) + ' €';
+        document.getElementById('mv-recommended-rate').textContent = data.recommendedRate.toFixed(2) + ' € / jour';
+
+        // Credits Table
+        const tbodyCredits = document.querySelector('#table-meal-vouchers tbody');
+        tbodyCredits.innerHTML = '';
+        const now = new Date();
+
+        const sortedCredits = [...appData.mealVoucherCredits].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        sortedCredits.forEach(credit => {
+            const tr = document.createElement('tr');
+
+            const expiry = new Date(credit.expiryDate);
+            const daysToExpiry = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+
+            let statusText = 'Actif';
+            let statusColor = 'var(--success-color)';
+            if (daysToExpiry <= 0) {
+                statusText = 'Expiré';
+                statusColor = 'var(--text-color)';
+            } else if (daysToExpiry < 60) {
+                statusText = 'Bientôt expiré';
+                statusColor = 'var(--warning-color)';
+            }
+
+            tr.innerHTML = `
+                <td data-label="Date Réception">${credit.date}</td>
+                <td data-label="Montant">${credit.amount.toFixed(2)} €</td>
+                <td data-label="Expiration (+12m)">${credit.expiryDate}</td>
+                <td data-label="Statut" style="color: ${statusColor}; font-weight: bold;">${statusText}</td>
+                <td data-label="Actions">
+                    <button class="btn btn-secondary btn-small" onclick="deleteMealVoucherCredit('${credit.id}')">Supprimer</button>
+                </td>
+            `;
+            tbodyCredits.appendChild(tr);
+        });
+
+        // Transactions Table (Read Only)
+        const tbodyTrans = document.querySelector('#table-meal-voucher-transactions tbody');
+        tbodyTrans.innerHTML = '';
+
+        const mvTransactions = appData.transactions.filter(t => t.mealVoucherPart > 0 && t.type === 'expense').sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        mvTransactions.forEach(t => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td data-label="Date">${t.date}</td>
+                <td data-label="Description / Note">${t.note || '-'}</td>
+                <td data-label="Catégorie">${getCategoryPath(t.categoryId, new Set(), true)}</td>
+                <td data-label="Total Achat">${t.amount.toFixed(2)} €</td>
+                <td data-label="Part Chèques Repas" style="color: var(--accent-color); font-weight: bold;">${t.mealVoucherPart.toFixed(2)} €</td>
+            `;
+            tbodyTrans.appendChild(tr);
+        });
+    }
+
+    const mvFormAdd = document.getElementById('form-meal-voucher');
+    if (mvFormAdd) {
+        mvFormAdd.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const amount = parseFloat(document.getElementById('mv-amount').value);
+            const date = document.getElementById('mv-date').value;
+
+            if (isNaN(amount) || amount <= 0 || !date) return;
+
+            // Calculate expiry: + 12 months exactly
+            const d = new Date(date);
+            d.setMonth(d.getMonth() + 12);
+            const expiryDate = d.toISOString().split('T')[0];
+
+            const newCredit = {
+                id: 'mv_' + Date.now(),
+                amount,
+                date,
+                expiryDate
+            };
+
+            if (!appData.mealVoucherCredits) appData.mealVoucherCredits = [];
+            appData.mealVoucherCredits.push(newCredit);
+
+            await saveData();
+            renderMealVouchers();
+            mvFormAdd.reset();
+        });
+    }
+
+    window.deleteMealVoucherCredit = async function(id) {
+        if(confirm("Supprimer ce lot de chèques repas ?")) {
+            appData.mealVoucherCredits = appData.mealVoucherCredits.filter(c => c.id !== id);
+            await saveData();
+            renderMealVouchers();
+        }
+    };
+
+
+    // Settings - Meal Vouchers
+    const mvEnabledCheckbox = document.getElementById('setting-meal-vouchers-enabled');
+    const mvDetailsDiv = document.getElementById('settings-meal-vouchers-details');
+    const mvExpectedInput = document.getElementById('setting-meal-vouchers-expected');
+    const mvCategoriesSelect = document.getElementById('setting-meal-vouchers-categories');
+
+    if (mvEnabledCheckbox) {
+        mvEnabledCheckbox.checked = appData.mealVouchersEnabled || false;
+        mvDetailsDiv.style.display = mvEnabledCheckbox.checked ? 'block' : 'none';
+
+        mvEnabledCheckbox.addEventListener('change', (e) => {
+            mvDetailsDiv.style.display = e.target.checked ? 'block' : 'none';
+        });
+    }
+
+    if (mvExpectedInput) {
+        mvExpectedInput.value = appData.mealVoucherExpectedMonthlyAmount || 0;
+    }
+
+    const mvForm = document.getElementById('form-settings-meal-vouchers');
+    if (mvForm) {
+        mvForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            appData.mealVouchersEnabled = mvEnabledCheckbox.checked;
+            appData.mealVoucherExpectedMonthlyAmount = parseFloat(mvExpectedInput.value) || 0;
+
+            const selectedCategories = Array.from(mvCategoriesSelect.selectedOptions).map(opt => opt.value);
+            appData.mealVoucherEligibleCategories = selectedCategories;
+
+            await saveData();
+            if (typeof updateNavigationVisibility === 'function') {
+                updateNavigationVisibility();
+            }
+            alert("Paramètres des chèques repas mis à jour !");
+            location.reload(); // Reload to apply UI changes everywhere properly
+        });
+    }
 
 
     // 7. Settings - Spending Goal

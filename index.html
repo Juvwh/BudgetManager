@@ -22,6 +22,7 @@
                 <li><a href="#" class="nav-link" data-target="tags">Tags</a></li>
                 <li><a href="#" class="nav-link" data-target="savings">Économies</a></li>
                 <li><a href="#" class="nav-link" data-target="prediction">Prédiction</a></li>
+                <li id="nav-item-meal-vouchers" style="display: none;"><a href="#" class="nav-link" data-target="meal-vouchers">Chèques Repas</a></li>
             </ul>
         </nav>
 
@@ -49,6 +50,9 @@
         <a href="#" class="nav-link" data-target="savings" aria-label="Économies">Éco.</a>
         <a href="#" class="nav-link" data-target="prediction" aria-label="Prédiction">
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+        </a>
+        <a href="#" class="nav-link" id="mobile-nav-meal-vouchers" data-target="meal-vouchers" aria-label="Chèques Repas" style="display: none;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M6 21v-4"/><path d="M10 21v-4"/><path d="M14 21v-4"/><path d="M18 21v-4"/><path d="M3 13h18"/><rect x="3" y="3" width="18" height="10" rx="2"/></svg>
         </a>
     </nav>
 
@@ -111,6 +115,36 @@
         </div>
     </div>
 
+    <!-- MODALE RECONCILIATION CHEQUES REPAS -->
+    <div id="mv-reconciliation-modal-overlay" class="login-overlay">
+        <div class="login-card card card-elegant" style="max-width: 800px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem; margin-bottom: 1rem;">
+                <h2 style="border: none; margin: 0; padding: 0; font-size: 1.5rem; color: var(--accent-color);">Réconciliation Chèques Repas</h2>
+                <button id="btn-close-mv-reconciliation-modal" class="btn btn-secondary btn-small" style="font-size: 1.2rem; padding: 0.2rem 0.6rem; border-radius: 50%;">&times;</button>
+            </div>
+            <p style="margin-bottom: 1rem;">Voici les dépenses alimentaires du mois précédent sans part chèques repas. Double-cliquez pour modifier rapidement la transaction, ou utilisez le champ ci-dessous.</p>
+            <div class="table-container" style="flex: 1; overflow-y: auto;">
+                <table id="table-mv-reconciliation">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th>Catégorie</th>
+                            <th>Total Achat</th>
+                            <th>Ajouter Part CR</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Injected by JS -->
+                    </tbody>
+                </table>
+            </div>
+            <div style="text-align: right; margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                <button id="btn-save-mv-reconciliation" class="btn btn-primary">Enregistrer les parts ajoutées</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODALE MOBILE POUR AJOUTER/EDITER -->
     <div id="mobile-form-modal" class="mobile-modal">
         <div class="mobile-modal-header">
@@ -147,11 +181,33 @@
                 <p style="margin: 0; font-size: 0.95rem;">Nous avons détecté des éléments avec des montants invalides (NaN) dans vos données. Veuillez vous rendre dans les onglets <strong>Transactions</strong> et/ou <strong>Abonnements</strong> pour supprimer ou corriger les lignes surlignées en rouge, afin que vos graphiques s'affichent correctement.</p>
             </div>
 
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary-color); margin-bottom: 1rem; padding-bottom: 0.5rem;">
+            <div id="dashboard-mv-reconciliation-banner" class="card" style="display: none; background-color: rgba(var(--accent-color-rgb, 10, 132, 255), 0.1); border-color: var(--accent-color); padding: 1rem; margin-bottom: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;">
+                    <div>
+                        <h3 style="color: var(--accent-color); margin-top: 0; margin-bottom: 0.5rem;">Réconciliation Chèques Repas</h3>
+                        <p style="margin: 0; font-size: 0.95rem;">Il y a des dépenses alimentaires du mois précédent sans part chèques repas renseignée. Voulez-vous les vérifier ?</p>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center; white-space: nowrap;">
+                        <button id="btn-open-mv-reconciliation" class="btn btn-primary btn-small">Vérifier</button>
+                        <button id="btn-close-mv-reconciliation" class="btn btn-secondary btn-small" style="font-size: 1.2rem; padding: 0.2rem 0.6rem; border-radius: 50%;">&times;</button>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary-color); margin-bottom: 1rem; padding-bottom: 0.5rem; flex-wrap: wrap; gap: 1rem;">
                 <h2 style="border: none; padding: 0; margin: 0;">Tableau de bord</h2>
-                <div class="month-selector">
-                    <label for="dash-filter-month" style="font-weight: bold; margin-right: 0.5rem; color: var(--text-color);">Période :</label>
-                    <input type="month" id="dash-filter-month" style="padding: 0.4rem; border: 1px solid var(--border-color); border-radius: 4px;">
+                <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                    <div class="mv-chart-toggle-container" style="display: none; align-items: center; gap: 0.5rem; background: var(--bg-color); padding: 0.2rem 0.5rem; border-radius: 20px; border: 1px solid var(--border-color);">
+                        <label for="dashboard-mv-toggle" style="font-size: 0.85rem; cursor: pointer; margin: 0;">Mode Graphiques :</label>
+                        <select id="dashboard-mv-toggle" style="border: none; background: transparent; font-size: 0.85rem; font-weight: bold; color: var(--primary-color); outline: none; cursor: pointer;">
+                            <option value="real">Argent Réel (Budget)</option>
+                            <option value="total">Montant Total (Conso)</option>
+                        </select>
+                    </div>
+                    <div class="month-selector">
+                        <label for="dash-filter-month" style="font-weight: bold; margin-right: 0.5rem; color: var(--text-color);">Période :</label>
+                        <input type="month" id="dash-filter-month" style="padding: 0.4rem; border: 1px solid var(--border-color); border-radius: 4px;">
+                    </div>
                 </div>
             </div>
 
@@ -224,7 +280,16 @@
 
         <!-- SECTION GRAPHIQUES -->
         <section id="charts" class="view-section hidden">
-            <h2 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">Graphiques</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+                <h2 style="border: none; margin: 0; padding: 0;">Graphiques</h2>
+                <div class="mv-chart-toggle-container" style="display: none; align-items: center; gap: 0.5rem; background: var(--bg-color); padding: 0.2rem 0.5rem; border-radius: 20px; border: 1px solid var(--border-color);">
+                    <label for="charts-mv-toggle" style="font-size: 0.85rem; cursor: pointer; margin: 0;">Mode Graphiques :</label>
+                    <select id="charts-mv-toggle" style="border: none; background: transparent; font-size: 0.85rem; font-weight: bold; color: var(--primary-color); outline: none; cursor: pointer;">
+                        <option value="real">Argent Réel (Budget)</option>
+                        <option value="total">Montant Total (Conso)</option>
+                    </select>
+                </div>
+            </div>
 
             <div class="charts-container">
                 <div class="chart-box card-elegant" style="grid-column: 1 / -1;">
@@ -286,6 +351,13 @@
                             <select id="trans-category" required>
                                 <!-- Injected by JS -->
                             </select>
+                        </div>
+                        <div class="form-group" id="trans-mv-group" style="display: none; background-color: rgba(var(--accent-color-rgb, 10, 132, 255), 0.05); padding: 0.5rem; border-radius: 8px; border-left: 3px solid var(--accent-color);">
+                            <label for="trans-mv-part" style="color: var(--accent-color);">Part payée en chèques repas (€)</label>
+                            <input type="number" id="trans-mv-part" step="0.01" min="0">
+                            <div id="trans-mv-suggestion" style="display: none; font-size: 0.85rem; color: var(--text-color); margin-top: 0.5rem; opacity: 0.8;">
+                                💡 Vous avez des chèques repas disponibles. N'oubliez pas de renseigner ce champ si vous en avez utilisé.
+                            </div>
                         </div>
                         <div class="form-group">
                             <label>Tags</label>
@@ -533,6 +605,11 @@
                     <p id="savings-view-real-saved" style="font-size: 2.5rem; font-weight: bold; margin: 0.5rem 0 0 0; color: var(--primary-color);">0.00 €</p>
                     <p style="color: var(--text-color); opacity: 0.8; font-size: 0.9rem;">Somme de l'épargne mise de côté lors de l'ajout de vos salaires.</p>
                 </div>
+                <div id="savings-view-mv-container" class="card card-elegant" style="text-align: center; flex: 1; min-width: 280px; max-width: 400px; border-left: 4px solid var(--accent-color); display: none;">
+                    <h3 style="color: var(--accent-color);">Valorisation Chèques Repas</h3>
+                    <p id="savings-view-mv-val" style="font-size: 2.5rem; font-weight: bold; margin: 0.5rem 0 0 0; color: var(--accent-color);">0.00 €</p>
+                    <p style="color: var(--text-color); opacity: 0.8; font-size: 0.9rem;">Équivalent pouvoir d'achat supplémentaire (Utilisés sur les 12 derniers mois).</p>
+                </div>
             </div>
 
             <div class="card">
@@ -548,6 +625,7 @@
                                 <th>Économie (Bilan)</th>
                                 <th>Épargne du mois</th>
                                 <th>Bénéfice Réel</th>
+                                <th class="col-mv-rate" style="display: none;">Taux couv. alimentaire</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -637,6 +715,94 @@
             </div>
         </section>
 
+        <!-- SECTION CHEQUES REPAS -->
+        <section id="meal-vouchers" class="view-section hidden">
+            <h2 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">Chèques Repas</h2>
+
+            <div class="summary-cards" style="margin-bottom: 2rem;">
+                <div class="card card-elegant" style="text-align: center;">
+                    <h3>Solde Disponible</h3>
+                    <p id="mv-available-balance" style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0; color: var(--accent-color);">0.00 €</p>
+                </div>
+                <div class="card card-elegant" style="text-align: center;">
+                    <h3>Perte Évitable (Proj.)</h3>
+                    <p id="mv-avoidable-loss" style="font-size: 1.5rem; font-weight: bold; margin: 0.5rem 0; color: var(--danger-color);">0.00 €</p>
+                    <small>Basé sur la conso. des 3 derniers mois</small>
+                </div>
+                <div class="card card-elegant" style="text-align: center;">
+                    <h3>Reçus (12 derniers mois)</h3>
+                    <p id="mv-received-12m" style="font-size: 1.2rem; font-weight: bold; margin: 0.5rem 0; color: var(--success-color);">0.00 €</p>
+                </div>
+                <div class="card card-elegant" style="text-align: center;">
+                    <h3>Dépensés (12 derniers mois)</h3>
+                    <p id="mv-spent-12m" style="font-size: 1.2rem; font-weight: bold; margin: 0.5rem 0;">0.00 €</p>
+                </div>
+                <div class="card card-elegant" style="text-align: center; grid-column: 1 / -1; background-color: var(--primary-color); color: white;">
+                    <h3 style="color: white; margin-top: 0;">Cadence recommandée</h3>
+                    <p id="mv-recommended-rate" style="font-size: 1.5rem; font-weight: bold; margin: 0.5rem 0;">0.00 € / jour</p>
+                    <small style="color: rgba(255,255,255,0.8);">Pour tout dépenser avant expiration</small>
+                </div>
+            </div>
+
+            <div class="split-layout">
+                <div class="form-panel card">
+                    <h3>Ajouter un lot de chèques</h3>
+                    <form id="form-meal-voucher">
+                        <div class="form-group">
+                            <label>Montant (€)</label>
+                            <input type="number" id="mv-amount" step="0.01" min="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Date de réception</label>
+                            <input type="date" id="mv-date" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Ajouter</button>
+                    </form>
+                </div>
+
+                <div class="list-panel card">
+                    <h3>Crédits (Lots reçus)</h3>
+                    <div class="table-container" style="max-height: 250px; overflow-y: auto;">
+                        <table id="table-meal-vouchers">
+                            <thead>
+                                <tr>
+                                    <th>Date Réception</th>
+                                    <th>Montant</th>
+                                    <th>Expiration (+12m)</th>
+                                    <th>Statut</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Injected by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 2rem;">
+                <h3>Historique des dépenses en chèques repas</h3>
+                <div class="table-container">
+                    <table id="table-meal-voucher-transactions">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Description / Note</th>
+                                <th>Catégorie</th>
+                                <th>Total Achat</th>
+                                <th>Part Chèques Repas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <small style="display: block; margin-top: 1rem; color: var(--text-color); opacity: 0.8;">Cette vue est en lecture seule. Pour modifier une transaction, utilisez l'onglet Transactions habituel.</small>
+            </div>
+        </section>
+
         <!-- SECTION PARAMETRES -->
         <section id="settings" class="view-section hidden">
             <h2>Paramètres & Sauvegardes</h2>
@@ -654,6 +820,31 @@
                         <input type="number" id="setting-spending-goal" step="1" min="0" required>
                     </div>
                     <button type="submit" class="btn btn-primary">Enregistrer l'objectif</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>Module Chèques Repas</h3>
+                <form id="form-settings-meal-vouchers">
+                    <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+                        <input type="checkbox" id="setting-meal-vouchers-enabled" style="width: auto;">
+                        <label for="setting-meal-vouchers-enabled" style="margin: 0; font-weight: bold; cursor: pointer;">Activer le module Chèques Repas</label>
+                    </div>
+                    <div id="settings-meal-vouchers-details" style="display: none; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                        <div class="form-group">
+                            <label>Catégories éligibles (Maintenez Ctrl/Cmd pour en sélectionner plusieurs)</label>
+                            <select id="setting-meal-vouchers-categories" multiple size="5" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 5px; font-family: inherit; background: var(--bg-color); color: var(--text-color);">
+                                <!-- Injected by JS -->
+                            </select>
+                            <small>Les dépenses dans ces catégories pourront comporter une part payée en chèques repas.</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Montant mensuel habituel (€)</label>
+                            <input type="number" id="setting-meal-vouchers-expected" step="1" min="0">
+                            <small>Pour une future intégration dans la projection (Bac à sable).</small>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Enregistrer les paramètres</button>
                 </form>
             </div>
 
