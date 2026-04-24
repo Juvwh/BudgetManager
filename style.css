@@ -806,14 +806,16 @@ h3 {
     }
 
     /* Titre des tags */
-    #table-tags-overview tbody td:nth-child(1) {
+    #table-tags-overview tbody td:nth-child(1),
+    #table-savings-history tbody td:nth-child(1) {
         font-weight: bold;
         justify-content: flex-start;
         padding-bottom: 0.5rem;
         border-bottom: 1px solid var(--border-color);
         margin-bottom: 0.5rem;
     }
-    #table-tags-overview tbody td:nth-child(1)::before {
+    #table-tags-overview tbody td:nth-child(1)::before,
+    #table-savings-history tbody td:nth-child(1)::before {
         display: none;
     }
 
