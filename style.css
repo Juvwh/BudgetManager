@@ -570,11 +570,11 @@ h3 {
         box-sizing: border-box;
     }
 
-    #table-transactions thead, #table-subscriptions thead, #table-modal-transactions thead {
+    #table-transactions thead, #table-subscriptions thead, #table-modal-transactions thead, #table-meal-voucher-transactions thead {
         display: none; /* Cacher les en-têtes */
     }
 
-    #table-transactions tbody tr, #table-subscriptions tbody tr, #table-modal-transactions tbody tr {
+    #table-transactions tbody tr, #table-subscriptions tbody tr, #table-modal-transactions tbody tr, #table-meal-voucher-transactions tbody tr {
         display: flex;
         flex-direction: row;
         flex-wrap: wrap;
@@ -589,7 +589,7 @@ h3 {
         box-sizing: border-box;
     }
 
-    #table-transactions tbody td, #table-subscriptions tbody td, #table-modal-transactions tbody td {
+    #table-transactions tbody td, #table-subscriptions tbody td, #table-modal-transactions tbody td, #table-meal-voucher-transactions tbody td {
         border-bottom: none;
         padding: 0.1rem 0;
         display: flex;
@@ -600,7 +600,7 @@ h3 {
         box-sizing: border-box;
     }
 
-    #table-transactions tbody td::before, #table-subscriptions tbody td::before, #table-modal-transactions tbody td::before {
+    #table-transactions tbody td::before, #table-subscriptions tbody td::before, #table-modal-transactions tbody td::before, #table-meal-voucher-transactions tbody td::before {
         display: none; /* Suppression de tous les labels */
     }
 
@@ -614,7 +614,8 @@ h3 {
 
     /* Note */
     #table-transactions tbody td[data-label="Note"],
-    #table-modal-transactions tbody td[data-label="Note"] {
+    #table-modal-transactions tbody td[data-label="Note"],
+    #table-meal-voucher-transactions tbody td[data-label="Note"] {
         order: 1;
         font-size: 0.85rem;
         color: var(--text-color);
@@ -624,29 +625,30 @@ h3 {
         padding-bottom: 0;
     }
     #table-transactions tbody td[data-label="Note"]:empty,
-    #table-modal-transactions tbody td[data-label="Note"]:empty {
+    #table-modal-transactions tbody td[data-label="Note"]:empty,
+    #table-meal-voucher-transactions tbody td[data-label="Note"]:empty {
         display: none;
     }
 
     /* Montant (En haut à droite) */
     #table-transactions tbody td[data-label="Montant"],
     #table-modal-transactions tbody td[data-label="Montant"],
-    #table-subscriptions tbody td[data-label="Montant"] {
+    #table-subscriptions tbody td[data-label="Montant"],
+    #table-meal-voucher-transactions tbody td[data-label="Montant"] {
         order: 2;
-        position: absolute;
-        top: 0.8rem;
-        right: 0.8rem;
         font-size: 1.25rem;
         font-weight: 700;
         padding: 0;
         text-align: right;
-        width: auto;
+        width: 100%;
+        justify-content: flex-end;
         margin-bottom: 0;
     }
 
     /* Catégorie / Nom (Titre principal) */
     #table-transactions tbody td[data-label="Catégorie"],
-    #table-modal-transactions tbody td[data-label="Catégorie"] {
+    #table-modal-transactions tbody td[data-label="Catégorie"],
+    #table-meal-voucher-transactions tbody td[data-label="Catégorie"] {
         order: 3;
         font-weight: normal;
         font-size: 0.85rem;
@@ -664,7 +666,8 @@ h3 {
 
     /* Date */
     #table-transactions tbody td[data-label="Date"],
-    #table-modal-transactions tbody td[data-label="Date"] {
+    #table-modal-transactions tbody td[data-label="Date"],
+    #table-meal-voucher-transactions tbody td[data-label="Date"] {
         order: 4;
         color: var(--text-color);
         opacity: 0.6;
@@ -687,6 +690,15 @@ h3 {
         display: none !important;
         margin: 0;
         padding: 0;
+    }
+
+    /* Part CR */
+    #table-meal-voucher-transactions tbody td[data-label="Part CR"] {
+        order: 6;
+        width: 100%;
+        text-align: right;
+        justify-content: flex-end;
+        margin-top: 0.2rem;
     }
 
     /* Lignes abonnements autres que Nom et Montant */
