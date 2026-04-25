@@ -2829,48 +2829,10 @@ window.updateNavigationVisibility = function() {
             }
         });
 
-        // 4. Recommended rate
-        let recommendedRate = 0;
-        creditsWithBalance.forEach(c => {
-            const daysToExpiry = Math.max(1, Math.ceil((new Date(c.expiryDate) - now) / (1000 * 60 * 60 * 24)));
-            recommendedRate += c.remaining / daysToExpiry;
-        });
-
-        // 5. Avoidable Loss Projection (based on avg last 3 months)
-        let totalSpentLast3m = 0;
-        const threeMonthsAgo = new Date();
-        threeMonthsAgo.setMonth(now.getMonth() - 3);
-
-        appData.transactions.forEach(t => {
-            if (t.mealVoucherPart > 0 && t.type === 'expense' && new Date(t.date) >= threeMonthsAgo) {
-                totalSpentLast3m += t.mealVoucherPart;
-            }
-        });
-
-        const dailyAvgLast3m = totalSpentLast3m / 90; // Approx 90 days
-        let avoidableLoss = 0;
-
-        let projectedRemainingSpent = 0;
-        creditsWithBalance.forEach(c => {
-             const daysToExpiry = Math.max(1, Math.ceil((new Date(c.expiryDate) - now) / (1000 * 60 * 60 * 24)));
-             const projectedConsumptionUntilExpiry = (dailyAvgLast3m * daysToExpiry) - projectedRemainingSpent;
-
-             let consumedOfThisCredit = projectedConsumptionUntilExpiry;
-             if (consumedOfThisCredit < 0) consumedOfThisCredit = 0;
-             if (consumedOfThisCredit > c.remaining) consumedOfThisCredit = c.remaining;
-
-             const loss = c.remaining - consumedOfThisCredit;
-             if (loss > 0) avoidableLoss += loss;
-
-             projectedRemainingSpent += consumedOfThisCredit;
-        });
-
         return {
             availableBalance,
             spentLast12m,
             receivedLast12m,
-            recommendedRate,
-            avoidableLoss,
             creditsWithBalance
         };
     }
@@ -3016,10 +2978,8 @@ window.updateNavigationVisibility = function() {
         const data = calculateMealVoucherData();
 
         document.getElementById('mv-available-balance').textContent = data.availableBalance.toFixed(2) + ' €';
-        document.getElementById('mv-avoidable-loss').textContent = data.avoidableLoss.toFixed(2) + ' €';
         document.getElementById('mv-received-12m').textContent = data.receivedLast12m.toFixed(2) + ' €';
         document.getElementById('mv-spent-12m').textContent = data.spentLast12m.toFixed(2) + ' €';
-        document.getElementById('mv-recommended-rate').textContent = data.recommendedRate.toFixed(2) + ' € / jour';
 
         // Credits Table
         const tbodyCredits = document.querySelector('#table-meal-vouchers tbody');
@@ -3066,10 +3026,10 @@ window.updateNavigationVisibility = function() {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td data-label="Date">${t.date}</td>
-                <td data-label="Description / Note">${t.note || '-'}</td>
+                <td data-label="Note">${t.note || '-'}</td>
                 <td data-label="Catégorie">${getCategoryPath(t.categoryId, new Set(), true)}</td>
-                <td data-label="Total Achat">${t.amount.toFixed(2)} €</td>
-                <td data-label="Part Chèques Repas" style="color: var(--accent-color); font-weight: bold;">${t.mealVoucherPart.toFixed(2)} €</td>
+                <td data-label="Montant">${t.amount.toFixed(2)} €</td>
+                <td data-label="Part CR" style="color: var(--accent-color); font-weight: bold;">${t.mealVoucherPart.toFixed(2)} €</td>
             `;
             tbodyTrans.appendChild(tr);
         });
