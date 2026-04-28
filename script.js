@@ -34,6 +34,8 @@ window.appData = window.appData || {
     mealVouchersEnabled: false,
     mealVoucherEligibleCategories: [],
     mealVoucherExpectedMonthlyAmount: 0,
+    investments: [],
+    investmentsEnabled: true,
     categories: [
         // Default categories
         { id: 'cat-inc-1', name: 'Salaire', type: 'income', parentId: null },
@@ -113,6 +115,8 @@ async function saveData() {
             mealVoucherEligibleCategories: appData.mealVoucherEligibleCategories || [],
             mealVoucherExpectedMonthlyAmount: appData.mealVoucherExpectedMonthlyAmount || 0,
             mealVoucherCredits: appData.mealVoucherCredits || [],
+            investments: appData.investments || [],
+            investmentsEnabled: appData.investmentsEnabled !== undefined ? appData.investmentsEnabled : true,
             updatedAt: new Date().toISOString()
         };
 
@@ -149,6 +153,9 @@ async function loadData() {
             if(parsed.mealVoucherEligibleCategories) appData.mealVoucherEligibleCategories = parsed.mealVoucherEligibleCategories;
             if(parsed.mealVoucherExpectedMonthlyAmount !== undefined) appData.mealVoucherExpectedMonthlyAmount = parsed.mealVoucherExpectedMonthlyAmount;
             if(parsed.mealVoucherCredits) appData.mealVoucherCredits = parsed.mealVoucherCredits;
+
+            if(parsed.investments) appData.investments = parsed.investments;
+            if(parsed.investmentsEnabled !== undefined) appData.investmentsEnabled = parsed.investmentsEnabled;
         } else {
             console.log("Aucune donnée Firestore trouvée. Initialisation avec les valeurs par défaut.");
             await saveData(); // Sauvegarde les valeurs par défaut
@@ -323,6 +330,12 @@ function renderTransactions() {
             if (t.savedAmount) {
                 formattedAmount += ` <br><small style="color:var(--text-color);">(Épargné: ${Number(t.savedAmount).toFixed(2)} €)</small>`;
             }
+        } else if (t.type === 'investment_transfer') {
+            displayType = '<span class="badge" style="background-color:rgba(10,132,255,0.1);color:var(--accent-color);">Transfert (Actif)</span>';
+            typeColor = 'text-red'; // Leaves the account
+        } else if (t.type === 'investment_return') {
+            displayType = '<span class="badge" style="background-color:rgba(48,209,88,0.1);color:var(--success-color);">Retour (Actif)</span>';
+            typeColor = 'text-green'; // Enters the account
         } else {
             displayType = 'Dépense';
             typeColor = 'text-red';
@@ -415,6 +428,7 @@ function updateFilterChips() {
 async function deleteTransaction(id) {
     if (confirm("Supprimer cette transaction ?")) {
         appData.transactions = appData.transactions.filter(t => t.id !== id);
+        if(typeof updateInvestmentsStatus === 'function') updateInvestmentsStatus();
         await saveData();
         renderTransactions();
         updateDashboard();
@@ -482,6 +496,11 @@ function editTransaction(id) {
         document.getElementById('trans-mv-part').value = '';
     }
 
+    if (trans.type === 'investment_transfer' || trans.type === 'investment_return') {
+        document.getElementById('trans-investment-id').value = trans.investmentId || '';
+        document.getElementById('trans-investment-id').dispatchEvent(new Event('change'));
+    }
+
     // Gérer les tags
     document.getElementById('trans-selected-tags').value = JSON.stringify(trans.tagIds || []);
     renderTransactionTagsSelector();
@@ -509,6 +528,10 @@ function resetTransactionForm() {
     const cancelBtn = document.getElementById('btn-cancel-edit-trans');
     if (cancelBtn) cancelBtn.style.display = 'none';
     document.getElementById('trans-mv-part').value = '';
+    document.getElementById('trans-investment-id').value = '';
+    document.getElementById('trans-investment-name').value = '';
+    document.getElementById('trans-investment-type').value = 'metaux';
+    document.getElementById('trans-investment-id').dispatchEvent(new Event('change'));
     document.getElementById('trans-category').dispatchEvent(new Event('change'));
 }
 
@@ -727,16 +750,26 @@ function getMonthData(year, month) {
     let income = 0;
     let expense = 0;
     let savings = 0;
+    let investmentTransfers = 0;
     let categoryExpenses = {};
 
     trans.forEach(t => {
+        if (t.type === 'investment_transfer') {
+            investmentTransfers += t.amount;
+        }
+
+        if (t.type === 'investment_transfer' || t.type === 'investment_return') {
+            // Ces types n'entrent pas dans le budget
+            return;
+        }
+
         if (t.type === 'income') {
             income += t.amount;
         } else if (t.type === 'salary') {
             const saved = t.savedAmount || 0;
             savings += saved;
             income += (t.amount - saved); // Only non-saved part goes to income
-        } else {
+        } else if (t.type === 'expense') {
             let actualAmount = t.amount;
             let chartMode = window.currentChartMode || 'real';
 
@@ -755,7 +788,7 @@ function getMonthData(year, month) {
         }
     });
 
-    return { income, expense, savings, balance: income - expense, categoryExpenses };
+    return { income, expense, savings, investmentTransfers, balance: income - expense, categoryExpenses };
 }
 
 function getSpecificMonthsCategoryData(monthPrefixes) {
@@ -1327,6 +1360,13 @@ function renderSavings() {
         const incomeColor = 'text-green';
         const incomeSign = '+';
 
+        let invMonthHtml = '';
+        if (appData.investmentsEnabled) {
+            invMonthHtml = `<td data-label="Investi ce mois" class="col-investment-month">${data.investmentTransfers > 0 ? data.investmentTransfers.toFixed(2) + ' €' : '-'}</td>`;
+        } else {
+            invMonthHtml = `<td data-label="Investi ce mois" class="col-investment-month" style="display: none;"></td>`;
+        }
+
         // Calculate Meal Voucher Coverage Rate
         let mvCoverageHtml = '';
         if (appData.mealVouchersEnabled) {
@@ -1359,15 +1399,24 @@ function renderSavings() {
             <td data-label="Économie (Bilan)" class="${savingsClass}">${savingsSign}${savingsForMonth.toFixed(2)} €</td>
             <td data-label="Épargne du mois" class="text-primary">${data.savings > 0 ? '+' : ''}${data.savings.toFixed(2)} €</td>
             <td data-label="Bénéfice Réel" class="${realProfitClass}" style="font-weight: bold;">${realProfitSign}${realProfit.toFixed(2)} €</td>
+            ${invMonthHtml}
             ${mvCoverageHtml}
         `;
         tbody.appendChild(tr);
     });
 
     if (sortedMonths.length === 0) {
-        const colSpan = appData.mealVouchersEnabled ? 8 : 7;
+        let colSpan = 7;
+        if (appData.mealVouchersEnabled) colSpan++;
+        if (appData.investmentsEnabled) colSpan++;
         tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center;">Aucune donnée disponible.</td></tr>`;
     }
+
+    // Investment columns toggles
+    const invColHeaders = document.querySelectorAll('.col-investment-month');
+    invColHeaders.forEach(th => {
+        th.style.display = appData.investmentsEnabled ? 'table-cell' : 'none';
+    });
 
     // Meal Vouchers Columns toggles
     const mvColHeaders = document.querySelectorAll('.col-mv-rate');
@@ -1528,6 +1577,25 @@ function updateDashboard() {
         currentYear = now.getFullYear();
         currentMonth = now.getMonth() + 1;
         document.getElementById('dash-filter-month').value = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+    }
+
+    // Update Patrimony Widget
+    const patrimonyWidget = document.getElementById('dashboard-patrimony-widget');
+    if (appData.investmentsEnabled && appData.investments && appData.investments.length > 0) {
+        if(patrimonyWidget) patrimonyWidget.style.display = 'block';
+        const treasury = typeof getTreasuryBalance === 'function' ? getTreasuryBalance() : 0;
+        const portfolio = typeof getPortfolioValue === 'function' ? getPortfolioValue() : 0;
+        const netWorth = treasury + portfolio;
+
+        const elTreasury = document.getElementById('dash-treasury');
+        const elPortfolio = document.getElementById('dash-portfolio');
+        const elNetWorth = document.getElementById('dash-net-worth');
+
+        if(elTreasury) elTreasury.textContent = treasury.toFixed(2) + ' €';
+        if(elPortfolio) elPortfolio.textContent = portfolio.toFixed(2) + ' €';
+        if(elNetWorth) elNetWorth.textContent = netWorth.toFixed(2) + ' €';
+    } else {
+        if(patrimonyWidget) patrimonyWidget.style.display = 'none';
     }
 
     // Update current month summary cards
@@ -1753,6 +1821,9 @@ function updateCategorySelects() {
     const populateTransSelect = () => {
         let transType = document.getElementById('trans-type').value;
         if (transType === 'salary') transType = 'income'; // Share income categories for salary
+        if (transType === 'investment_transfer') transType = 'expense';
+        if (transType === 'investment_return') transType = 'income';
+
         transSelect.innerHTML = '';
         sortedCategories.filter(c => c.type === transType).forEach(c => {
             const opt = document.createElement('option');
@@ -1790,6 +1861,8 @@ function updateCategorySelects() {
         const type = e.target.value;
         const savingsGroup = document.getElementById('trans-savings-group');
         const amountLabel = document.getElementById('trans-amount-label');
+        const investmentGroup = document.getElementById('trans-investment-group');
+
         if (type === 'salary') {
             savingsGroup.style.display = 'block';
             amountLabel.textContent = 'Montant Total du Salaire (€)';
@@ -1797,8 +1870,39 @@ function updateCategorySelects() {
             savingsGroup.style.display = 'none';
             amountLabel.textContent = 'Montant (€)';
         }
+
+        if (type === 'investment_transfer' || type === 'investment_return') {
+            if(investmentGroup) investmentGroup.style.display = 'block';
+            populateTransInvestmentSelect();
+        } else {
+            if(investmentGroup) investmentGroup.style.display = 'none';
+        }
+
         updateMvFormFields();
     });
+
+    document.getElementById('trans-investment-id').addEventListener('change', (e) => {
+        const newFields = document.getElementById('trans-investment-new-fields');
+        if (e.target.value === '') {
+            newFields.style.display = 'block';
+        } else {
+            newFields.style.display = 'none';
+        }
+    });
+
+    function populateTransInvestmentSelect() {
+        const select = document.getElementById('trans-investment-id');
+        select.innerHTML = '<option value="">-- Créer un nouvel actif --</option>';
+        if (appData.investments) {
+            appData.investments.forEach(inv => {
+                const option = document.createElement('option');
+                option.value = inv.id;
+                option.textContent = `${inv.name} (${inv.type}) - ${inv.status === 'closed' ? 'Clôturé' : 'Actif'}`;
+                select.appendChild(option);
+            });
+        }
+        select.dispatchEvent(new Event('change'));
+    }
 
     document.getElementById('trans-category').addEventListener('change', updateMvFormFields);
 
@@ -2331,6 +2435,8 @@ document.addEventListener('DOMContentLoaded', () => {
             renderTagsOverview();
         } else if(targetId === 'savings') {
             renderSavings();
+        } else if(targetId === 'investments') {
+            if(typeof renderInvestments === 'function') renderInvestments();
         }
     });
 
@@ -2571,6 +2677,41 @@ document.addEventListener('DOMContentLoaded', () => {
             tagIds = JSON.parse(document.getElementById('trans-selected-tags').value);
         } catch(e) {}
 
+        let investmentId = undefined;
+
+        if (type === 'investment_transfer' || type === 'investment_return') {
+            const selectId = document.getElementById('trans-investment-id').value;
+            if (selectId === '') {
+                // Create new investment
+                const newInvName = document.getElementById('trans-investment-name').value || 'Nouvel actif';
+                const newInvType = document.getElementById('trans-investment-type').value;
+                investmentId = 'inv-' + generateId();
+
+                const newInvestment = {
+                    id: investmentId,
+                    name: newInvName,
+                    type: newInvType,
+                    acquisitionDate: date,
+                    status: 'active',
+                    valueHistory: []
+                };
+
+                // Add initial value history entry if it's a transfer (buying)
+                if (type === 'investment_transfer') {
+                    newInvestment.valueHistory.push({
+                        id: 'vh-' + generateId(),
+                        date: date,
+                        value: amount
+                    });
+                }
+
+                if(!appData.investments) appData.investments = [];
+                appData.investments.push(newInvestment);
+            } else {
+                investmentId = selectId;
+            }
+        }
+
         if (transId) {
             // Update
             const transIndex = appData.transactions.findIndex(t => t.id === transId);
@@ -2584,7 +2725,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     date,
                     categoryId,
                     note,
-                    tagIds
+                    tagIds,
+                    investmentId
                 };
             }
         } else {
@@ -2598,11 +2740,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 date,
                 categoryId,
                 note,
-                tagIds
+                tagIds,
+                investmentId
             };
             appData.transactions.push(newTrans);
         }
 
+        if (typeof updateInvestmentsStatus === 'function') {
+            updateInvestmentsStatus();
+        }
         await saveData();
         resetTransactionForm();
         renderTransactions();
@@ -2741,17 +2887,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
 window.updateNavigationVisibility = function() {
     const mealVouchersEnabled = appData.mealVouchersEnabled || false;
-    const desktopLink = document.getElementById('nav-item-meal-vouchers');
-    const mobileLink = document.getElementById('mobile-nav-meal-vouchers');
-
-    // Toggle containers
+    const desktopLinkMv = document.getElementById('nav-item-meal-vouchers');
+    const mobileLinkMv = document.getElementById('mobile-nav-meal-vouchers');
     const chartToggleContainers = document.querySelectorAll('.mv-chart-toggle-container');
 
-    if (desktopLink) desktopLink.style.display = mealVouchersEnabled ? 'list-item' : 'none';
-    if (mobileLink) mobileLink.style.display = mealVouchersEnabled ? 'flex' : 'none';
+    if (desktopLinkMv) desktopLinkMv.style.display = mealVouchersEnabled ? 'list-item' : 'none';
+    if (mobileLinkMv) mobileLinkMv.style.display = mealVouchersEnabled ? 'flex' : 'none';
 
     chartToggleContainers.forEach(c => {
         c.style.display = mealVouchersEnabled ? 'flex' : 'none';
+    });
+
+    const investmentsEnabled = appData.investmentsEnabled !== undefined ? appData.investmentsEnabled : true;
+    const desktopLinkInv = document.getElementById('nav-item-investments');
+    const mobileLinkInv = document.getElementById('mobile-nav-investments');
+
+    if (desktopLinkInv) desktopLinkInv.style.display = investmentsEnabled ? 'list-item' : 'none';
+    if (mobileLinkInv) mobileLinkInv.style.display = investmentsEnabled ? 'flex' : 'none';
+
+    // Si on désactive la section dans laquelle on se trouve
+    if (!investmentsEnabled && document.getElementById('investments') && document.getElementById('investments').classList.contains('active')) {
+        document.querySelector('.nav-link[data-target="dashboard"]').click();
+    }
+
+    // Also toggle investment dropdown options in transaction form
+    const invTypeOptions = document.querySelectorAll('.opt-investment');
+    invTypeOptions.forEach(opt => {
+        opt.style.display = investmentsEnabled ? 'block' : 'none';
     });
 }
 
@@ -3112,6 +3274,27 @@ window.updateNavigationVisibility = function() {
         });
     }
 
+
+    // Settings - Investments
+    const invEnabledCheckbox = document.getElementById('setting-investments-enabled');
+    if (invEnabledCheckbox) {
+        invEnabledCheckbox.checked = appData.investmentsEnabled !== undefined ? appData.investmentsEnabled : true;
+    }
+
+    const invForm = document.getElementById('form-settings-investments');
+    if (invForm) {
+        invForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            appData.investmentsEnabled = invEnabledCheckbox.checked;
+            await saveData();
+
+            if (typeof updateNavigationVisibility === 'function') {
+                updateNavigationVisibility();
+            }
+            alert("Paramètres des investissements mis à jour !");
+            location.reload();
+        });
+    }
 
     // 7. Settings - Spending Goal
     const settingsMonthInput = document.getElementById('setting-spending-month');
@@ -3745,3 +3928,343 @@ async function advanceSubscription(subId) {
     updateDashboard();
 }
 window.advanceSubscription = advanceSubscription;
+
+// --- INVESTMENTS MANAGEMENT ---
+
+function updateInvestmentsStatus() {
+    if (!appData.investments) return;
+
+    appData.investments.forEach(inv => {
+        let investedAmount = 0;
+
+        // Compute invested amount from transactions
+        appData.transactions.forEach(t => {
+            if (t.investmentId === inv.id) {
+                if (t.type === 'investment_transfer') {
+                    investedAmount += t.amount;
+                } else if (t.type === 'investment_return') {
+                    investedAmount -= t.amount;
+                }
+            }
+        });
+
+        if (investedAmount <= 0.01 && inv.status === 'active' && appData.transactions.some(t => t.investmentId === inv.id)) {
+            // Only auto-close if there are transactions (not just an empty newly created asset)
+            inv.status = 'closed';
+        } else if (investedAmount > 0.01 && inv.status === 'closed') {
+            inv.status = 'active'; // Re-open if money is added back
+        }
+    });
+}
+window.updateInvestmentsStatus = updateInvestmentsStatus;
+
+function getTreasuryBalance() {
+    let treasury = 0;
+    appData.transactions.forEach(t => {
+        if (t.type === 'income' || t.type === 'salary') {
+            treasury += t.amount;
+        } else if (t.type === 'expense') {
+            treasury -= t.amount;
+        } else if (t.type === 'investment_transfer') {
+            treasury -= t.amount;
+        } else if (t.type === 'investment_return') {
+            treasury += t.amount;
+        }
+    });
+    return treasury;
+}
+window.getTreasuryBalance = getTreasuryBalance;
+
+function getInvestedAmount(investmentId) {
+    let investedAmount = 0;
+    appData.transactions.forEach(t => {
+        if (t.investmentId === investmentId) {
+            if (t.type === 'investment_transfer') {
+                investedAmount += t.amount;
+            } else if (t.type === 'investment_return') {
+                investedAmount -= t.amount;
+            }
+        }
+    });
+    return investedAmount;
+}
+
+function getPortfolioValue() {
+    let total = 0;
+    if (appData.investments) {
+        appData.investments.forEach(inv => {
+            if (inv.status === 'active' && inv.valueHistory && inv.valueHistory.length > 0) {
+                // Get latest value from history based on date
+                const sortedHistory = [...inv.valueHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
+                total += sortedHistory[0].value;
+            }
+        });
+    }
+    return total;
+}
+window.getPortfolioValue = getPortfolioValue;
+
+function renderInvestments() {
+    updateInvestmentsStatus();
+
+    let totalInvested = 0;
+    let totalCurrentValue = 0;
+
+    const listContainer = document.getElementById('investments-list');
+    if (!listContainer) return;
+    listContainer.innerHTML = '';
+
+    if (!appData.investments || appData.investments.length === 0) {
+        listContainer.innerHTML = '<p>Aucun investissement enregistré.</p>';
+        document.getElementById('inv-total-invested').textContent = '0.00 €';
+        document.getElementById('inv-total-value').textContent = '0.00 €';
+        document.getElementById('inv-total-performance').textContent = '0.00 € (0%)';
+        renderPortfolioChart();
+        return;
+    }
+
+    // Sort: Active first, then by name
+    const sortedInvestments = [...appData.investments].sort((a, b) => {
+        if (a.status === 'active' && b.status === 'closed') return -1;
+        if (a.status === 'closed' && b.status === 'active') return 1;
+        return a.name.localeCompare(b.name);
+    });
+
+    sortedInvestments.forEach(inv => {
+        const invested = getInvestedAmount(inv.id);
+
+        let currentValue = 0;
+        let lastUpdateDate = null;
+        let isOldUpdate = false;
+
+        if (inv.status === 'closed') {
+            currentValue = 0;
+        } else if (inv.valueHistory && inv.valueHistory.length > 0) {
+            const sortedHistory = [...inv.valueHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
+            currentValue = sortedHistory[0].value;
+            lastUpdateDate = new Date(sortedHistory[0].date);
+
+            // Check if older than 30 days
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            if (lastUpdateDate < thirtyDaysAgo) {
+                isOldUpdate = true;
+            }
+        } else {
+            // New investment without history (should have one created at start, but fallback)
+            currentValue = invested;
+            lastUpdateDate = new Date(inv.acquisitionDate);
+        }
+
+        if (inv.status === 'active') {
+            totalInvested += invested;
+            totalCurrentValue += currentValue;
+        }
+
+        const performance = currentValue - invested;
+        let perfPercent = 0;
+        if (invested > 0) {
+            perfPercent = (performance / invested) * 100;
+        }
+
+        const perfClass = performance >= 0 ? 'text-green' : 'text-red';
+        const perfSign = performance >= 0 ? '+' : '';
+
+        const card = document.createElement('div');
+        card.className = `investment-card ${inv.status === 'closed' ? 'closed' : ''}`;
+
+        let badgesHtml = '';
+        if (inv.status === 'closed') {
+            badgesHtml += '<span class="badge badge-closed">Clôturé</span>';
+        } else if (isOldUpdate) {
+            badgesHtml += '<span class="badge badge-warning" title="Mise à jour ancienne">À rafraîchir</span>';
+        }
+
+        card.innerHTML = `
+            <div class="investment-card-info">
+                <h4 class="investment-card-name">${inv.name} ${badgesHtml}</h4>
+                <p class="investment-card-type">Type: ${inv.type} | Acquis le: ${inv.acquisitionDate}</p>
+            </div>
+            <div class="investment-card-values">
+                <p class="investment-card-current">${inv.status === 'closed' ? '0.00 €' : currentValue.toFixed(2) + ' €'}</p>
+                <p class="investment-card-invested">Investi: ${invested.toFixed(2)} €</p>
+                ${inv.status === 'active' ? `<p class="investment-card-performance ${perfClass}">${perfSign}${performance.toFixed(2)} € (${perfSign}${perfPercent.toFixed(1)}%)</p>` : ''}
+            </div>
+            <div class="investment-card-actions">
+                <button class="btn btn-secondary btn-small" onclick="openInvestmentDetail('${inv.id}')">Détails / MAJ</button>
+            </div>
+        `;
+
+        listContainer.appendChild(card);
+    });
+
+    const globalPerf = totalCurrentValue - totalInvested;
+    let globalPerfPercent = 0;
+    if (totalInvested > 0) {
+        globalPerfPercent = (globalPerf / totalInvested) * 100;
+    }
+
+    document.getElementById('inv-total-invested').textContent = totalInvested.toFixed(2) + ' €';
+    document.getElementById('inv-total-value').textContent = totalCurrentValue.toFixed(2) + ' €';
+
+    const globalPerfEl = document.getElementById('inv-total-performance');
+    globalPerfEl.textContent = `${globalPerf >= 0 ? '+' : ''}${globalPerf.toFixed(2)} € (${globalPerf >= 0 ? '+' : ''}${globalPerfPercent.toFixed(1)}%)`;
+    globalPerfEl.style.color = globalPerf >= 0 ? 'var(--success-color)' : 'var(--danger-color)';
+
+    renderPortfolioChart();
+}
+window.renderInvestments = renderInvestments;
+
+function openInvestmentDetail(id) {
+    const inv = appData.investments.find(i => i.id === id);
+    if (!inv) return;
+
+    document.getElementById('inv-detail-title').textContent = inv.name;
+    document.getElementById('inv-detail-type').textContent = inv.type;
+    document.getElementById('inv-detail-date').textContent = inv.acquisitionDate;
+    document.getElementById('inv-detail-status').textContent = inv.status === 'closed' ? 'Clôturé' : 'Actif';
+
+    const invested = getInvestedAmount(id);
+    document.getElementById('inv-detail-invested').textContent = invested.toFixed(2) + ' €';
+
+    document.getElementById('inv-val-asset-id').value = id;
+
+    const today = new Date();
+    document.getElementById('inv-val-date').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    if (inv.valueHistory && inv.valueHistory.length > 0) {
+        const sorted = [...inv.valueHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
+        document.getElementById('inv-val-amount').value = sorted[0].value;
+    } else {
+        document.getElementById('inv-val-amount').value = invested;
+    }
+
+    // Fill history table
+    const tbody = document.querySelector('#table-investment-history tbody');
+    tbody.innerHTML = '';
+
+    if (inv.valueHistory && inv.valueHistory.length > 0) {
+        const sorted = [...inv.valueHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
+        sorted.forEach(entry => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${entry.date}</td>
+                <td>${entry.value.toFixed(2)} €</td>
+                <td>
+                    <button class="btn btn-danger btn-small" onclick="deleteInvestmentHistoryEntry('${inv.id}', '${entry.id}')">Supprimer</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } else {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Aucun historique.</td></tr>';
+    }
+
+    document.getElementById('investment-detail-modal-overlay').classList.add('active');
+}
+window.openInvestmentDetail = openInvestmentDetail;
+
+document.getElementById('btn-close-inv-detail-modal').addEventListener('click', () => {
+    document.getElementById('investment-detail-modal-overlay').classList.remove('active');
+});
+
+document.getElementById('form-investment-value').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const invId = document.getElementById('inv-val-asset-id').value;
+    const date = document.getElementById('inv-val-date').value;
+    const value = parseFloat(document.getElementById('inv-val-amount').value);
+
+    const inv = appData.investments.find(i => i.id === invId);
+    if (inv) {
+        if (!inv.valueHistory) inv.valueHistory = [];
+
+        // Check if date already exists
+        const existingIndex = inv.valueHistory.findIndex(vh => vh.date === date);
+        if (existingIndex !== -1) {
+            if (confirm('Une estimation existe déjà pour cette date. Voulez-vous la remplacer ?')) {
+                inv.valueHistory[existingIndex].value = value;
+            } else {
+                return;
+            }
+        } else {
+            inv.valueHistory.push({
+                id: 'vh-' + generateId(),
+                date: date,
+                value: value
+            });
+        }
+
+        await saveData();
+        openInvestmentDetail(invId); // Refresh modal
+        renderInvestments();
+        updateDashboard();
+    }
+});
+
+window.deleteInvestmentHistoryEntry = async function(invId, entryId) {
+    if (confirm('Supprimer cette estimation ?')) {
+        const inv = appData.investments.find(i => i.id === invId);
+        if (inv && inv.valueHistory) {
+            inv.valueHistory = inv.valueHistory.filter(vh => vh.id !== entryId);
+            await saveData();
+            openInvestmentDetail(invId);
+            renderInvestments();
+            updateDashboard();
+        }
+    }
+};
+
+let portfolioChartInstance = null;
+
+function renderPortfolioChart() {
+    const canvas = document.getElementById('portfolioChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    if (!appData.investments || appData.investments.length === 0) {
+        return; // nothing to draw
+    }
+
+    // Gather all unique dates across all active investments
+    const allDatesSet = new Set();
+    const activeInvs = appData.investments.filter(i => i.status === 'active' && i.valueHistory && i.valueHistory.length > 0);
+
+    if (activeInvs.length === 0) return;
+
+    activeInvs.forEach(inv => {
+        inv.valueHistory.forEach(vh => allDatesSet.add(vh.date));
+    });
+
+    const allDates = Array.from(allDatesSet).sort((a, b) => new Date(a) - new Date(b));
+
+    // For each date, compute total portfolio value
+    const totals = [];
+
+    allDates.forEach(date => {
+        let totalVal = 0;
+        activeInvs.forEach(inv => {
+            // Find value on or before this date
+            const pastValues = inv.valueHistory.filter(vh => new Date(vh.date) <= new Date(date));
+            if (pastValues.length > 0) {
+                pastValues.sort((a, b) => new Date(b.date) - new Date(a.date));
+                totalVal += pastValues[0].value;
+            }
+        });
+        totals.push(totalVal);
+    });
+
+    // Vanilla JS Canvas drawing (line chart) based on the app's existing logic
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Create arrays for drawing
+    const dataPoints = totals;
+    const labels = allDates;
+
+    const isDarkMode = document.body.classList.contains('dark-mode');
+    const textColor = isDarkMode ? '#f2f2f7' : '#1c1c1e';
+    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+
+    if (typeof drawCustomLineChart === 'function') {
+        drawCustomLineChart(ctx, labels, dataPoints, null, textColor, gridColor);
+    }
+}
