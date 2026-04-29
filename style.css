@@ -1342,3 +1342,95 @@ tr:hover {
     background-color: var(--input-bg);
     color: var(--input-text);
 }
+
+/* INVESTMENTS MODULE STYLES */
+.investment-card {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    gap: 1rem;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.investment-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.investment-card.closed {
+    opacity: 0.6;
+    background: var(--bg-color);
+}
+
+.investment-card-info {
+    flex: 2;
+    min-width: 200px;
+}
+
+.investment-card-name {
+    font-weight: bold;
+    font-size: 1.1rem;
+    margin: 0 0 0.2rem 0;
+}
+
+.investment-card-type {
+    font-size: 0.85rem;
+    color: var(--text-color);
+    opacity: 0.8;
+    margin: 0;
+}
+
+.investment-card-values {
+    flex: 1;
+    min-width: 150px;
+    text-align: right;
+}
+
+.investment-card-current {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: var(--accent-color);
+    margin: 0;
+}
+
+.investment-card-invested {
+    font-size: 0.9rem;
+    color: var(--text-color);
+    margin: 0;
+}
+
+.investment-card-performance {
+    font-size: 0.95rem;
+    font-weight: bold;
+    margin-top: 0.2rem;
+}
+
+.investment-card-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.badge {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.badge-warning {
+    background-color: rgba(255, 149, 0, 0.2);
+    color: #ff9500;
+}
+
+.badge-closed {
+    background-color: var(--border-color);
+    color: var(--text-color);
+}
