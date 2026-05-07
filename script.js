@@ -1409,7 +1409,7 @@ function renderSavings() {
     appData.transactions.forEach(t => {
         let profitDiff = 0;
         if (t.type === 'income') profitDiff = t.amount;
-        else if (t.type === 'salary') profitDiff = t.amount;
+        else if (t.type === 'salary') profitDiff = t.amount - (t.savedAmount || 0);
         else if (t.type === 'expense') profitDiff = -t.amount;
 
         globalTotalProfit += profitDiff;
