@@ -1367,30 +1367,6 @@ function renderSavings() {
             invMonthHtml = `<td data-label="Investi ce mois" class="col-investment-month" style="display: none;"></td>`;
         }
 
-        // Calculate Meal Voucher Coverage Rate
-        let mvCoverageHtml = '';
-        if (appData.mealVouchersEnabled) {
-            let totalEligibleFoodSpent = 0;
-            let totalMvSpentInMonth = 0;
-
-            const transInMonth = appData.transactions.filter(t => t.date && t.date.startsWith(monthStr));
-            transInMonth.forEach(t => {
-                if (t.type === 'expense' && appData.mealVoucherEligibleCategories && appData.mealVoucherEligibleCategories.includes(t.categoryId)) {
-                    totalEligibleFoodSpent += t.amount;
-                    if (t.mealVoucherPart > 0) {
-                        totalMvSpentInMonth += t.mealVoucherPart;
-                    }
-                }
-            });
-
-            let mvRate = 0;
-            if (totalEligibleFoodSpent > 0) {
-                mvRate = (totalMvSpentInMonth / totalEligibleFoodSpent) * 100;
-            }
-            mvCoverageHtml = `<td data-label="Taux couv. alimentaire">${mvRate.toFixed(1)}%</td>`;
-        }
-
-
         tr.innerHTML = `
             <td data-label="Mois">${formattedMonth}</td>
             <td data-label="Revenus réels" class="${incomeColor}">${incomeSign}${data.income.toFixed(2)} €</td>
@@ -1400,14 +1376,12 @@ function renderSavings() {
             <td data-label="Épargne du mois" class="text-primary">${data.savings > 0 ? '+' : ''}${data.savings.toFixed(2)} €</td>
             <td data-label="Bénéfice Réel" class="${realProfitClass}" style="font-weight: bold;">${realProfitSign}${realProfit.toFixed(2)} €</td>
             ${invMonthHtml}
-            ${mvCoverageHtml}
         `;
         tbody.appendChild(tr);
     });
 
     if (sortedMonths.length === 0) {
         let colSpan = 7;
-        if (appData.mealVouchersEnabled) colSpan++;
         if (appData.investmentsEnabled) colSpan++;
         tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center;">Aucune donnée disponible.</td></tr>`;
     }
@@ -1416,12 +1390,6 @@ function renderSavings() {
     const invColHeaders = document.querySelectorAll('.col-investment-month');
     invColHeaders.forEach(th => {
         th.style.display = appData.investmentsEnabled ? 'table-cell' : 'none';
-    });
-
-    // Meal Vouchers Columns toggles
-    const mvColHeaders = document.querySelectorAll('.col-mv-rate');
-    mvColHeaders.forEach(th => {
-        th.style.display = appData.mealVouchersEnabled ? 'table-cell' : 'none';
     });
 
     const mvValContainer = document.getElementById('savings-view-mv-container');
@@ -1433,31 +1401,53 @@ function renderSavings() {
         mvValContainer.style.display = 'none';
     }
 
+    // Recalculate global totals independently of grouped months for robustness
+    let globalTotalProfit = 0;
+    let globalCurrentMonthProfit = 0;
+    let globalTotalSaved = 0;
+
+    appData.transactions.forEach(t => {
+        let profitDiff = 0;
+        if (t.type === 'income') profitDiff = t.amount;
+        else if (t.type === 'salary') profitDiff = t.amount;
+        else if (t.type === 'expense') profitDiff = -t.amount;
+
+        globalTotalProfit += profitDiff;
+
+        if (t.date && t.date.startsWith(currentMonthStr)) {
+            globalCurrentMonthProfit += profitDiff;
+        }
+
+        if (t.type === 'salary' && t.savedAmount) {
+            globalTotalSaved += t.savedAmount;
+        }
+    });
+
     // Update Real Profit view (Cumul Total)
     const totalRealProfitElement = document.getElementById('savings-view-total');
-    if (totalRealProfit >= 0) {
-        totalRealProfitElement.textContent = `+${totalRealProfit.toFixed(2)} €`;
+    if (globalTotalProfit >= 0) {
+        totalRealProfitElement.textContent = `+${globalTotalProfit.toFixed(2)} €`;
         totalRealProfitElement.className = 'text-green';
     } else {
-        totalRealProfitElement.textContent = `${totalRealProfit.toFixed(2)} €`;
+        totalRealProfitElement.textContent = `${globalTotalProfit.toFixed(2)} €`;
         totalRealProfitElement.className = 'text-red';
     }
 
     // Update Real Profit view (Ce mois-ci)
     const currentMonthRealProfitElement = document.getElementById('savings-view-current-month');
     if (currentMonthRealProfitElement) {
-        if (currentMonthRealProfit >= 0) {
-            currentMonthRealProfitElement.textContent = `+${currentMonthRealProfit.toFixed(2)} €`;
+        if (globalCurrentMonthProfit >= 0) {
+            currentMonthRealProfitElement.textContent = `+${globalCurrentMonthProfit.toFixed(2)} €`;
             currentMonthRealProfitElement.className = 'text-green';
         } else {
-            currentMonthRealProfitElement.textContent = `${currentMonthRealProfit.toFixed(2)} €`;
+            currentMonthRealProfitElement.textContent = `${globalCurrentMonthProfit.toFixed(2)} €`;
             currentMonthRealProfitElement.className = 'text-red';
         }
     }
 
     // Update Real Saved view
     const totalRealSavedElement = document.getElementById('savings-view-real-saved');
-    totalRealSavedElement.textContent = `+${totalRealSaved.toFixed(2)} €`;
+    totalRealSavedElement.textContent = `+${globalTotalSaved.toFixed(2)} €`;
 }
 
 function updateCategorySelectionTotal() {
@@ -1582,7 +1572,7 @@ function updateDashboard() {
     // Update Patrimony Widget
     const patrimonyWidget = document.getElementById('dashboard-patrimony-widget');
     if (appData.investmentsEnabled && appData.investments && appData.investments.length > 0) {
-        if(patrimonyWidget) patrimonyWidget.style.display = 'block';
+        if(patrimonyWidget) patrimonyWidget.style.display = 'none'; // HIDDEN as requested
         const treasury = typeof getTreasuryBalance === 'function' ? getTreasuryBalance() : 0;
         const portfolio = typeof getPortfolioValue === 'function' ? getPortfolioValue() : 0;
         const netWorth = treasury + portfolio;
@@ -2998,6 +2988,7 @@ window.updateNavigationVisibility = function() {
             creditsWithBalance
         };
     }
+    window.calculateMealVoucherData = calculateMealVoucherData;
 
     window.checkMvReconciliation = function() {
         const banner = document.getElementById('dashboard-mv-reconciliation-banner');
