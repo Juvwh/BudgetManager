@@ -902,6 +902,39 @@
                 </div>
             </div>
 
+            <div class="split-layout" style="margin-top: 2rem;">
+                <div class="form-panel card">
+                    <h3>Ajouter une dépense partagée (hors budget)</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-color); opacity: 0.8; margin-bottom: 1rem;">Ces dépenses déduisent votre solde de chèques repas mais n'apparaissent pas dans vos statistiques et transactions principales.</p>
+                    <form id="form-meal-voucher-expense">
+                        <div class="form-group">
+                            <label>Montant (€)</label>
+                            <input type="number" id="mv-expense-amount" step="0.01" min="0" required>
+                        </div>
+                        <input type="hidden" id="mv-expense-id">
+                        <button type="submit" id="btn-submit-mv-expense" class="btn btn-primary">Ajouter la dépense</button>
+                        <button type="button" id="btn-cancel-edit-mv-expense" class="btn btn-secondary" style="display:none; margin-top: 0.5rem;">Annuler</button>
+                    </form>
+                </div>
+
+                <div class="list-panel card">
+                    <h3>Dépenses partagées</h3>
+                    <div class="table-container" style="max-height: 250px; overflow-y: auto;">
+                        <table id="table-meal-voucher-external-expenses">
+                            <thead>
+                                <tr>
+                                    <th>Montant</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Injected by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <div class="card" style="margin-top: 2rem;">
                 <h3>Historique des dépenses en chèques repas</h3>
                 <div class="table-container">

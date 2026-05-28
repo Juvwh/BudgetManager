@@ -31,6 +31,7 @@ window.appData = window.appData || {
     simulations: [],
     simulationBalance: 0,
     mealVoucherCredits: [],
+    mealVoucherExpenses: [],
     mealVouchersEnabled: false,
     mealVoucherEligibleCategories: [],
     mealVoucherExpectedMonthlyAmount: 0,
@@ -115,6 +116,7 @@ async function saveData() {
             mealVoucherEligibleCategories: appData.mealVoucherEligibleCategories || [],
             mealVoucherExpectedMonthlyAmount: appData.mealVoucherExpectedMonthlyAmount || 0,
             mealVoucherCredits: appData.mealVoucherCredits || [],
+            mealVoucherExpenses: appData.mealVoucherExpenses || [],
             investments: appData.investments || [],
             investmentsEnabled: appData.investmentsEnabled !== undefined ? appData.investmentsEnabled : true,
             updatedAt: new Date().toISOString()
@@ -153,6 +155,7 @@ async function loadData() {
             if(parsed.mealVoucherEligibleCategories) appData.mealVoucherEligibleCategories = parsed.mealVoucherEligibleCategories;
             if(parsed.mealVoucherExpectedMonthlyAmount !== undefined) appData.mealVoucherExpectedMonthlyAmount = parsed.mealVoucherExpectedMonthlyAmount;
             if(parsed.mealVoucherCredits) appData.mealVoucherCredits = parsed.mealVoucherCredits;
+            if(parsed.mealVoucherExpenses) appData.mealVoucherExpenses = parsed.mealVoucherExpenses;
 
             if(parsed.investments) appData.investments = parsed.investments;
             if(parsed.investmentsEnabled !== undefined) appData.investmentsEnabled = parsed.investmentsEnabled;
@@ -2922,9 +2925,19 @@ window.updateNavigationVisibility = function() {
         // Create a working copy of credits to track remaining balance
         let remainingCredits = sortedCredits.map(c => ({...c, remaining: c.amount, consumed: 0}));
 
-        // 2. Sort all MV transactions chronologically
-        const mvTransactions = appData.transactions
+        // 2. Sort all MV transactions (internal + external) chronologically
+        const internalMvTransactions = appData.transactions
             .filter(t => t.mealVoucherPart > 0 && t.type === 'expense')
+            .map(t => ({ date: t.date, amount: t.mealVoucherPart, isExternal: false }));
+
+        if (!appData.mealVoucherExpenses) appData.mealVoucherExpenses = [];
+        const externalMvTransactions = appData.mealVoucherExpenses.map(t => ({
+            date: t.date,
+            amount: t.amount,
+            isExternal: true
+        }));
+
+        const allMvTransactions = [...internalMvTransactions, ...externalMvTransactions]
             .sort((a, b) => new Date(a.date) - new Date(b.date));
 
         let spentLast12m = 0;
@@ -2938,12 +2951,12 @@ window.updateNavigationVisibility = function() {
         });
 
         // 3. Process transactions chronologically to consume credits via FIFO
-        mvTransactions.forEach(t => {
-            if (new Date(t.date) >= twelveMonthsAgo) {
-                spentLast12m += t.mealVoucherPart;
+        allMvTransactions.forEach(t => {
+            if (new Date(t.date) >= twelveMonthsAgo && !t.isExternal) {
+                spentLast12m += t.amount;
             }
 
-            let amountToConsume = t.mealVoucherPart;
+            let amountToConsume = t.amount;
             const tDate = new Date(t.date);
 
             // Find credits that were active at the time of the transaction
@@ -3169,6 +3182,24 @@ window.updateNavigationVisibility = function() {
             tbodyCredits.appendChild(tr);
         });
 
+        // External Expenses Table
+        const tbodyExtExpenses = document.querySelector('#table-meal-voucher-external-expenses tbody');
+        tbodyExtExpenses.innerHTML = '';
+        if (appData.mealVoucherExpenses) {
+            const sortedExtExpenses = [...appData.mealVoucherExpenses].sort((a, b) => new Date(b.date) - new Date(a.date));
+            sortedExtExpenses.forEach(exp => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td data-label="Montant" style="font-weight: bold;">${exp.amount.toFixed(2)} €</td>
+                    <td data-label="Actions">
+                        <button class="btn btn-secondary btn-small" onclick="editMealVoucherExpense('${exp.id}')">Modifier</button>
+                        <button class="btn btn-danger btn-small" onclick="deleteMealVoucherExpense('${exp.id}')">Supprimer</button>
+                    </td>
+                `;
+                tbodyExtExpenses.appendChild(tr);
+            });
+        }
+
         // Transactions Table (Read Only)
         const tbodyTrans = document.querySelector('#table-meal-voucher-transactions tbody');
         tbodyTrans.innerHTML = '';
@@ -3221,6 +3252,75 @@ window.updateNavigationVisibility = function() {
     window.deleteMealVoucherCredit = async function(id) {
         if(confirm("Supprimer ce lot de chèques repas ?")) {
             appData.mealVoucherCredits = appData.mealVoucherCredits.filter(c => c.id !== id);
+            await saveData();
+            renderMealVouchers();
+        }
+    };
+
+    const mvFormExpense = document.getElementById('form-meal-voucher-expense');
+    if (mvFormExpense) {
+        mvFormExpense.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const amount = parseFloat(document.getElementById('mv-expense-amount').value);
+            const idInput = document.getElementById('mv-expense-id').value;
+
+            if (isNaN(amount) || amount <= 0) return;
+
+            if (!appData.mealVoucherExpenses) appData.mealVoucherExpenses = [];
+
+            if (idInput) {
+                // Edit
+                const index = appData.mealVoucherExpenses.findIndex(ex => ex.id === idInput);
+                if (index !== -1) {
+                    appData.mealVoucherExpenses[index].amount = amount;
+                }
+            } else {
+                // Add
+                appData.mealVoucherExpenses.push({
+                    id: 'mvexp_' + Date.now(),
+                    amount,
+                    date: new Date().toISOString().split('T')[0] // Use today's date for FIFO consumption logic
+                });
+            }
+
+            await saveData();
+            renderMealVouchers();
+            resetMvExpenseForm();
+        });
+    }
+
+    const btnCancelMvExpense = document.getElementById('btn-cancel-edit-mv-expense');
+    if (btnCancelMvExpense) {
+        btnCancelMvExpense.addEventListener('click', resetMvExpenseForm);
+    }
+
+    function resetMvExpenseForm() {
+        if(mvFormExpense) mvFormExpense.reset();
+        document.getElementById('mv-expense-id').value = '';
+        const btnSubmit = document.getElementById('btn-submit-mv-expense');
+        if(btnSubmit) btnSubmit.textContent = 'Ajouter la dépense';
+        if(btnCancelMvExpense) btnCancelMvExpense.style.display = 'none';
+    }
+
+    window.editMealVoucherExpense = function(id) {
+        if (!appData.mealVoucherExpenses) return;
+        const exp = appData.mealVoucherExpenses.find(ex => ex.id === id);
+        if (!exp) return;
+
+        document.getElementById('mv-expense-amount').value = exp.amount;
+        document.getElementById('mv-expense-id').value = exp.id;
+
+        const btnSubmit = document.getElementById('btn-submit-mv-expense');
+        if(btnSubmit) btnSubmit.textContent = 'Modifier la dépense';
+        if(btnCancelMvExpense) btnCancelMvExpense.style.display = 'inline-block';
+
+        // Scroll to form if needed
+        document.getElementById('form-meal-voucher-expense').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
+    window.deleteMealVoucherExpense = async function(id) {
+        if(confirm("Supprimer cette dépense partagée ?")) {
+            appData.mealVoucherExpenses = appData.mealVoucherExpenses.filter(ex => ex.id !== id);
             await saveData();
             renderMealVouchers();
         }
@@ -3369,6 +3469,7 @@ window.updateNavigationVisibility = function() {
                 simulations: [],
                 simulationBalance: 0,
                 mealVoucherCredits: [],
+                mealVoucherExpenses: [],
                 mealVouchersEnabled: false,
                 mealVoucherEligibleCategories: [],
                 mealVoucherExpectedMonthlyAmount: 0,
