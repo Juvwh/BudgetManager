@@ -953,52 +953,216 @@ function attachChartClickListener(canvasId) {
 }
 
 function showCategoryDetails(categoryName, totalAmount) {
-    const periodSelect = document.getElementById('chart-period-select');
-    let months = 1; // Default
-    if (periodSelect && document.querySelector('#charts').classList.contains('active')) {
-         months = parseInt(periodSelect.value, 10);
-    }
+    // Determine the source view (dashboard or charts)
+    const isChartsView = document.querySelector('#charts').classList.contains('active');
 
-    // Get filter prefix based on dashboard month
     let filterPrefixes = [];
-    const dashMonthFilter = document.getElementById('dash-filter-month').value;
-    let year, month;
-    if (dashMonthFilter) {
-        const parts = dashMonthFilter.split('-');
-        year = parseInt(parts[0], 10);
-        month = parseInt(parts[1], 10);
+    if (isChartsView) {
+        // Chart view logic: use dash-filter-month and chart-period-select (months backwards)
+        const periodSelect = document.getElementById('chart-period-select');
+        let months = periodSelect ? parseInt(periodSelect.value, 10) : 1;
+        const dashMonthFilter = document.getElementById('dash-filter-month').value;
+        let year, month;
+        if (dashMonthFilter) {
+            const parts = dashMonthFilter.split('-');
+            year = parseInt(parts[0], 10);
+            month = parseInt(parts[1], 10);
+        } else {
+            const now = new Date();
+            year = now.getFullYear();
+            month = now.getMonth() + 1;
+        }
+        for (let i = 0; i < months; i++) {
+            let m = month - i;
+            let y = year;
+            if (m <= 0) {
+                m += 12;
+                y -= 1;
+            }
+            filterPrefixes.push(`${y}-${String(m).padStart(2, '0')}`);
+        }
     } else {
-        const now = new Date();
-        year = now.getFullYear();
-        month = now.getMonth() + 1;
+        // Dashboard logic: use dashboard-category-month-selector directly
+        const selector = document.getElementById('dashboard-category-month-selector');
+        if (selector && selector.selectedOptions.length > 0) {
+            filterPrefixes = Array.from(selector.selectedOptions).map(opt => opt.value);
+        } else {
+            // Fallback to dash-filter-month if selector is empty or missing
+            const dashMonthFilter = document.getElementById('dash-filter-month').value;
+            if (dashMonthFilter) {
+                filterPrefixes.push(dashMonthFilter);
+            }
+        }
     }
 
-    for (let i = 0; i < months; i++) {
-        let m = month - i;
-        let y = year;
-        if (m <= 0) {
-            m += 12;
-            y -= 1;
+    // Determine if the categoryName is a main category or a subcategory
+    let isMainCategory = true;
+    if (categoryName.includes(' > ')) {
+        isMainCategory = false;
+    } else {
+        // It could be a main category that has no subcategories in the string, but we also check
+        // if there are any actual subcategories in the DB for this main category to be thorough.
+        const mainCatObj = appData.categories.find(c => c.name === categoryName && c.parentId === null);
+        if (!mainCatObj) {
+            // If we didn't find a main category with this exact name, it might be a subcategory
+            // that we are rendering in detail level, but mostly we rely on the path string.
+            // Also, some subcategories might not have a parent name in the label if we split it earlier.
+            isMainCategory = false;
         }
-        filterPrefixes.push(`${y}-${String(m).padStart(2, '0')}`);
     }
+
+    // Setup global state for the modal to use
+    window.currentModalCategory = categoryName;
+    window.currentModalPrefixes = filterPrefixes;
+    window.currentModalIsMainCategory = isMainCategory;
+
+    // Reset filters to default state
+    document.getElementById('data-modal-period').value = 'inherited';
+    document.getElementById('data-modal-cat-mode').value = 'with_subcategories';
+
+    // Call render to build the modal contents
+    renderCategoryModal();
+
+    // Show the modal
+    document.getElementById('data-modal-overlay').classList.add('active');
+}
+
+
+function renderCategoryModal() {
+    const categoryName = window.currentModalCategory;
+    const filterPrefixes = window.currentModalPrefixes || [];
+    const isMainCategory = window.currentModalIsMainCategory;
+
+    const modalTitle = document.getElementById('data-modal-title');
+    const filtersContainer = document.getElementById('data-modal-filters-container');
+    const catModeGroup = document.getElementById('data-modal-cat-mode-group');
+    const periodSelect = document.getElementById('data-modal-period');
+    const customDatesGroup = document.getElementById('data-modal-custom-dates');
+    const dateStartInput = document.getElementById('data-modal-date-start');
+    const dateEndInput = document.getElementById('data-modal-date-end');
+
+    if(!filtersContainer) return;
+
+    // Make sure filters are visible
+    filtersContainer.style.display = 'flex';
+
+    // Hide or show category inclusion mode
+    if (isMainCategory) {
+        catModeGroup.style.display = 'flex';
+    } else {
+        catModeGroup.style.display = 'none';
+    }
+
+    // Custom dates visibility
+    if (periodSelect.value === 'custom') {
+        customDatesGroup.style.display = 'flex';
+    } else {
+        customDatesGroup.style.display = 'none';
+    }
+
+    modalTitle.innerHTML = `Détails : ${categoryName}`;
+
+    // Read current filter settings
+    const catMode = document.getElementById('data-modal-cat-mode').value;
+    const periodMode = periodSelect.value;
+    const dateStart = dateStartInput.value;
+    const dateEnd = dateEndInput.value;
 
     // Filter transactions
     const trans = appData.transactions.filter(t => {
         if (t.type !== 'expense') return false;
+
         const catPath = getCategoryPath(t.categoryId);
         const topCatName = catPath.split(' > ')[0];
 
-        // Match exact path OR top category name depending on chart detail level
-        const isMatch = (catPath === categoryName) || (topCatName === categoryName);
+        let isMatch = false;
+        if (isMainCategory) {
+            if (catMode === 'with_subcategories') {
+                isMatch = (topCatName === categoryName);
+            } else {
+                isMatch = (catPath === categoryName);
+            }
+        } else {
+            isMatch = (catPath === categoryName);
+        }
 
-        return isMatch && filterPrefixes.some(prefix => t.date.startsWith(prefix));
+        if (!isMatch) return false;
+
+        // Apply period filter
+        if (periodMode === 'inherited') {
+            return filterPrefixes.some(prefix => t.date && t.date.startsWith(prefix));
+        } else if (periodMode === 'all_time') {
+            return true;
+        } else if (periodMode === 'last_month') {
+            const now = new Date();
+            let year = now.getFullYear();
+            let month = now.getMonth(); // 0-indexed, so getMonth() is naturally the previous month
+            if (month === 0) {
+                month = 12;
+                year -= 1;
+            }
+            const prefix = `${year}-${String(month).padStart(2, '0')}`;
+            return t.date && t.date.startsWith(prefix);
+        } else if (periodMode === 'last_year') {
+            const now = new Date();
+            const lastYear = now.getFullYear() - 1;
+            return t.date && t.date.startsWith(`${lastYear}-`);
+        } else if (periodMode === 'custom') {
+            if (dateStart && t.date < dateStart) return false;
+            if (dateEnd && t.date > dateEnd) return false;
+            return true;
+        }
+
+        return true;
     });
 
     trans.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    openDataModal(`Détails : ${categoryName}`, trans, totalAmount, 'expense');
+    // Calculate total
+    let totalAmount = 0;
+    const chartMode = window.currentChartMode || 'real';
+
+    trans.forEach(t => {
+        let actualAmount = Math.abs(t.amount);
+        if (chartMode === 'real' && t.mealVoucherPart > 0) {
+            actualAmount = actualAmount - t.mealVoucherPart;
+        }
+        totalAmount += actualAmount;
+    });
+
+    // Update UI
+    const totalSpan = document.getElementById('data-modal-total');
+    totalSpan.textContent = '-' + totalAmount.toFixed(2) + ' €';
+    totalSpan.className = 'text-red';
+
+    const tbody = document.querySelector('#table-modal-transactions tbody');
+    tbody.innerHTML = '';
+
+    if (trans.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Aucune transaction trouvée.</td></tr>';
+    } else {
+        trans.forEach(t => {
+            const tr = document.createElement('tr');
+            tr.className = 'clickable-row';
+            tr.onclick = () => {
+                closeDataModal();
+                document.querySelector('.nav-link[data-target="transactions"]').click();
+                editTransaction(t.id);
+            };
+            const catName = getCategoryPath(t.categoryId, new Set(), true);
+
+            tr.innerHTML = `
+                <td data-label="Date">${t.date}</td>
+                <td data-label="Type"><span class="${t.type === 'income' ? 'text-green' : 'text-red'}">${t.type === 'income' ? 'Revenu' : 'Dépense'}</span></td>
+                <td data-label="Catégorie">${catName}</td>
+                <td data-label="Note">${t.note || ''}</td>
+                <td data-label="Montant" class="${t.type === 'income' ? 'text-green' : 'text-red'}">${t.type === 'income' ? '+' : '-'}${t.amount.toFixed(2)} €</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
 }
+
 
 function showMonthDetails(year, month, label, totalIncome, totalExpense) {
     const prefix = `${year}-${String(month).padStart(2, '0')}`;
@@ -3483,6 +3647,11 @@ window.updateNavigationVisibility = function() {
 
 // --- MODAL GENERIQUE ---
 function openDataModal(title, transactions, totalAmount, totalType = 'expense') {
+    const filtersContainer = document.getElementById('data-modal-filters-container');
+    if (filtersContainer) {
+        filtersContainer.style.display = 'none';
+    }
+
     document.getElementById('data-modal-title').textContent = title;
 
     const totalSpan = document.getElementById('data-modal-total');
@@ -3526,6 +3695,18 @@ function closeDataModal() {
 }
 
 document.getElementById('btn-close-modal').addEventListener('click', closeDataModal);
+
+    // Event listeners for category modal filters
+    const catModeFilter = document.getElementById('data-modal-cat-mode');
+    const periodFilter = document.getElementById('data-modal-period');
+    const dateStartFilter = document.getElementById('data-modal-date-start');
+    const dateEndFilter = document.getElementById('data-modal-date-end');
+
+    if (catModeFilter) catModeFilter.addEventListener('change', () => { if (typeof renderCategoryModal === 'function') renderCategoryModal(); });
+    if (periodFilter) periodFilter.addEventListener('change', () => { if (typeof renderCategoryModal === 'function') renderCategoryModal(); });
+    if (dateStartFilter) dateStartFilter.addEventListener('change', () => { if (typeof renderCategoryModal === 'function') renderCategoryModal(); });
+    if (dateEndFilter) dateEndFilter.addEventListener('change', () => { if (typeof renderCategoryModal === 'function') renderCategoryModal(); });
+
 
 // Close modal on click outside
 document.getElementById('data-modal-overlay').addEventListener('click', (e) => {
@@ -4360,3 +4541,5 @@ function renderPortfolioChart() {
         drawCustomLineChart(ctx, labels, dataPoints, null, textColor, gridColor);
     }
 }
+
+window.showCategoryDetails = showCategoryDetails;
