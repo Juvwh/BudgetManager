@@ -2219,10 +2219,11 @@ function renderCategoryTree() {
 
             const badge = `<span class="cat-type-badge ${cat.type === 'income' ? 'badge-income' : 'badge-expense'}">${cat.type === 'income' ? 'Revenu' : 'Dépense'}</span>`;
 
+            const fullPath = getCategoryPath(cat.id);
             el.innerHTML = `
-                <div>
-                    <span class="drag-handle">☰</span>
-                    <strong>${cat.name}</strong> ${!parentId ? badge : ''}
+                <div style="cursor: pointer; flex-grow: 1;" onclick="showCategoryDetails('${fullPath}', 0)">
+                    <span class="drag-handle" style="cursor: grab;" onclick="event.stopPropagation()">☰</span>
+                    <strong style="color: var(--primary-color);">${cat.name}</strong> ${!parentId ? badge : ''}
                 </div>
                 <button class="btn btn-danger btn-small" onclick="deleteCategory('${cat.id}')">Supprimer</button>
             `;
