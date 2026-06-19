@@ -995,20 +995,11 @@ function showCategoryDetails(categoryName, totalAmount) {
         }
     }
 
-    // Determine if the categoryName is a main category or a subcategory
-    let isMainCategory = true;
-    if (categoryName.includes(' > ')) {
-        isMainCategory = false;
-    } else {
-        // It could be a main category that has no subcategories in the string, but we also check
-        // if there are any actual subcategories in the DB for this main category to be thorough.
-        const mainCatObj = appData.categories.find(c => c.name === categoryName && c.parentId === null);
-        if (!mainCatObj) {
-            // If we didn't find a main category with this exact name, it might be a subcategory
-            // that we are rendering in detail level, but mostly we rely on the path string.
-            // Also, some subcategories might not have a parent name in the label if we split it earlier.
-            isMainCategory = false;
-        }
+    // Determine if the categoryName has any descendants
+    let isMainCategory = false;
+    const allPaths = appData.categories.map(c => getCategoryPath(c.id));
+    if (allPaths.some(p => p.startsWith(categoryName + ' > '))) {
+        isMainCategory = true;
     }
 
     // Setup global state for the modal to use
@@ -1073,12 +1064,11 @@ function renderCategoryModal() {
         if (t.type !== 'expense') return false;
 
         const catPath = getCategoryPath(t.categoryId);
-        const topCatName = catPath.split(' > ')[0];
 
         let isMatch = false;
         if (isMainCategory) {
             if (catMode === 'with_subcategories') {
-                isMatch = (topCatName === categoryName);
+                isMatch = (catPath === categoryName || catPath.startsWith(categoryName + ' > '));
             } else {
                 isMatch = (catPath === categoryName);
             }
