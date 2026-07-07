@@ -1568,9 +1568,18 @@ function renderSavings() {
 
     appData.transactions.forEach(t => {
         let profitDiff = 0;
-        if (t.type === 'income') profitDiff = t.amount;
-        else if (t.type === 'salary') profitDiff = t.amount - (t.savedAmount || 0);
-        else if (t.type === 'expense') profitDiff = -t.amount;
+        if (t.type === 'income') {
+            profitDiff = t.amount;
+        } else if (t.type === 'salary') {
+            profitDiff = t.amount - (t.savedAmount || 0);
+        } else if (t.type === 'expense') {
+            let actualAmount = t.amount;
+            let chartMode = window.currentChartMode || 'real';
+            if (chartMode === 'real' && t.mealVoucherPart > 0) {
+                actualAmount = t.amount - t.mealVoucherPart;
+            }
+            profitDiff = -actualAmount;
+        }
 
         globalTotalProfit += profitDiff;
 
