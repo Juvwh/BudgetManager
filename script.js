@@ -1762,6 +1762,17 @@ function updateDashboard() {
     document.getElementById('dash-income').textContent = '+' + currentData.income.toFixed(2) + ' €';
     document.getElementById('dash-expense').textContent = '-' + currentData.expense.toFixed(2) + ' €';
 
+    const balance = currentData.income - currentData.expense;
+    const balanceEl = document.getElementById('dash-balance');
+    balanceEl.textContent = (balance >= 0 ? '+' : '') + balance.toFixed(2) + ' €';
+    if (balance >= 0) {
+        balanceEl.classList.add('text-green');
+        balanceEl.classList.remove('text-red');
+    } else {
+        balanceEl.classList.add('text-red');
+        balanceEl.classList.remove('text-green');
+    }
+
     // Update Goal Progress Bar
     const progressBar = document.getElementById('goal-progress-bar');
     const currentMarker = document.getElementById('progress-current-marker');
