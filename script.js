@@ -260,6 +260,17 @@ function renderTransactions() {
 
     let filterMonth = document.getElementById('filter-month').value;
 
+    // Calculate refunds per expense globally for the view
+    const refundsByExpense = {};
+    const refundLinks = {};
+    appData.transactions.forEach(t => {
+        if (t.type === 'income' && t.linkedExpenseId) {
+            if (!refundsByExpense[t.linkedExpenseId]) refundsByExpense[t.linkedExpenseId] = 0;
+            refundsByExpense[t.linkedExpenseId] += t.amount;
+            refundLinks[t.id] = t.linkedExpenseId;
+        }
+    });
+
     let filteredTrans = appData.transactions.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
 
     if (filterMonth) {
@@ -327,6 +338,12 @@ function renderTransactions() {
         if (t.type === 'income') {
             displayType = 'Revenu';
             typeColor = 'text-green';
+            if (refundLinks[t.id]) {
+                const linkedExp = appData.transactions.find(x => x.id === refundLinks[t.id]);
+                if (linkedExp) {
+                    displayType += `<br><small style="color:var(--text-color);">↪ Remboursement de: ${linkedExp.note || getCategoryPath(linkedExp.categoryId)}</small>`;
+                }
+            }
         } else if (t.type === 'salary') {
             displayType = 'Salaire';
             typeColor = 'text-primary'; // Using primary color for salary
@@ -342,9 +359,16 @@ function renderTransactions() {
         } else {
             displayType = 'Dépense';
             typeColor = 'text-red';
+            let amountHtml = `-${Number(t.amount).toFixed(2)} €`;
+
             if (t.mealVoucherPart > 0) {
-                formattedAmount = `-${Number(t.amount).toFixed(2)} € <br><small style="color:var(--accent-color);">dont ${Number(t.mealVoucherPart).toFixed(2)} € (CR)</small><br><small style="color:var(--text-color);">Reste (Argent): -${Number(t.amount - t.mealVoucherPart).toFixed(2)} €</small>`;
+                amountHtml += ` <br><small style="color:var(--accent-color);">dont ${Number(t.mealVoucherPart).toFixed(2)} € (CR)</small><br><small style="color:var(--text-color);">Reste (Argent): -${Number(t.amount - t.mealVoucherPart).toFixed(2)} €</small>`;
             }
+            if (refundsByExpense[t.id]) {
+                const remains = Math.max(0, t.amount - refundsByExpense[t.id]);
+                amountHtml += `<br><small style="color:var(--success-color); font-weight:bold;">Reste à charge: -${remains.toFixed(2)} €</small>`;
+            }
+            formattedAmount = amountHtml;
         }
 
         let checkboxHtml = '';
@@ -364,8 +388,11 @@ function renderTransactions() {
             <td data-label="Tags">${tagsCellHtml}</td>
             <td data-label="Montant" class="${t.type === 'expense' ? 'text-red' : 'text-green'}">${formattedAmount}</td>
             <td data-label="Actions">
-                <button class="btn btn-secondary btn-small icon-btn-mobile" title="Modifier" onclick="editTransaction('${t.id}')"><span class="btn-text">Modifier</span><svg class="mobile-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
-                <button class="btn btn-danger btn-small icon-btn-mobile" title="Supprimer" onclick="deleteTransaction('${t.id}')"><span class="btn-text">Supprimer</span><svg class="mobile-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
+                <div style="display: flex; gap: 0.2rem; flex-wrap: wrap;">
+                    <button class="btn btn-secondary btn-small icon-btn-mobile" title="Modifier" onclick="editTransaction('${t.id}')"><span class="btn-text">Modifier</span><svg class="mobile-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
+                    ${t.type === 'expense' ? `<button class="btn btn-small icon-btn-mobile" style="background-color: var(--success-color); color: white;" title="Remboursement" onclick="addRefund('${t.id}')"><span class="btn-text">💰</span><svg class="mobile-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></button>` : ''}
+                    <button class="btn btn-danger btn-small icon-btn-mobile" title="Supprimer" onclick="deleteTransaction('${t.id}')"><span class="btn-text">Supprimer</span><svg class="mobile-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
+                </div>
             </td>
         `;
         tbody.appendChild(tr);
@@ -428,8 +455,87 @@ function updateFilterChips() {
     tagsContainer.innerHTML = tagChipsHtml;
 }
 
+window.addRefund = function(expenseId) {
+    const expense = appData.transactions.find(t => t.id === expenseId);
+    if (!expense) return;
+
+    // Detect current view
+    let activeSection = null;
+    document.querySelectorAll('.view-section').forEach(sec => {
+        if (sec.classList.contains('active')) {
+            activeSection = sec.id;
+        }
+    });
+
+    if (activeSection === 'transactions') {
+        const modalTitle = document.getElementById('mobile-modal-title');
+        const mobileModal = document.getElementById('mobile-form-modal');
+        const mobileModalContainer = document.getElementById('mobile-form-container');
+        const formOriginalParents = {
+            'form-transaction': document.querySelector('#transactions .form-panel'),
+            'form-subscription': document.querySelector('#subscriptions .form-panel')
+        };
+
+        if (window.innerWidth <= 768) {
+            modalTitle.textContent = "Ajouter un remboursement";
+            if (formOriginalParents['form-transaction'].parentElement !== mobileModalContainer) {
+                mobileModalContainer.appendChild(formOriginalParents['form-transaction']);
+            }
+            mobileModal.classList.add('active');
+        } else {
+            // Desktop
+            openEditModal('form-transaction', "Ajouter un remboursement");
+        }
+    }
+
+    resetTransactionForm();
+
+    // Set form to income
+    document.getElementById('trans-type').value = 'income';
+    document.getElementById('trans-type').dispatchEvent(new Event('change'));
+
+    // Pre-fill fields
+    document.getElementById('trans-date').value = new Date().toISOString().split('T')[0];
+
+    // We cannot pre-fill with an expense category since the type is now 'income'.
+    // We'll leave it blank or let the user choose an appropriate income category.
+    document.getElementById('trans-category').value = '';
+
+    document.getElementById('trans-note').value = `Remboursement: ${expense.note || getCategoryPath(expense.categoryId)}`;
+
+    // Wait slightly for DOM to update from the 'change' event to set linked expense
+    setTimeout(() => {
+        // Create a fake option if it doesn't exist so it can be selected immediately
+        // The real list is populated asynchronously or might not contain it if > 6 months
+        const select = document.getElementById('trans-linked-expense');
+        if (!Array.from(select.options).some(opt => opt.value === expenseId)) {
+            const opt = document.createElement('option');
+            opt.value = expenseId;
+            opt.textContent = `${expense.date} - ${getCategoryPath(expense.categoryId)} - ${expense.note ? expense.note + ' - ' : ''}${expense.amount.toFixed(2)}€`;
+            select.appendChild(opt);
+        }
+        select.value = expenseId;
+
+        // Optionally pre-fill amount with the remaining unrefunded amount
+        const effectiveTrans = getEffectiveTransactions();
+        const effectiveExp = effectiveTrans.find(t => t.id === expenseId);
+        if (effectiveExp) {
+            document.getElementById('trans-amount').value = effectiveExp.amount.toFixed(2);
+        } else {
+            document.getElementById('trans-amount').value = expense.amount.toFixed(2);
+        }
+    }, 100);
+}
+
 async function deleteTransaction(id) {
     if (confirm("Supprimer cette transaction ?")) {
+        // Also remove linkedExpenseId from any refunds that were linked to this expense
+        appData.transactions.forEach(t => {
+            if (t.linkedExpenseId === id) {
+                delete t.linkedExpenseId;
+            }
+        });
+
         appData.transactions = appData.transactions.filter(t => t.id !== id);
         if(typeof updateInvestmentsStatus === 'function') updateInvestmentsStatus();
         await saveData();
@@ -508,6 +614,12 @@ function editTransaction(id) {
     document.getElementById('trans-selected-tags').value = JSON.stringify(trans.tagIds || []);
     renderTransactionTagsSelector();
 
+    if (trans.type === 'income' && trans.linkedExpenseId) {
+        document.getElementById('trans-linked-expense').value = trans.linkedExpenseId;
+    } else {
+        document.getElementById('trans-linked-expense').value = '';
+    }
+
     // Changer l'état des boutons
     document.getElementById('btn-submit-trans').textContent = "Mettre à jour";
     document.getElementById('btn-cancel-edit-trans').style.display = 'none'; // Pas besoin dans la modale, on a la croix
@@ -531,6 +643,7 @@ function resetTransactionForm() {
     const cancelBtn = document.getElementById('btn-cancel-edit-trans');
     if (cancelBtn) cancelBtn.style.display = 'none';
     document.getElementById('trans-mv-part').value = '';
+    document.getElementById('trans-linked-expense').value = '';
     document.getElementById('trans-investment-id').value = '';
     document.getElementById('trans-investment-name').value = '';
     document.getElementById('trans-investment-type').value = 'metaux';
@@ -748,7 +861,8 @@ async function deleteSubscription(id) {
 // --- DASHBOARD & CHARTS MANAGEMENT ---
 function getMonthData(year, month) {
     const prefix = `${year}-${String(month).padStart(2, '0')}`;
-    const trans = appData.transactions.filter(t => t.date.startsWith(prefix));
+    const effectiveTrans = getEffectiveTransactions();
+    const trans = effectiveTrans.filter(t => t.date.startsWith(prefix));
 
     let income = 0;
     let expense = 0;
@@ -796,7 +910,8 @@ function getMonthData(year, month) {
 
 function getSpecificMonthsCategoryData(monthPrefixes) {
     // Filter transactions by these prefixes
-    const trans = appData.transactions.filter(t =>
+    const effectiveTrans = getEffectiveTransactions();
+    const trans = effectiveTrans.filter(t =>
         monthPrefixes.some(prefix => t.date && t.date.startsWith(prefix))
     );
 
@@ -1455,9 +1570,10 @@ function drawHorizontalBarChart(canvasId, dataObj) {
 
 function renderSavings() {
     let allMonths = new Set();
+    const effectiveTrans = getEffectiveTransactions();
 
     // Add all months with transactions
-    appData.transactions.forEach(t => {
+    effectiveTrans.forEach(t => {
         if (t.date && t.date.length >= 7) {
             allMonths.add(t.date.substring(0, 7));
         }
@@ -2048,8 +2164,55 @@ function updateCategorySelects() {
             if(investmentGroup) investmentGroup.style.display = 'none';
         }
 
+        const linkedExpenseGroup = document.getElementById('trans-linked-expense-group');
+        if (linkedExpenseGroup) {
+            if (type === 'income') {
+                linkedExpenseGroup.style.display = 'block';
+                populateLinkedExpenseSelect();
+            } else {
+                linkedExpenseGroup.style.display = 'none';
+            }
+        }
+
         updateMvFormFields();
     });
+
+    function populateLinkedExpenseSelect() {
+        const select = document.getElementById('trans-linked-expense');
+        if (!select) return;
+        const currentValue = select.value;
+        select.innerHTML = '<option value="">-- Aucune (Revenu standard) --</option>';
+
+        // Show recent expenses (e.g. last 6 months)
+        const cutoffDate = new Date();
+        cutoffDate.setMonth(cutoffDate.getMonth() - 6);
+        const recentExpenses = appData.transactions
+            .filter(t => t.type === 'expense' && new Date(t.date) >= cutoffDate)
+            .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        recentExpenses.forEach(exp => {
+            const opt = document.createElement('option');
+            opt.value = exp.id;
+            const categoryName = getCategoryPath(exp.categoryId);
+            opt.textContent = `${exp.date} - ${categoryName} - ${exp.note ? exp.note + ' - ' : ''}${exp.amount.toFixed(2)}€`;
+            select.appendChild(opt);
+        });
+
+        if (currentValue) {
+            // If the currently selected value is older than 6 months it won't be in the list, so we add it manually
+            if (!recentExpenses.some(t => t.id === currentValue)) {
+                const exp = appData.transactions.find(t => t.id === currentValue);
+                if (exp) {
+                    const opt = document.createElement('option');
+                    opt.value = exp.id;
+                    const categoryName = getCategoryPath(exp.categoryId);
+                    opt.textContent = `${exp.date} - ${categoryName} - ${exp.note ? exp.note + ' - ' : ''}${exp.amount.toFixed(2)}€`;
+                    select.appendChild(opt);
+                }
+            }
+            select.value = currentValue;
+        }
+    }
 
     document.getElementById('trans-investment-id').addEventListener('change', (e) => {
         const newFields = document.getElementById('trans-investment-new-fields');
@@ -2252,6 +2415,43 @@ function renderCategoryTree() {
     };
 
     buildTree(null, container);
+}
+
+/**
+ * Processes appData.transactions to apply refunds to their linked expenses.
+ * - Reduces the amount of the linked expense by the refund amount (min 0).
+ * - Removes the refund transaction from the returned list (since it's applied retroactively).
+ * @param {Array} transactions - The list of transactions to process (defaults to appData.transactions)
+ * @returns {Array} - The effective list of transactions.
+ */
+function getEffectiveTransactions(transactions = appData.transactions) {
+    if (!transactions) return [];
+
+    const effectiveTrans = JSON.parse(JSON.stringify(transactions)); // Deep copy to avoid mutating appData
+    const refundsByExpense = {};
+    const refundsToRemove = new Set();
+
+    // 1. Identify refunds
+    effectiveTrans.forEach(t => {
+        if (t.type === 'income' && t.linkedExpenseId) {
+            refundsToRemove.add(t.id);
+            if (!refundsByExpense[t.linkedExpenseId]) {
+                refundsByExpense[t.linkedExpenseId] = 0;
+            }
+            refundsByExpense[t.linkedExpenseId] += t.amount;
+        }
+    });
+
+    // 2. Apply refunds to expenses and filter out the refund transactions
+    return effectiveTrans
+        .filter(t => !refundsToRemove.has(t.id))
+        .map(t => {
+            if (t.type === 'expense' && refundsByExpense[t.id]) {
+                t.amount = Math.max(0, t.amount - refundsByExpense[t.id]);
+                t.isRefunded = true; // Mark it so UI could know if needed in other places, though renderTransactions uses raw data.
+            }
+            return t;
+        });
 }
 
 async function deleteCategory(id) {
@@ -2848,6 +3048,14 @@ document.addEventListener('DOMContentLoaded', () => {
             tagIds = JSON.parse(document.getElementById('trans-selected-tags').value);
         } catch(e) {}
 
+        let linkedExpenseId = undefined;
+        if (type === 'income') {
+            const linkedSelect = document.getElementById('trans-linked-expense');
+            if (linkedSelect && linkedSelect.value) {
+                linkedExpenseId = linkedSelect.value;
+            }
+        }
+
         let investmentId = undefined;
 
         if (type === 'investment_transfer' || type === 'investment_return') {
@@ -2897,7 +3105,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     categoryId,
                     note,
                     tagIds,
-                    investmentId
+                    investmentId,
+                    linkedExpenseId
                 };
             }
         } else {
@@ -2912,7 +3121,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 categoryId,
                 note,
                 tagIds,
-                investmentId
+                investmentId,
+                linkedExpenseId
             };
             appData.transactions.push(newTrans);
         }

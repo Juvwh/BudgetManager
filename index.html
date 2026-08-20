@@ -434,6 +434,14 @@
                                 💡 Vous avez des chèques repas disponibles. N'oubliez pas de renseigner ce champ si vous en avez utilisé.
                             </div>
                         </div>
+                        <div class="form-group" id="trans-linked-expense-group" style="display: none; background-color: rgba(var(--success-color-rgb, 40, 167, 69), 0.05); padding: 0.5rem; border-radius: 8px; border-left: 3px solid var(--success-color);">
+                            <label style="color: var(--success-color);">Lié à une dépense (Remboursement rétroactif)</label>
+                            <select id="trans-linked-expense">
+                                <option value="">-- Aucune (Revenu standard) --</option>
+                                <!-- Injected by JS -->
+                            </select>
+                            <small>Le montant de ce revenu viendra déduire le coût de la dépense sélectionnée dans vos statistiques.</small>
+                        </div>
                         <div class="form-group">
                             <label>Tags</label>
                             <div id="trans-tags-container" class="tags-container" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
