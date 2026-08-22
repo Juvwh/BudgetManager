@@ -1026,6 +1026,37 @@
                 <h3>Arborescence</h3>
                 <small class="muted">Glissez-déposez pour réorganiser</small>
             </div>
+
+            <div class="cat-toolbar">
+                <div class="form-group">
+                    <label for="cat-period">Période</label>
+                    <select id="cat-period">
+                        <option value="all">Tout l'historique</option>
+                        <option value="current_month">Mois en cours</option>
+                        <option value="last_3">3 derniers mois</option>
+                        <option value="last_6">6 derniers mois</option>
+                        <option value="last_12">12 derniers mois</option>
+                        <option value="current_year">Année en cours</option>
+                        <option value="custom">Intervalle personnalisé</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="cat-search">Rechercher</label>
+                    <input type="search" id="cat-search" placeholder="Nom de catégorie…">
+                </div>
+                <div id="cat-custom-dates" class="cat-toolbar-dates" style="display: none;">
+                    <div class="form-group">
+                        <label for="cat-date-start">Du</label>
+                        <input type="date" id="cat-date-start">
+                    </div>
+                    <div class="form-group">
+                        <label for="cat-date-end">Au</label>
+                        <input type="date" id="cat-date-end">
+                    </div>
+                </div>
+            </div>
+
+            <div id="cat-summary" class="cat-summary"></div>
             <div id="category-tree"></div>
         </div>
     </div>

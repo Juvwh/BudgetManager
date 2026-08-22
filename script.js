@@ -1255,7 +1255,7 @@ function attachChartClickListener(canvasId) {
     });
 }
 
-function showCategoryDetails(categoryName, totalAmount) {
+function showCategoryDetails(categoryName, totalAmount, options = {}) {
     // Determine the source view (dashboard or charts)
     const isChartsView = document.querySelector('#charts').classList.contains('active');
 
@@ -1311,8 +1311,26 @@ function showCategoryDetails(categoryName, totalAmount) {
     window.currentModalIsMainCategory = isMainCategory;
 
     // Reset filters to default state
-    document.getElementById('data-modal-period').value = 'inherited';
+    const periodField = document.getElementById('data-modal-period');
+    const startField = document.getElementById('data-modal-date-start');
+    const endField = document.getElementById('data-modal-date-end');
+
     document.getElementById('data-modal-cat-mode').value = 'with_subcategories';
+    startField.value = '';
+    endField.value = '';
+
+    if (options.dateStart || options.dateEnd) {
+        // Période imposée par l'appelant (écran Catégories) : on la reporte tel quel
+        periodField.value = 'custom';
+        startField.value = options.dateStart || '';
+        endField.value = options.dateEnd || '';
+    } else if (options.allTime || filterPrefixes.length === 0) {
+        // Sans période héritée exploitable, « Période du tableau de bord » ne
+        // filtrerait plus rien du tout et l'historique s'afficherait vide.
+        periodField.value = 'all_time';
+    } else {
+        periodField.value = 'inherited';
+    }
 
     // Call render to build the modal contents
     renderCategoryModal();
@@ -1362,9 +1380,16 @@ function renderCategoryModal() {
     const dateStart = dateStartInput.value;
     const dateEnd = dateEndInput.value;
 
+    // Une catégorie de revenu ne contient pas de dépenses : on adapte les types
+    // retenus, sinon la modale reste désespérément vide.
+    const isIncomeCategory = getCategoryTypeByPath(categoryName) === 'income';
+    const matchesType = t => isIncomeCategory
+        ? (t.type === 'income' || t.type === 'salary')
+        : t.type === 'expense';
+
     // Filter transactions
     const trans = appData.transactions.filter(t => {
-        if (t.type !== 'expense') return false;
+        if (!matchesType(t)) return false;
 
         const catPath = getCategoryPath(t.categoryId);
 
@@ -1428,8 +1453,8 @@ function renderCategoryModal() {
 
     // Update UI
     const totalSpan = document.getElementById('data-modal-total');
-    totalSpan.textContent = '-' + totalAmount.toFixed(2) + ' €';
-    totalSpan.className = 'text-red';
+    totalSpan.textContent = (isIncomeCategory ? '+' : '-') + totalAmount.toFixed(2) + ' €';
+    totalSpan.className = isIncomeCategory ? 'text-green' : 'text-red';
 
     const totalLabel = document.getElementById('data-modal-total-label');
     if (totalLabel) {
@@ -1438,7 +1463,7 @@ function renderCategoryModal() {
             : 'Total :';
     }
 
-    renderCategoryBreakdown(categoryName, trans, isMainCategory && catMode === 'with_subcategories');
+    renderCategoryBreakdown(categoryName, trans, isMainCategory && catMode === 'with_subcategories', isIncomeCategory);
 
     const tbody = document.querySelector('#table-modal-transactions tbody');
     tbody.innerHTML = '';
@@ -1474,7 +1499,7 @@ function renderCategoryModal() {
  * (sous-arbre complet inclus). Les transactions reçues sont déjà filtrées
  * par période et par mode d'inclusion.
  */
-function renderCategoryBreakdown(categoryName, trans, enabled) {
+function renderCategoryBreakdown(categoryName, trans, enabled, isIncome = false) {
     const container = document.getElementById('data-modal-breakdown');
     if (!container) return;
 
@@ -1520,7 +1545,7 @@ function renderCategoryBreakdown(categoryName, trans, enabled) {
             <div class="breakdown-row">
                 <span class="breakdown-label">${label}</span>
                 <span class="breakdown-share">${share.toFixed(0)}%</span>
-                <span class="breakdown-amount text-red">-${amount.toFixed(2)} €</span>
+                <span class="breakdown-amount ${isIncome ? 'text-green' : 'text-red'}">${isIncome ? '+' : '-'}${amount.toFixed(2)} €</span>
             </div>`;
     };
 
@@ -2486,6 +2511,17 @@ function updateHorizontalBarChart(year, month) {
 
 // --- INITIALIZATION ---
 // --- CATEGORIES MANAGEMENT ---
+/** Retourne la catégorie correspondant à un chemin complet « Parent > Enfant ». */
+function getCategoryByPath(path) {
+    return appData.categories.find(c => getCategoryPath(c.id) === path) || null;
+}
+
+/** Type ('expense' par défaut) de la catégorie désignée par son chemin complet. */
+function getCategoryTypeByPath(path) {
+    const cat = getCategoryByPath(path);
+    return cat ? cat.type : 'expense';
+}
+
 function getCategoryPath(catId, visited = new Set(), forTable = false) {
     const cat = appData.categories.find(c => c.id === catId);
     if (!cat) return 'Inconnu';
@@ -2733,7 +2769,7 @@ function renderCategoryTree() {
         e.dataTransfer.dropEffect = 'move';
 
         // Add visual cue
-        const dropTarget = e.target.closest('.cat-dropzone');
+        const dropTarget = e.target.closest('.cat-dropzone, .cat-drop-target');
         if (dropTarget) {
             const targetId = dropTarget.dataset.id;
             // Prevent dropping into itself or its descendants
@@ -2746,7 +2782,7 @@ function renderCategoryTree() {
     };
 
     const handleDragLeave = (e) => {
-        const dropTarget = e.target.closest('.cat-dropzone');
+        const dropTarget = e.target.closest('.cat-dropzone, .cat-drop-target');
         if (dropTarget) {
             dropTarget.classList.remove('drop-hover');
             dropTarget.classList.remove('drop-invalid');
@@ -2755,7 +2791,7 @@ function renderCategoryTree() {
 
     const handleDrop = async (e, targetId) => {
         e.preventDefault();
-        const dropTarget = e.target.closest('.cat-dropzone');
+        const dropTarget = e.target.closest('.cat-dropzone, .cat-drop-target');
         if (dropTarget) {
             dropTarget.classList.remove('drop-hover');
             dropTarget.classList.remove('drop-invalid');
@@ -2809,8 +2845,25 @@ function renderCategoryTree() {
 
     container.appendChild(rootDropzone);
 
+    // Totaux de la période sélectionnée + filtre de recherche
+    const range = getCategoryTreeRange();
+    const totals = computeCategoryTotals(range);
+    const searchInput = document.getElementById('cat-search');
+    // Recherche insensible à la casse et aux accents (« hot » trouve « Hôtel »)
+    const normalize = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const search = normalize((searchInput ? searchInput.value : '').trim());
+
+    const matchesSearch = (catId) => {
+        if (!search) return true;
+        const cat = appData.categories.find(c => c.id === catId);
+        if (cat && normalize(cat.name).includes(search)) return true;
+        return appData.categories.some(c => c.parentId === catId && matchesSearch(c.id));
+    };
+
     const buildTree = (parentId, parentElement) => {
-        const children = appData.categories.filter(c => c.parentId === parentId);
+        const children = appData.categories
+            .filter(c => c.parentId === parentId)
+            .filter(c => matchesSearch(c.id));
 
         if (children.length === 0) return;
 
@@ -2824,7 +2877,7 @@ function renderCategoryTree() {
             wrapper.className = 'cat-wrapper';
 
             const el = document.createElement('div');
-            el.className = 'cat-item cat-dropzone';
+            el.className = 'cat-item cat-drop-target';
             el.draggable = true;
             el.dataset.id = cat.id;
 
@@ -2834,28 +2887,205 @@ function renderCategoryTree() {
             el.addEventListener('dragleave', handleDragLeave);
             el.addEventListener('drop', (e) => handleDrop(e, cat.id));
 
-            const badge = `<span class="cat-type-badge ${cat.type === 'income' ? 'badge-income' : 'badge-expense'}">${cat.type === 'income' ? 'Revenu' : 'Dépense'}</span>`;
+            const hasChildren = appData.categories.some(c => c.parentId === cat.id);
+            // Une recherche active déplie tout, sinon on respecte le choix de l'utilisateur
+            const collapsed = hasChildren && !search && collapsedCategories.has(cat.id);
+
+            const isIncome = cat.type === 'income';
+            const stats = totals[cat.id] || { own: 0, subtree: 0 };
+            const sign = isIncome ? '+' : '-';
+            const amountClass = isIncome ? 'text-green' : 'text-red';
+            const zero = stats.subtree === 0;
+
+            const toggle = hasChildren
+                ? `<button type="button" class="cat-toggle${collapsed ? ' is-collapsed' : ''}" aria-label="Plier ou déplier">
+                       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                   </button>`
+                : '<span class="cat-toggle-spacer"></span>';
+
+            const badge = !parentId
+                ? `<span class="cat-type-badge ${isIncome ? 'badge-income' : 'badge-expense'}">${isIncome ? 'Revenu' : 'Dépense'}</span>`
+                : '';
+
+            // Pour un parent, on affiche le cumul du sous-arbre et, s'il diffère,
+            // la part imputée directement à la catégorie elle-même.
+            const showOwn = hasChildren && stats.own > 0 && stats.own !== stats.subtree;
+            const amountBlock = `
+                <span class="cat-amounts">
+                    <span class="cat-amount ${zero ? 'is-zero' : amountClass}">${zero ? '0.00 €' : sign + stats.subtree.toFixed(2) + ' €'}</span>
+                    ${showOwn ? `<span class="cat-amount-own">dont ${stats.own.toFixed(2)} € en direct</span>` : ''}
+                </span>`;
 
             const fullPath = getCategoryPath(cat.id);
             el.innerHTML = `
-                <div style="cursor: pointer; flex-grow: 1;" onclick="showCategoryDetails('${fullPath}', 0)">
-                    <span class="drag-handle" style="cursor: grab;" onclick="event.stopPropagation()">☰</span>
-                    <strong style="color: var(--primary-color);">${cat.name}</strong> ${!parentId ? badge : ''}
-                </div>
-                <button class="btn btn-danger btn-small" onclick="deleteCategory('${cat.id}')">Supprimer</button>
+                <span class="drag-handle" title="Glisser pour déplacer">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>
+                </span>
+                ${toggle}
+                <button type="button" class="cat-name-btn" title="Voir le détail des transactions">
+                    <span class="cat-name">${cat.name}</span>
+                    ${badge}
+                </button>
+                ${amountBlock}
+                <button type="button" class="cat-delete" title="Supprimer la catégorie" aria-label="Supprimer ${cat.name}">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+                </button>
             `;
+
+            el.querySelector('.cat-name-btn').addEventListener('click', () => {
+                showCategoryDetails(fullPath, 0, {
+                    dateStart: range.start,
+                    dateEnd: range.end,
+                    allTime: !range.start && !range.end
+                });
+            });
+
+            el.querySelector('.cat-delete').addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteCategory(cat.id);
+            });
+
+            const toggleBtn = el.querySelector('.cat-toggle');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (collapsedCategories.has(cat.id)) {
+                        collapsedCategories.delete(cat.id);
+                    } else {
+                        collapsedCategories.add(cat.id);
+                    }
+                    renderCategoryTree();
+                });
+            }
 
             wrapper.appendChild(el);
             childrenContainer.appendChild(wrapper);
 
             // Recursively build children inside this wrapper
-            buildTree(cat.id, wrapper);
+            if (!collapsed) buildTree(cat.id, wrapper);
         });
 
         parentElement.appendChild(childrenContainer);
     };
 
     buildTree(null, container);
+
+    if (!container.querySelector('.cat-item')) {
+        const empty = document.createElement('p');
+        empty.className = 'muted cat-empty';
+        empty.textContent = search
+            ? 'Aucune catégorie ne correspond à cette recherche.'
+            : 'Aucune catégorie pour le moment.';
+        container.appendChild(empty);
+    }
+
+    renderCategorySummary(totals, range);
+}
+
+
+/** Catégories repliées dans l'arborescence des réglages (état d'affichage seulement). */
+const collapsedCategories = new Set();
+
+/**
+ * Intervalle de dates ({start, end} au format YYYY-MM-DD, null = borne ouverte)
+ * choisi dans la barre d'outils de l'écran Catégories.
+ */
+function getCategoryTreeRange() {
+    const select = document.getElementById('cat-period');
+    const mode = select ? select.value : 'all';
+    const now = new Date();
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const monthsBack = (n) => iso(new Date(now.getFullYear(), now.getMonth() - n + 1, 1));
+
+    switch (mode) {
+        case 'current_month':
+            return { start: iso(new Date(now.getFullYear(), now.getMonth(), 1)), end: iso(now), label: 'Mois en cours' };
+        case 'last_3':
+            return { start: monthsBack(3), end: iso(now), label: '3 derniers mois' };
+        case 'last_6':
+            return { start: monthsBack(6), end: iso(now), label: '6 derniers mois' };
+        case 'last_12':
+            return { start: monthsBack(12), end: iso(now), label: '12 derniers mois' };
+        case 'current_year':
+            return { start: `${now.getFullYear()}-01-01`, end: iso(now), label: 'Année en cours' };
+        case 'custom': {
+            const start = document.getElementById('cat-date-start');
+            const end = document.getElementById('cat-date-end');
+            return {
+                start: start && start.value ? start.value : null,
+                end: end && end.value ? end.value : null,
+                label: 'Intervalle personnalisé'
+            };
+        }
+        default:
+            return { start: null, end: null, label: "Tout l'historique" };
+    }
+}
+
+/**
+ * Totaux par catégorie sur un intervalle de dates.
+ * @returns {Object} catId -> { own, subtree } ; `own` ne compte que les
+ *          transactions imputées directement à la catégorie, `subtree` y ajoute
+ *          celles de toutes ses descendantes.
+ */
+function computeCategoryTotals(range) {
+    const totals = {};
+    appData.categories.forEach(c => { totals[c.id] = { own: 0, subtree: 0 }; });
+
+    const chartMode = window.currentChartMode || 'real';
+
+    getEffectiveTransactions().forEach(t => {
+        if (!t.categoryId || !totals[t.categoryId]) return;
+        if (t.type === 'investment_transfer' || t.type === 'investment_return') return;
+        if (range.start && (!t.date || t.date < range.start)) return;
+        if (range.end && (!t.date || t.date > range.end)) return;
+
+        let amount = Math.abs(t.amount);
+        if (t.type === 'expense' && chartMode === 'real' && t.mealVoucherPart > 0) {
+            amount -= t.mealVoucherPart;
+        }
+
+        totals[t.categoryId].own += amount;
+
+        // Remonter la chaîne des parents pour alimenter les cumuls
+        let current = t.categoryId;
+        const seen = new Set();
+        while (current && totals[current] && !seen.has(current)) {
+            seen.add(current);
+            totals[current].subtree += amount;
+            const cat = appData.categories.find(c => c.id === current);
+            current = cat ? cat.parentId : null;
+        }
+    });
+
+    return totals;
+}
+
+/** Bandeau récapitulatif au-dessus de l'arborescence (dépenses / revenus de la période). */
+function renderCategorySummary(totals, range) {
+    const box = document.getElementById('cat-summary');
+    if (!box) return;
+
+    let expense = 0;
+    let income = 0;
+    appData.categories.forEach(c => {
+        if (c.parentId) return; // les racines cumulent déjà leurs descendantes
+        const stats = totals[c.id];
+        if (!stats) return;
+        if (c.type === 'income') income += stats.subtree;
+        else expense += stats.subtree;
+    });
+
+    const periodText = (range.start || range.end)
+        ? `${range.label} (${range.start || '…'} → ${range.end || '…'})`
+        : range.label;
+
+    box.innerHTML = `
+        <div class="cat-summary-period">${periodText}</div>
+        <div class="cat-summary-figures">
+            <span>Dépenses <strong class="text-red">-${expense.toFixed(2)} €</strong></span>
+            <span>Revenus <strong class="text-green">+${income.toFixed(2)} €</strong></span>
+        </div>`;
 }
 
 /**
@@ -3428,6 +3658,29 @@ document.addEventListener('DOMContentLoaded', () => {
         updateCategorySelects();
         renderCategoryTree();
     });
+
+    // 4.4b Barre d'outils de l'arborescence : période et recherche
+    const catPeriodSelect = document.getElementById('cat-period');
+    if (catPeriodSelect) {
+        const syncCustomDates = () => {
+            const box = document.getElementById('cat-custom-dates');
+            if (box) box.style.display = catPeriodSelect.value === 'custom' ? 'flex' : 'none';
+        };
+        syncCustomDates();
+
+        catPeriodSelect.addEventListener('change', () => {
+            syncCustomDates();
+            renderCategoryTree();
+        });
+
+        ['cat-date-start', 'cat-date-end'].forEach(id => {
+            const input = document.getElementById(id);
+            if (input) input.addEventListener('change', renderCategoryTree);
+        });
+
+        const catSearch = document.getElementById('cat-search');
+        if (catSearch) catSearch.addEventListener('input', renderCategoryTree);
+    }
 
 
     // 4.5 Handle Tags creation

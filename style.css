@@ -1187,6 +1187,7 @@ main#app-content {
 }
 
 .form-group input[type="text"],
+.form-group input[type="search"],
 .form-group input[type="number"],
 .form-group input[type="date"],
 .form-group input[type="month"],
@@ -1532,6 +1533,38 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
 /* -------------------------------------------------------------------------
    13. ARBORESCENCE DES CATÉGORIES
    ------------------------------------------------------------------------- */
+.cat-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+    padding-bottom: 0.9rem;
+    margin-bottom: 0.9rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.cat-toolbar .form-group { margin-bottom: 0; flex: 1 1 180px; min-width: 150px; }
+.cat-toolbar-dates { display: flex; gap: 0.75rem; flex: 1 1 100%; }
+.cat-toolbar-dates .form-group { flex: 1 1 140px; }
+
+.cat-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    padding: 0.6rem 0.85rem;
+    margin-bottom: 0.9rem;
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+}
+
+.cat-summary-period { font-size: 0.82rem; color: var(--text-muted); }
+.cat-summary-figures { display: flex; gap: 1rem; font-size: 0.88rem; }
+.cat-summary-figures strong { font-variant-numeric: tabular-nums; }
+
+.cat-empty { margin-top: 0.9rem; text-align: center; }
+
 .cat-wrapper { margin-bottom: 2px; }
 
 .cat-children-container {
@@ -1543,26 +1576,117 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
 .cat-item {
     display: flex;
     align-items: center;
-    gap: 0.55rem;
-    padding: 0.5rem 0.65rem;
+    gap: 0.5rem;
+    padding: 0.45rem 0.6rem;
     border-radius: var(--r-md);
     background: var(--surface-2);
     border: 1px solid transparent;
     margin-bottom: 3px;
+    transition: border-color 0.12s ease, background-color 0.12s ease;
 }
 
-.cat-item:hover { border-color: var(--border-color); }
+.cat-item:hover { border-color: var(--border-strong); }
 .cat-item.dragging { opacity: 0.45; }
+.cat-item.drop-hover { border-color: var(--accent-color); background: var(--accent-soft); }
+.cat-item.drop-invalid { border-color: var(--danger-color); }
 
 .drag-handle {
+    display: inline-flex;
+    align-items: center;
     cursor: grab;
     color: var(--text-muted);
-    opacity: 0;
+    opacity: 0.35;
     transition: opacity 0.15s ease;
     user-select: none;
+    flex: 0 0 auto;
 }
 
 .cat-item:hover .drag-handle { opacity: 1; }
+
+.cat-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    flex: 0 0 auto;
+    padding: 0;
+    border: none;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: transform 0.15s ease, background-color 0.12s ease;
+}
+
+.cat-toggle:hover { background: var(--card-bg); color: var(--text-color); }
+.cat-toggle.is-collapsed { transform: rotate(-90deg); }
+.cat-toggle-spacer { width: 20px; flex: 0 0 auto; }
+
+.cat-name-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0.15rem 0.2rem;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    border-radius: var(--r-sm);
+}
+
+.cat-name {
+    font-weight: 650;
+    color: var(--accent-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cat-name-btn:hover .cat-name { text-decoration: underline; }
+
+.cat-amounts {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    flex: 0 0 auto;
+    line-height: 1.25;
+}
+
+.cat-amount { font-weight: 650; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.cat-amount.is-zero { color: var(--text-muted); font-weight: 500; }
+.cat-amount-own { font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; }
+
+.cat-delete {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    flex: 0 0 auto;
+    padding: 0;
+    border: none;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    opacity: 0.3;
+    transition: opacity 0.15s ease, background-color 0.12s ease, color 0.12s ease;
+}
+
+.cat-item:hover .cat-delete,
+.cat-delete:focus-visible { opacity: 1; }
+.cat-delete:hover { background: var(--danger-soft, rgba(220, 53, 69, 0.12)); color: var(--danger-color); }
+
+/* Sur écran tactile, il n'y a pas de survol : la corbeille reste visible */
+@media (hover: none) {
+    .cat-delete { opacity: 0.6; }
+    .drag-handle { opacity: 0.6; }
+}
 
 .cat-dropzone {
     height: 8px;
@@ -1574,8 +1698,10 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
 .cat-dropzone.drop-invalid { background: var(--danger-color); height: 12px; }
 
 .root-dropzone {
-    margin-top: 0.75rem;
-    padding: 0.85rem;
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    padding: 0.7rem;
+    height: auto;
     border: 2px dashed var(--border-strong);
     border-radius: var(--r-md);
     text-align: center;
@@ -1583,7 +1709,12 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
     font-size: 0.85rem;
 }
 
-.root-dropzone.drop-hover { border-color: var(--accent-color); color: var(--accent-color); background: var(--accent-soft); }
+.root-dropzone.drop-hover { border-color: var(--accent-color); color: var(--accent-color); background: var(--accent-soft); height: auto; }
+
+@media (max-width: 560px) {
+    .cat-amount-own { display: none; }
+    .cat-name { white-space: normal; }
+}
 
 /* -------------------------------------------------------------------------
    14. INVESTISSEMENTS
