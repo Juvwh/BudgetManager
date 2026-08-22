@@ -775,65 +775,145 @@ async function processSubscriptions() {
 }
 
 function renderSubscriptions() {
-    const tbody = document.querySelector('#table-subscriptions tbody');
-    tbody.innerHTML = '';
+    const list = document.getElementById('subscriptions-list');
+    if (!list) return;
+    list.innerHTML = '';
 
-    // Sort to put completed ones at the end
     const sortedSubs = [...appData.subscriptions].sort((a, b) => {
         if (a.status === 'completed' && b.status !== 'completed') return 1;
         if (a.status !== 'completed' && b.status === 'completed') return -1;
-        return 0;
+        const da = a.nextDate || a.startDate || '';
+        const db = b.nextDate || b.startDate || '';
+        return da < db ? -1 : (da > db ? 1 : 0);
     });
+
+    // Bandeau de synthèse : poids mensuel des récurrences
+    const summaryEl = document.getElementById('subscriptions-summary');
+    if (summaryEl) {
+        let monthlyExpense = 0;
+        let monthlyIncome = 0;
+        appData.subscriptions.forEach(sub => {
+            if (sub.status === 'completed') return;
+            const amount = Number(sub.amount) || 0;
+            let perMonth = amount;
+            if (sub.frequency === 'weekly') perMonth = amount * 52 / 12;
+            else if (sub.frequency === 'yearly') perMonth = amount / 12;
+            if (sub.type === 'income') monthlyIncome += perMonth;
+            else monthlyExpense += perMonth;
+        });
+        summaryEl.textContent = '-' + monthlyExpense.toFixed(2) + ' € / mois'
+            + (monthlyIncome > 0 ? '  ·  +' + monthlyIncome.toFixed(2) + ' € / mois' : '');
+    }
+
+    if (sortedSubs.length === 0) {
+        list.innerHTML = '<div class="feed-empty">Aucune récurrence. Ajoutez un abonnement ou un prélèvement pour qu\'il soit généré automatiquement.</div>';
+        return;
+    }
+
+    const ICONS = {
+        advance: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5l7 7-7 7"/><path d="M4 5l7 7-7 7"/></svg>',
+        history: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+        edit: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+        del: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>'
+    };
 
     sortedSubs.forEach(sub => {
-        const tr = document.createElement('tr');
         const isCorrupted = isNaN(sub.amount) || sub.amount === null || sub.amount === undefined || !sub.startDate;
         const isCompleted = sub.status === 'completed';
+        const isIncome = sub.type === 'income';
 
-        let freqText = '';
+        const card = document.createElement('div');
+        card.className = 'sub-card' + (isCompleted ? ' is-done' : '') + (isCorrupted ? ' is-corrupted' : '');
+        card.ondblclick = () => editSubscription(sub.id);
+
+        // Fréquence lisible
+        let freqText = 'Fréquence inconnue';
+        let freqShort = '?';
         if (sub.frequency === 'monthly' && sub.startDate) {
-            const day = parseInt(sub.startDate.split('-')[2], 10);
-            freqText = `Tous les ${day} du mois`;
-        } else {
-            const freqMap = { 'weekly': 'Hebdomadaire', 'monthly': 'Tous les X du mois', 'yearly': 'Annuelle', 'installments': 'En plusieurs fois' };
-            freqText = freqMap[sub.frequency] || sub.frequency;
+            freqText = 'Tous les ' + parseInt(sub.startDate.split('-')[2], 10) + ' du mois';
+            freqShort = 'M';
+        } else if (sub.frequency === 'weekly') {
+            freqText = 'Chaque semaine';
+            freqShort = 'S';
+        } else if (sub.frequency === 'yearly') {
+            freqText = 'Chaque année';
+            freqShort = 'A';
+        } else if (sub.frequency === 'installments') {
+            freqText = 'Paiement en plusieurs fois';
+            freqShort = 'X';
+        } else if (sub.frequency === 'monthly') {
+            freqText = 'Chaque mois';
+            freqShort = 'M';
         }
 
-        if (isCorrupted) {
-            tr.style.backgroundColor = 'rgba(255, 59, 48, 0.1)';
-            tr.style.borderLeft = '4px solid var(--danger-color)';
-        } else if (isCompleted) {
-            tr.style.opacity = '0.6';
-            tr.style.backgroundColor = 'var(--secondary-color)';
+        // Métadonnées secondaires
+        const meta = [freqText, getCategoryPath(sub.categoryId)];
+        if (!isCompleted && (sub.nextDate || sub.startDate)) {
+            meta.push('prochaine le ' + fmtShortDate(sub.nextDate || sub.startDate));
+        }
+        if (sub.endDate) meta.push('jusqu\'au ' + fmtShortDate(sub.endDate));
+
+        // Coût ramené au mois
+        let perMonthText = '';
+        const amount = Number(sub.amount) || 0;
+        if (!isCorrupted && !isCompleted) {
+            if (sub.frequency === 'weekly') perMonthText = '≈ ' + (amount * 52 / 12).toFixed(2) + ' € / mois';
+            else if (sub.frequency === 'yearly') perMonthText = '≈ ' + (amount / 12).toFixed(2) + ' € / mois';
         }
 
-        const formattedAmount = isCorrupted ? 'Erreur (NaN)' : `${Number(sub.amount).toFixed(2)} €`;
-        let displayName = sub.name || 'Sans Nom';
+        let badges = '';
+        if (isCompleted) badges += ' <span class="badge badge-closed">Terminé</span>';
+        if (isCorrupted) badges += ' <span class="cat-type-badge badge-expense">Corrompu</span>';
 
-        if (isCompleted) {
-            displayName += ' <span class="cat-type-badge" style="background-color: var(--text-color); margin-left: 5px;">Terminé</span>';
-        }
-        if (isCorrupted) {
-            displayName += ' <span class="cat-type-badge badge-expense" style="margin-left: 5px;">Corrompu</span>';
+        // Avancement des paiements en plusieurs fois
+        let progressHtml = '';
+        if (sub.frequency === 'installments' && sub.totalInstallments) {
+            const paid = sub.installmentsPaid || 0;
+            const pct = Math.min(100, (paid / sub.totalInstallments) * 100);
+            progressHtml =
+                '<div class="sub-progress">' +
+                    '<div class="sub-progress-head"><span>' + paid + ' / ' + sub.totalInstallments + ' mensualités</span>' +
+                    '<span>' + Math.round(pct) + '%</span></div>' +
+                    '<div class="bar-track"><div class="bar-value" style="width:' + pct + '%"></div></div>' +
+                '</div>';
         }
 
-        tr.innerHTML = `
-            <td data-label="Nom">${displayName}</td>
-            <td data-label="Type"><span class="${sub.type === 'income' ? 'text-green' : 'text-red'}">${sub.type === 'income' ? 'Revenu' : 'Dépense'}</span></td>
-            <td data-label="Fréquence">${freqText || 'Inconnue'}</td>
-            <td data-label="Montant" class="${sub.type === 'income' ? 'text-green' : 'text-red'}">${formattedAmount}</td>
-            <td data-label="Prochaine date">${isCompleted ? '-' : (sub.nextDate || sub.startDate || 'Erreur')}</td>
-            <td data-label="Date de fin">${sub.endDate || (sub.frequency === 'installments' && isCompleted ? 'Terminé' : '-')}</td>
-            <td data-label="Actions">
-                ${sub.frequency === 'installments' && !isCompleted ? `<button class="btn btn-small icon-btn-mobile" title="Avancer" style="background-color: var(--accent-color); color: white;" onclick="advanceSubscription('${sub.id}')"><span class="btn-text">Avancer</span><svg class="mobile-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5l7 7-7 7"/><path d="M4 5l7 7-7 7"/></svg></button>` : ''}
-                <button class="btn btn-primary btn-small icon-btn-mobile" title="Historique" onclick="viewSubscriptionHistory('${sub.id}')"><span class="btn-text">Historique</span><svg class="mobile-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></button>
-                <button class="btn btn-secondary btn-small icon-btn-mobile" title="Modifier" onclick="editSubscription('${sub.id}')"><span class="btn-text">Modifier</span><svg class="mobile-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
-                <button class="btn btn-danger btn-small icon-btn-mobile" title="Supprimer" onclick="deleteSubscription('${sub.id}')"><span class="btn-text">Supprimer</span><svg class="mobile-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
-            </td>
-        `;
-        tbody.appendChild(tr);
+        card.innerHTML =
+            '<div class="sub-icon ' + (isIncome ? 'is-in' : 'is-out') + '">' + freqShort + '</div>' +
+            '<div class="sub-main">' +
+                '<div class="sub-name">' + (sub.name || 'Sans nom') + badges + '</div>' +
+                '<div class="sub-meta">' + meta.join(' · ') + '</div>' +
+                progressHtml +
+            '</div>' +
+            '<div class="sub-right">' +
+                '<div class="sub-amount ' + (isIncome ? 'text-green' : 'text-red') + '">' +
+                    (isCorrupted ? 'Erreur (NaN)' : (isIncome ? '+' : '-') + amount.toFixed(2) + ' €') +
+                '</div>' +
+                (perMonthText ? '<div class="sub-permonth">' + perMonthText + '</div>' : '') +
+            '</div>' +
+            '<div class="sub-actions">' +
+                (sub.frequency === 'installments' && !isCompleted
+                    ? '<button class="icon-action is-advance" title="Avancer une mensualité" data-action="advance">' + ICONS.advance + '</button>' : '') +
+                '<button class="icon-action" title="Historique" data-action="history">' + ICONS.history + '</button>' +
+                '<button class="icon-action" title="Modifier" data-action="edit">' + ICONS.edit + '</button>' +
+                '<button class="icon-action is-delete" title="Supprimer" data-action="delete">' + ICONS.del + '</button>' +
+            '</div>';
+
+        card.querySelectorAll('[data-action]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const action = btn.getAttribute('data-action');
+                if (action === 'advance') advanceSubscription(sub.id);
+                else if (action === 'history') viewSubscriptionHistory(sub.id);
+                else if (action === 'edit') editSubscription(sub.id);
+                else if (action === 'delete') deleteSubscription(sub.id);
+            });
+        });
+
+        list.appendChild(card);
     });
 }
+
 
 function viewSubscriptionHistory(subId) {
     const sub = appData.subscriptions.find(s => s.id === subId);
@@ -5232,48 +5312,14 @@ function renderDashboardExtras(year, month) {
     setDelta('dash-expense-delta', current.expense, previous.expense, true);
     setDelta('dash-balance-delta', current.balance, previous.balance, false);
 
-    // --- Rythme de dépense ---
-    const today = new Date();
-    const isCurrentMonth = today.getFullYear() === year && (today.getMonth() + 1) === month;
-    const daysInMonth = new Date(year, month, 0).getDate();
-    const dayOfMonth = isCurrentMonth ? today.getDate() : daysInMonth;
-    const daysLeft = Math.max(0, daysInMonth - dayOfMonth);
-
+    // --- Objectif du mois ---
     let goal = appData.spendingGoal;
     const monthStr = year + '-' + String(month).padStart(2, '0');
     if (appData.monthlyGoals && appData.monthlyGoals[monthStr] !== undefined) {
         goal = appData.monthlyGoals[monthStr];
     }
 
-    const dailyAvg = current.expense / Math.max(1, dayOfMonth);
     const remaining = (goal || 0) - current.expense;
-
-    const elAvg = document.getElementById('dash-daily-avg');
-    if (elAvg) elAvg.textContent = fmtEuro(dailyAvg);
-
-    const elLeft = document.getElementById('dash-daily-left');
-    if (elLeft) {
-        if (!goal) {
-            elLeft.textContent = '—';
-            elLeft.style.color = '';
-        } else if (remaining <= 0) {
-            elLeft.textContent = '0.00 €';
-            elLeft.style.color = 'var(--danger-color)';
-        } else {
-            elLeft.textContent = fmtEuro(remaining / Math.max(1, daysLeft || 1));
-            elLeft.style.color = '';
-        }
-    }
-
-    const projection = dailyAvg * daysInMonth;
-    const elProj = document.getElementById('dash-projection');
-    if (elProj) {
-        elProj.textContent = fmtEuro(projection);
-        elProj.style.color = goal && projection > goal ? 'var(--danger-color)' : 'var(--success-color)';
-    }
-
-    const elSavings = document.getElementById('dash-savings-month');
-    if (elSavings) elSavings.textContent = fmtEuro(current.savings);
 
     // Légende de l'objectif
     const elTarget = document.getElementById('goal-value-target');
@@ -5478,18 +5524,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Surlignage du groupe de navigation actif
-    document.addEventListener('viewChanged', (e) => {
-        highlightNavGroup(e.detail);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
+    document.addEventListener('viewChanged', (e) => highlightNavGroup(e.detail));
     highlightNavGroup('dashboard');
+
+    // Retour en haut uniquement lors d'un vrai changement d'onglet
+    document.querySelectorAll('.nav-link[data-target]').forEach(link => {
+        link.addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    });
 
     initQuickAdd();
     initAdvancedFields();
+    initSubscriptionSummary();
 
-    // Les graphiques sont redessinés à la largeur du conteneur
+    // Les graphiques sont redessinés uniquement si la largeur change.
+    // (Sur mobile, l'apparition de la barre d'URL déclenche un resize en
+    //  hauteur qu'il ne faut surtout pas confondre avec une rotation.)
     let resizeTimer = null;
+    let lastWidth = window.innerWidth;
     window.addEventListener('resize', () => {
+        if (window.innerWidth === lastWidth) return;
+        lastWidth = window.innerWidth;
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(() => {
             const active = document.querySelector('.view-section.active');
@@ -5498,6 +5554,72 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 250);
     });
 });
+
+// Résume en une phrase la récurrence en cours de saisie
+function initSubscriptionSummary() {
+    const form = document.getElementById('form-subscription');
+    const out = document.getElementById('sub-summary');
+    if (!form || !out) return;
+
+    const update = () => {
+        const type = document.getElementById('sub-type').value;
+        const frequency = document.getElementById('sub-frequency').value;
+        const startDate = document.getElementById('sub-start-date').value;
+        const endDate = document.getElementById('sub-end-date').value;
+
+        let amount = parseFloat(document.getElementById('sub-amount').value);
+        let extra = '';
+
+        if (frequency === 'installments') {
+            const total = parseFloat(document.getElementById('sub-total-amount').value);
+            const count = parseInt(document.getElementById('sub-installments-count').value, 10);
+            if (!isNaN(total) && count > 1) {
+                amount = total / count;
+                extra = ' (' + total.toFixed(2) + ' € au total)';
+            } else {
+                amount = NaN;
+            }
+        }
+
+        if (isNaN(amount) || amount <= 0) {
+            out.textContent = 'Choisissez un montant et une fréquence.';
+            out.classList.remove('is-filled');
+            return;
+        }
+
+        const word = type === 'income' ? 'Revenu' : 'Dépense';
+        let rhythm = '';
+        if (frequency === 'weekly') rhythm = 'chaque semaine';
+        else if (frequency === 'yearly') rhythm = 'chaque année';
+        else if (frequency === 'installments') {
+            const count = parseInt(document.getElementById('sub-installments-count').value, 10);
+            rhythm = 'chaque mois pendant ' + count + ' mois';
+        } else if (startDate) rhythm = 'tous les ' + parseInt(startDate.split('-')[2], 10) + ' du mois';
+        else rhythm = 'chaque mois';
+
+        let phrase = word + ' de ' + amount.toFixed(2) + ' € ' + rhythm + extra;
+        if (startDate) phrase += ', à partir du ' + fmtShortDate(startDate);
+        if (endDate) phrase += ' et jusqu\'au ' + fmtShortDate(endDate);
+
+        // Poids mensuel équivalent
+        let perMonth = amount;
+        if (frequency === 'weekly') perMonth = amount * 52 / 12;
+        else if (frequency === 'yearly') perMonth = amount / 12;
+        if (frequency === 'weekly' || frequency === 'yearly') {
+            phrase += ' — soit ' + perMonth.toFixed(2) + ' € par mois';
+        }
+
+        out.textContent = phrase + '.';
+        out.classList.add('is-filled');
+    };
+
+    form.addEventListener('input', update);
+    form.addEventListener('change', update);
+    document.addEventListener('viewChanged', (e) => {
+        if (e.detail === 'subscriptions') setTimeout(update, 0);
+    });
+    update();
+}
 
 // Ouvre le bloc "Options avancées" dès qu'un champ conditionnel devient utile
 function initAdvancedFields() {

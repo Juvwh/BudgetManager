@@ -215,25 +215,6 @@
                     </div>
                 </div>
 
-                <!-- Repères de rythme calculés côté JS -->
-                <div class="mini-stats" id="dash-pace-stats">
-                    <div class="mini-stat">
-                        <span class="mini-label">Dépense / jour</span>
-                        <span class="mini-value" id="dash-daily-avg">0.00 €</span>
-                    </div>
-                    <div class="mini-stat">
-                        <span class="mini-label">Budget restant / jour</span>
-                        <span class="mini-value" id="dash-daily-left">0.00 €</span>
-                    </div>
-                    <div class="mini-stat">
-                        <span class="mini-label">Projection fin de mois</span>
-                        <span class="mini-value" id="dash-projection">0.00 €</span>
-                    </div>
-                    <div class="mini-stat">
-                        <span class="mini-label">Épargne du mois</span>
-                        <span class="mini-value" id="dash-savings-month">0.00 €</span>
-                    </div>
-                </div>
             </div>
 
             <!-- Évolution du patrimoine -->
@@ -529,82 +510,80 @@
     </nav>
 
     <div class="split-layout">
-        <div class="form-panel card">
-            <h3>Ajouter une récurrence</h3>
+        <div class="form-panel card composer">
+            <div class="card-head">
+                <h3>Nouvelle récurrence</h3>
+            </div>
             <form id="form-subscription">
-                <div class="form-group">
-                    <label>Type</label>
-                    <select id="sub-type" required>
-                        <option value="expense">Dépense</option>
-                        <option value="income">Revenu</option>
-                    </select>
+                <div class="composer-grid">
+                    <div class="form-group">
+                        <label for="sub-type">Type</label>
+                        <select id="sub-type" required>
+                            <option value="expense">Dépense</option>
+                            <option value="income">Revenu</option>
+                        </select>
+                    </div>
+                    <div class="form-group composer-wide">
+                        <label for="sub-name">Nom</label>
+                        <input type="text" id="sub-name" placeholder="Ex: Assurance auto" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="sub-frequency">Fréquence</label>
+                        <select id="sub-frequency" required>
+                            <option value="monthly">Mensuelle</option>
+                            <option value="weekly">Hebdomadaire</option>
+                            <option value="yearly">Annuelle</option>
+                            <option value="installments">Paiement en plusieurs fois</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="sub-amount-group">
+                        <label for="sub-amount">Montant (€)</label>
+                        <input type="number" id="sub-amount" step="0.01" min="0" inputmode="decimal" placeholder="0.00" required>
+                    </div>
+                    <div class="form-group composer-wide" id="sub-installments-group" style="display: none;">
+                        <label for="sub-total-amount">Montant total (€) et nombre de mois</label>
+                        <div class="inline-row">
+                            <input type="number" id="sub-total-amount" step="0.01" min="0" inputmode="decimal" placeholder="Total" style="flex: 2;">
+                            <input type="number" id="sub-installments-count" step="1" min="2" placeholder="Mois" style="flex: 1;">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="sub-start-date">Première échéance</label>
+                        <input type="date" id="sub-start-date" required>
+                    </div>
+                    <div class="form-group" id="sub-end-date-group">
+                        <label for="sub-end-date">Fin (optionnelle)</label>
+                        <input type="date" id="sub-end-date">
+                    </div>
+                    <div class="form-group composer-wide">
+                        <label for="sub-category">Catégorie</label>
+                        <select id="sub-category" required></select>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Nom</label>
-                    <input type="text" id="sub-name" placeholder="Ex: Assurance Auto" required>
-                </div>
-                <div class="form-group">
-                    <label>Fréquence</label>
-                    <select id="sub-frequency" required>
-                        <option value="weekly">Hebdomadaire</option>
-                        <option value="monthly">Tous les X du mois</option>
-                        <option value="yearly">Annuelle</option>
-                        <option value="installments">Paiement en plusieurs fois</option>
-                    </select>
-                </div>
-                <div class="form-group" id="sub-amount-group">
-                    <label>Montant (€)</label>
-                    <input type="number" id="sub-amount" step="0.01" min="0" inputmode="decimal" required>
-                </div>
-                <div class="form-group" id="sub-installments-group" style="display: none;">
-                    <label>Montant total (€)</label>
-                    <input type="number" id="sub-total-amount" step="0.01" min="0">
-                    <label style="margin-top: 0.5rem;">Nombre de mois</label>
-                    <input type="number" id="sub-installments-count" step="1" min="2">
-                </div>
-                <div class="form-group">
-                    <label>Catégorie</label>
-                    <select id="sub-category" required></select>
-                </div>
-                <div class="form-group">
-                    <label>Date de début</label>
-                    <input type="date" id="sub-start-date" required>
-                </div>
-                <div class="form-group" id="sub-end-date-group">
-                    <label>Date de fin (optionnelle)</label>
-                    <input type="date" id="sub-end-date">
-                    <small>Si définie, les transactions cesseront d'être générées après cette date.</small>
-                </div>
+
+                <p class="composer-summary" id="sub-summary">Choisissez un montant et une fréquence.</p>
+
                 <div class="form-group check-row" id="sub-apply-past-container" style="display: none;">
                     <input type="checkbox" id="sub-apply-past">
-                    <label for="sub-apply-past">Appliquer les modifications de montant / nom / catégorie aux anciennes transactions</label>
+                    <label for="sub-apply-past">Appliquer aussi le montant, le nom et la catégorie aux transactions déjà générées</label>
                 </div>
+
                 <input type="hidden" id="sub-id">
-                <button type="submit" id="btn-submit-sub" class="btn btn-primary btn-block">Ajouter</button>
-                <button type="button" id="btn-cancel-edit-sub" class="btn btn-secondary btn-block" style="display:none;">Annuler</button>
+                <div class="composer-actions">
+                    <button type="submit" id="btn-submit-sub" class="btn btn-primary">Ajouter</button>
+                    <button type="button" id="btn-cancel-edit-sub" class="btn btn-secondary" style="display:none;">Annuler</button>
+                </div>
             </form>
         </div>
 
         <div class="list-panel card">
             <div class="card-head">
                 <h3>Vos récurrences</h3>
+                <span class="muted" id="subscriptions-summary"></span>
             </div>
-            <div class="table-container">
-                <table id="table-subscriptions">
-                    <thead>
-                        <tr>
-                            <th>Nom</th>
-                            <th>Type</th>
-                            <th>Fréquence</th>
-                            <th>Montant</th>
-                            <th>Prochaine date</th>
-                            <th>Date de fin</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
+            <div id="subscriptions-list" class="sub-list"></div>
         </div>
     </div>
 </section>

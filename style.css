@@ -475,22 +475,16 @@ main#app-content {
 .goal-wrap {
     position: relative;
     height: 16px;
-    margin: 0.5rem 0 1rem;
+    margin: 2.6rem 0 3.4rem;
 }
-
-/* Les anciens repères restent dans le DOM (pilotés par le JS) mais ne sont
-   plus affichés : la légende ci-dessous est plus lisible. */
-#progress-current-text,
-#progress-limit-text,
-#progress-remaining-text,
-#progress-current-marker,
-#progress-limit-marker { display: none !important; }
 
 .goal-legend {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 0.6rem;
     margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
 }
 
 .goal-legend-item {
@@ -802,6 +796,83 @@ main#app-content {
 
 .composer-actions .btn { min-width: 140px; }
 
+.composer-summary {
+    margin: 0.9rem 0 0;
+    padding: 0.6rem 0.85rem;
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+    border: 1px dashed var(--border-color);
+    font-size: 0.88rem;
+    color: var(--text-muted);
+}
+
+.composer-summary.is-filled {
+    border-style: solid;
+    border-color: rgba(var(--accent-color-rgb), 0.35);
+    background: var(--accent-soft);
+    color: var(--text-color);
+    font-weight: 550;
+}
+
+/* ---- Liste des récurrences ---- */
+.sub-list { display: flex; flex-direction: column; gap: 0.6rem; }
+
+.sub-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+    transition: border-color 0.15s ease;
+}
+
+.sub-card:hover { border-color: var(--border-strong); }
+.sub-card.is-done { opacity: 0.6; }
+.sub-card.is-corrupted { background: var(--danger-soft); box-shadow: inset 3px 0 0 var(--danger-color); }
+
+.sub-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.sub-icon.is-in { background: var(--success-soft); color: var(--success-color); }
+.sub-icon.is-out { background: var(--danger-soft); color: var(--danger-color); }
+
+.sub-main { min-width: 0; }
+.sub-name { font-weight: 650; font-size: 0.96rem; }
+.sub-meta {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sub-right { text-align: right; white-space: nowrap; }
+.sub-amount { font-size: 1.02rem; font-weight: 700; }
+.sub-permonth { font-size: 0.74rem; color: var(--text-muted); }
+
+.sub-actions { display: flex; gap: 0.25rem; }
+.icon-action.is-advance:hover { color: var(--accent-color); border-color: var(--accent-color); }
+
+.sub-progress { margin-top: 0.5rem; max-width: 320px; }
+.sub-progress-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.74rem;
+    color: var(--text-muted);
+    margin-bottom: 0.2rem;
+}
+
 /* ---- Liste des transactions ---- */
 .txn-list { display: flex; flex-direction: column; gap: 1.1rem; }
 
@@ -969,7 +1040,8 @@ main#app-content {
 }
 
 /* Transactions : le composeur est une bande pleine largeur au-dessus de la liste */
-#transactions .split-layout { grid-template-columns: minmax(0, 1fr); }
+#transactions .split-layout,
+#subscriptions .split-layout { grid-template-columns: minmax(0, 1fr); }
 
 .split-layout > .card { margin-bottom: 0; }
 
@@ -1786,14 +1858,17 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
     /* min-width:0 evite qu'un contenu long elargisse une carte au-dela de l'ecran */
     .dash-grid > * > * { margin-bottom: 0; min-width: 0; max-width: 100%; }
     .summary-cards { order: 1; margin-bottom: 0; }
-    .quick-add { order: 2; }
-    #goal-progress-card { order: 3; }
+    #goal-progress-card { order: 2; }
+    #dashboard-category-chart-card { order: 3; }
     #dash-card-patrimony { order: 4; }
-    #dash-card-top { order: 5; }
-    #dash-card-upcoming { order: 6; }
-    #dashboard-category-chart-card { order: 7; }
-    #dash-card-recent { order: 8; }
-    #dashboard-patrimony-widget { order: 9; }
+    #dash-card-upcoming { order: 5; }
+    #dash-card-recent { order: 6; }
+    #dashboard-patrimony-widget { order: 7; }
+
+    /* Sur mobile, la saisie passe par le bouton + et le détail par catégorie
+       est déjà couvert par le graphique : ces blocs sont masqués. */
+    .quick-add,
+    #dash-card-top { display: none; }
 
     .mini-stats { grid-template-columns: repeat(2, 1fr); }
 
@@ -1964,6 +2039,19 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
     .txn-title { white-space: normal; }
     .txn-day { position: static; padding-right: 0.2rem; }
     .txn-actions { width: auto; }
+
+    .sub-card {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-areas: "icon main right" "actions actions actions";
+        gap: 0.6rem;
+    }
+
+    .sub-icon { grid-area: icon; }
+    .sub-main { grid-area: main; }
+    .sub-right { grid-area: right; }
+    .sub-actions { grid-area: actions; justify-content: flex-end; }
+    .sub-meta { white-space: normal; }
+    .sub-progress { max-width: none; }
     .goal-legend { grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
     .goal-legend-item { padding-left: 0.5rem; }
     .goal-legend-value { font-size: 0.98rem; }

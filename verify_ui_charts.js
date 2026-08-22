@@ -35,7 +35,12 @@ const SEED = () => {
             { id: 't7', type: 'expense', amount: 810, date: d(-1, 3), categoryId: 'cat-exp-1-1', note: 'Loyer', tagIds: [] },
             { id: 't8', type: 'investment_transfer', amount: 500, date: d(-1, 10), categoryId: 'cat-exp-1', note: 'Achat or', tagIds: [], investmentId: 'inv-1' }
         ],
-        subscriptions: [], tags: [{ id: 'tag-1', name: 'Maison', color: '#0a6cff' }],
+        subscriptions: [
+            { id: 's1', type: 'expense', name: 'Netflix', amount: 13.99, frequency: 'monthly', categoryId: 'cat-exp-3', startDate: d(-6, 5), nextDate: d(1, 5), status: 'active' },
+            { id: 's2', type: 'expense', name: 'Canapé', amount: 100, frequency: 'installments', categoryId: 'cat-exp-1', startDate: d(-3, 1), nextDate: d(1, 1), status: 'active', totalAmount: 1000, totalInstallments: 10, installmentsPaid: 3 },
+            { id: 's3', type: 'income', name: 'Loyer garage', amount: 90, frequency: 'monthly', categoryId: 'cat-inc-3', startDate: d(-5, 8), nextDate: d(1, 8), status: 'active' }
+        ],
+        tags: [{ id: 'tag-1', name: 'Maison', color: '#0a6cff' }],
         simulations: [], investmentsEnabled: true,
         investments: [{
             id: 'inv-1', name: 'Or physique', type: 'metaux', acquisitionDate: d(-3, 1), status: 'active',
@@ -163,6 +168,45 @@ const inkOf = (id) => {
     await page.selectOption('#trans-type', 'expense');
     await page.screenshot({ path: 'ui_desktop_transactions.png', fullPage: true });
 
+    // Récurrences
+    await page.click('#transactions .subnav-link[data-target="subscriptions"]');
+    await page.waitForTimeout(600);
+    const subs = await page.evaluate(() => ({
+        cards: document.querySelectorAll('#subscriptions-list .sub-card').length,
+        progress: document.querySelectorAll('#subscriptions-list .sub-progress').length,
+        summary: document.getElementById('subscriptions-summary').textContent
+    }));
+    check('récurrences affichées en cartes', subs.cards === 3, subs.cards + ' cartes');
+    check('avancement des paiements en plusieurs fois', subs.progress === 1);
+    check('poids mensuel des récurrences', /€ \/ mois/.test(subs.summary), subs.summary);
+
+    // Résumé en direct du formulaire
+    await page.fill('#sub-name', 'Salle de sport');
+    await page.fill('#sub-amount', '29.90');
+    await page.fill('#sub-start-date', '2026-03-12');
+    await page.waitForTimeout(300);
+    const subSummary = await page.textContent('#sub-summary');
+    check('résumé en direct de la récurrence', subSummary.includes('29.90') && subSummary.includes('12 du mois'), subSummary);
+
+    await page.selectOption('#sub-frequency', 'installments');
+    await page.waitForTimeout(300);
+    const installVisible = await page.isVisible('#sub-installments-group');
+    check('champs "plusieurs fois" affichés', installVisible);
+    await page.selectOption('#sub-frequency', 'monthly');
+    await page.screenshot({ path: 'ui_desktop_subscriptions.png', fullPage: true });
+
+    // Objectif : repères flottants rétablis, rythme retiré
+    await page.click('.nav-link[data-target="dashboard"]');
+    await page.waitForTimeout(500);
+    const goalUi = await page.evaluate(() => ({
+        floating: getComputedStyle(document.getElementById('progress-current-text')).display !== 'none'
+            && getComputedStyle(document.getElementById('progress-limit-marker')).display !== 'none',
+        paceRemoved: !document.getElementById('dash-pace-stats'),
+        legend: !!document.getElementById('goal-value-target')
+    }));
+    check('repères flottants de la barre rétablis', goalUi.floating);
+    check('bloc "rythme" remplacé par la légende', goalUi.paceRemoved && goalUi.legend);
+
     await ctx.close();
 
     // ---------- Mobile : aucun défilement horizontal ----------
@@ -202,15 +246,53 @@ const inkOf = (id) => {
         }
     }
 
-    // Les indicateurs doivent précéder la saisie rapide
+    // Composition du tableau de bord mobile
     await mpage.evaluate(() => document.querySelector('.nav-link[data-target="dashboard"]').click());
-    await mpage.waitForTimeout(400);
-    const orderOk = await mpage.evaluate(() => {
-        const kpi = document.querySelector('.summary-cards').getBoundingClientRect().top;
-        const quick = document.querySelector('.quick-add').getBoundingClientRect().top;
-        return kpi < quick;
+    await mpage.waitForTimeout(500);
+    const dash = await mpage.evaluate(() => {
+        const top = (sel) => {
+            const el = document.querySelector(sel);
+            if (!el || getComputedStyle(el).display === 'none') return null;
+            return el.getBoundingClientRect().top + window.scrollY;
+        };
+        return {
+            kpi: top('.summary-cards'),
+            goal: top('#goal-progress-card'),
+            categories: top('#dashboard-category-chart-card'),
+            patrimony: top('#dash-card-patrimony'),
+            quickHidden: getComputedStyle(document.querySelector('.quick-add')).display === 'none',
+            topHidden: getComputedStyle(document.getElementById('dash-card-top')).display === 'none'
+        };
     });
-    check('mobile : indicateurs affichés avant la saisie rapide', orderOk);
+    check('mobile : indicateurs en premier', dash.kpi !== null && dash.kpi < dash.goal, JSON.stringify(dash));
+    check('mobile : "Nouvelle transaction" masquée', dash.quickHidden);
+    check('mobile : "Top catégories" masqué', dash.topHidden);
+    check('mobile : "Dépenses par catégorie" avant "Évolution du patrimoine"',
+        dash.categories < dash.patrimony, dash.categories + ' < ' + dash.patrimony);
+
+    // Le bouton + reste opérationnel sans la carte de saisie rapide
+    await mpage.click('#fab-add');
+    await mpage.waitForTimeout(500);
+    const fabOpens = await mpage.evaluate(() =>
+        document.getElementById('mobile-form-modal').classList.contains('active')
+        || document.getElementById('edit-modal-overlay').classList.contains('active'));
+    check('mobile : le bouton + ouvre la saisie depuis l\'accueil', fabOpens);
+    await mpage.evaluate(() => {
+        const b = document.getElementById('btn-close-mobile-modal');
+        if (b) b.click();
+    });
+    await mpage.waitForTimeout(300);
+
+    // Défilement : un resize en hauteur (barre d'URL mobile) ne doit pas
+    // renvoyer la page en haut
+    await mpage.evaluate(() => window.scrollTo(0, 600));
+    await mpage.waitForTimeout(300);
+    const before = await mpage.evaluate(() => window.scrollY);
+    await mpage.setViewportSize({ width: 390, height: 790 });
+    await mpage.waitForTimeout(900);
+    const after = await mpage.evaluate(() => window.scrollY);
+    check('mobile : pas de remontée automatique au défilement', before > 0 && Math.abs(after - before) < 60,
+        before + 'px → ' + after + 'px');
 
     await mctx.close();
     await browser.close();
