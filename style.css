@@ -1709,6 +1709,32 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
 
 .modal-total { font-size: 1.05rem; font-weight: 650; margin-bottom: 1rem; }
 
+/* Répartition d'une catégorie et de ses sous-catégories (modale de détails) */
+.modal-breakdown {
+    margin: -0.4rem 0 1rem;
+    padding: 0.6rem 0.85rem;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--surface-2);
+}
+.breakdown-title {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.65;
+    margin-bottom: 0.4rem;
+}
+.breakdown-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    padding: 0.2rem 0;
+    font-size: 0.9rem;
+}
+.breakdown-label { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.breakdown-share { flex: 0 0 auto; opacity: 0.6; font-variant-numeric: tabular-nums; }
+.breakdown-amount { flex: 0 0 auto; font-weight: 600; font-variant-numeric: tabular-nums; }
+
 .modal-filters {
     display: flex;
     gap: 1rem;

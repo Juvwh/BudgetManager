@@ -1431,6 +1431,15 @@ function renderCategoryModal() {
     totalSpan.textContent = '-' + totalAmount.toFixed(2) + ' €';
     totalSpan.className = 'text-red';
 
+    const totalLabel = document.getElementById('data-modal-total-label');
+    if (totalLabel) {
+        totalLabel.textContent = (isMainCategory && catMode === 'with_subcategories')
+            ? 'Total (catégorie + sous-catégories) :'
+            : 'Total :';
+    }
+
+    renderCategoryBreakdown(categoryName, trans, isMainCategory && catMode === 'with_subcategories');
+
     const tbody = document.querySelector('#table-modal-transactions tbody');
     tbody.innerHTML = '';
 
@@ -1459,6 +1468,70 @@ function renderCategoryModal() {
     }
 }
 
+/**
+ * Affiche la répartition du total d'une catégorie : le montant imputé à la
+ * catégorie elle-même, puis le sous-total de chaque sous-catégorie directe
+ * (sous-arbre complet inclus). Les transactions reçues sont déjà filtrées
+ * par période et par mode d'inclusion.
+ */
+function renderCategoryBreakdown(categoryName, trans, enabled) {
+    const container = document.getElementById('data-modal-breakdown');
+    if (!container) return;
+
+    if (!enabled) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+        return;
+    }
+
+    const chartMode = window.currentChartMode || 'real';
+    const buckets = {};      // libellé de la sous-catégorie directe -> montant
+    let ownAmount = 0;       // dépenses imputées directement à la catégorie
+
+    trans.forEach(t => {
+        let amount = Math.abs(t.amount);
+        if (chartMode === 'real' && t.mealVoucherPart > 0) {
+            amount = amount - t.mealVoucherPart;
+        }
+
+        const catPath = getCategoryPath(t.categoryId);
+        if (catPath === categoryName) {
+            ownAmount += amount;
+            return;
+        }
+
+        // Premier niveau sous la catégorie courante
+        const child = catPath.slice(categoryName.length + 3).split(' > ')[0];
+        buckets[child] = (buckets[child] || 0) + amount;
+    });
+
+    const rows = Object.entries(buckets).sort((a, b) => b[1] - a[1]);
+    const total = ownAmount + rows.reduce((sum, [, amount]) => sum + amount, 0);
+
+    if (rows.length === 0 && ownAmount === 0) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+        return;
+    }
+
+    const line = (label, amount) => {
+        const share = total > 0 ? (amount / total) * 100 : 0;
+        return `
+            <div class="breakdown-row">
+                <span class="breakdown-label">${label}</span>
+                <span class="breakdown-share">${share.toFixed(0)}%</span>
+                <span class="breakdown-amount text-red">-${amount.toFixed(2)} €</span>
+            </div>`;
+    };
+
+    container.innerHTML = `
+        <div class="breakdown-title">Répartition</div>
+        ${line(categoryName + ' (direct)', ownAmount)}
+        ${rows.map(([label, amount]) => line(label, amount)).join('')}
+    `;
+    container.style.display = 'block';
+}
+
 
 function showMonthDetails(year, month, label, totalIncome, totalExpense) {
     const prefix = `${year}-${String(month).padStart(2, '0')}`;
@@ -1470,6 +1543,9 @@ function showMonthDetails(year, month, label, totalIncome, totalExpense) {
 
     // Add custom header info to the modal for this specific case
     document.getElementById('data-modal-title').innerHTML = `Mois : ${label} <small>(${year})</small>`;
+    renderCategoryBreakdown(null, [], false);
+    const monthTotalLabel = document.getElementById('data-modal-total-label');
+    if (monthTotalLabel) monthTotalLabel.textContent = 'Total :';
 
     const totalSpan = document.getElementById('data-modal-total');
     totalSpan.innerHTML = `
@@ -4249,6 +4325,9 @@ function openDataModal(title, transactions, totalAmount, totalType = 'expense') 
     }
 
     document.getElementById('data-modal-title').textContent = title;
+    renderCategoryBreakdown(null, [], false);
+    const genericTotalLabel = document.getElementById('data-modal-total-label');
+    if (genericTotalLabel) genericTotalLabel.textContent = 'Total :';
 
     const totalSpan = document.getElementById('data-modal-total');
     const prefixStr = totalType === 'income' ? '+' : '-';
