@@ -250,23 +250,18 @@ function updateTransactionSelectionTotal() {
 }
 
 function renderTransactions() {
-    const tbody = document.querySelector('#table-transactions tbody');
-    const tableHeaderCheckboxCol = document.querySelector('#table-transactions thead th.col-checkbox');
-    tbody.innerHTML = '';
+    const list = document.getElementById('transactions-list');
+    if (!list) return;
+    list.innerHTML = '';
 
-    if (tableHeaderCheckboxCol) {
-        tableHeaderCheckboxCol.style.display = isTransactionSelectionMode ? 'table-cell' : 'none';
-    }
+    const filterMonth = document.getElementById('filter-month').value;
 
-    let filterMonth = document.getElementById('filter-month').value;
-
-    // Calculate refunds per expense globally for the view
+    // Remboursements rattachés à une dépense
     const refundsByExpense = {};
     const refundLinks = {};
     appData.transactions.forEach(t => {
         if (t.type === 'income' && t.linkedExpenseId) {
-            if (!refundsByExpense[t.linkedExpenseId]) refundsByExpense[t.linkedExpenseId] = 0;
-            refundsByExpense[t.linkedExpenseId] += t.amount;
+            refundsByExpense[t.linkedExpenseId] = (refundsByExpense[t.linkedExpenseId] || 0) + t.amount;
             refundLinks[t.id] = t.linkedExpenseId;
         }
     });
@@ -274,7 +269,7 @@ function renderTransactions() {
     let filteredTrans = appData.transactions.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
 
     if (filterMonth) {
-        filteredTrans = filteredTrans.filter(t => t.date.startsWith(filterMonth));
+        filteredTrans = filteredTrans.filter(t => t.date && t.date.startsWith(filterMonth));
     }
 
     if (currentTransactionFilter === 'income') {
@@ -284,7 +279,6 @@ function renderTransactions() {
     } else if (currentTransactionFilter === 'salary') {
         filteredTrans = filteredTrans.filter(t => t.type === 'salary');
     } else if (currentTransactionFilter.startsWith('cat-')) {
-        // Includes subcategories
         filteredTrans = filteredTrans.filter(t => {
             const cat = appData.categories.find(c => c.id === t.categoryId);
             return t.categoryId === currentTransactionFilter || (cat && cat.parentId === currentTransactionFilter);
@@ -294,122 +288,182 @@ function renderTransactions() {
     if (currentTransactionTagFilters.length > 0) {
         filteredTrans = filteredTrans.filter(t => {
             if (!t.tagIds) return false;
-            // Retourne true si la transaction possède au moins un des tags sélectionnés (OU logique)
             return currentTransactionTagFilters.some(filterTagId => t.tagIds.includes(filterTagId));
         });
     }
 
+    // Compteur + total filtré
+    const counter = document.getElementById('transactions-count');
+    if (counter) {
+        const net = filteredTrans.reduce((sum, t) => {
+            if (t.type === 'expense' || t.type === 'investment_transfer') return sum - (Number(t.amount) || 0);
+            return sum + (Number(t.amount) || 0);
+        }, 0);
+        counter.textContent = filteredTrans.length + (filteredTrans.length > 1 ? ' transactions · ' : ' transaction · ')
+            + (net >= 0 ? '+' : '-') + Math.abs(net).toFixed(2) + ' €';
+    }
+
+    if (filteredTrans.length === 0) {
+        list.innerHTML = '<div class="feed-empty">Aucune transaction pour ces filtres.</div>';
+        updateFilterChips();
+        return;
+    }
+
+    // Regroupement par jour
+    const groups = [];
+    const byDate = {};
     filteredTrans.forEach(t => {
-        const tr = document.createElement('tr');
-        tr.className = 'clickable-row'; // Visual cue
+        const key = t.date || 'inconnu';
+        if (!byDate[key]) { byDate[key] = []; groups.push(key); }
+        byDate[key].push(t);
+    });
 
-        const isCorrupted = isNaN(t.amount) || t.amount === null || t.amount === undefined || !t.date;
-        if (isCorrupted) {
-            tr.style.backgroundColor = 'rgba(255, 59, 48, 0.1)';
-            tr.style.borderLeft = '4px solid var(--danger-color)';
+    const ICONS = {
+        edit: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+        refund: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
+        del: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>'
+    };
+
+    const TYPE_LABELS = {
+        expense: 'Dépense', income: 'Revenu', salary: 'Salaire',
+        investment_transfer: 'Transfert', investment_return: 'Retour'
+    };
+
+    groups.forEach(dateKey => {
+        const items = byDate[dateKey];
+
+        // Solde du jour
+        const dayNet = items.reduce((sum, t) => {
+            if (t.type === 'expense' || t.type === 'investment_transfer') return sum - (Number(t.amount) || 0);
+            return sum + (Number(t.amount) || 0);
+        }, 0);
+
+        let dayLabel = 'Date inconnue';
+        if (dateKey !== 'inconnu') {
+            const d = new Date(dateKey);
+            if (!isNaN(d.getTime())) {
+                dayLabel = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+                dayLabel = dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1);
+            }
         }
 
-        tr.ondblclick = () => editTransaction(t.id); // Option C: Quick edit on double click
+        const group = document.createElement('div');
+        group.className = 'txn-group';
+        const head = document.createElement('div');
+        head.className = 'txn-day';
+        head.innerHTML = '<span>' + dayLabel + '</span>'
+            + '<span class="' + (dayNet >= 0 ? 'text-green' : 'text-red') + '">'
+            + (dayNet >= 0 ? '+' : '-') + Math.abs(dayNet).toFixed(2) + ' €</span>';
+        group.appendChild(head);
 
-        const catName = getCategoryPath(t.categoryId, new Set(), true);
+        items.forEach(t => {
+            const isCorrupted = isNaN(t.amount) || t.amount === null || t.amount === undefined || !t.date;
+            const isIncome = t.type === 'income' || t.type === 'salary' || t.type === 'investment_return';
+            const catName = getCategoryPath(t.categoryId);
 
-        // Tags HTML
-        let tagsHtml = '';
-        if (t.tagIds && t.tagIds.length > 0) {
-            t.tagIds.forEach(tagId => {
-                const tag = appData.tags.find(g => g.id === tagId);
-                if (tag) {
-                    tagsHtml += `<span class="tag-chip tag-display"><span class="tag-dot" style="background-color: ${tag.color};"></span>${tag.name}</span>`;
-                }
-            });
-        }
+            const row = document.createElement('div');
+            row.className = 'txn-row' + (isCorrupted ? ' is-corrupted' : '');
+            row.dataset.id = t.id;
+            row.ondblclick = () => editTransaction(t.id);
 
-        let formattedAmount = '';
-        if (isCorrupted) {
-            formattedAmount = 'Erreur (NaN)';
-        } else if (t.type === 'expense') {
-            formattedAmount = `-${Number(t.amount).toFixed(2)} €`;
-        } else {
-            formattedAmount = `+${Number(t.amount).toFixed(2)} €`;
-        }
+            // Colonne de gauche : case à cocher ou pastille
+            let leadHtml;
+            if (isTransactionSelectionMode) {
+                const checked = selectedTransactionIds.has(t.id) ? 'checked' : '';
+                leadHtml = '<input type="checkbox" class="transaction-checkbox" data-id="' + t.id + '" ' + checked + '>';
+            } else {
+                const cls = isIncome ? 'is-in' : (t.type === 'investment_transfer' ? 'is-neutral' : 'is-out');
+                leadHtml = '<span class="txn-avatar ' + cls + '">' + (catName || '?').trim().charAt(0).toUpperCase() + '</span>';
+            }
 
-        let displayType = '';
-        let typeColor = '';
-        if (t.type === 'income') {
-            displayType = 'Revenu';
-            typeColor = 'text-green';
+            // Titre + sous-titre
+            const title = t.note ? t.note : catName;
+            let subParts = [];
+            if (t.note) subParts.push(catName);
+            const typeLabel = TYPE_LABELS[t.type] || t.type;
+            // "Dépense"/"Revenu" sont déjà lisibles au signe et à la couleur du montant
+            if (t.type !== 'expense' && t.type !== 'income' && typeLabel !== catName) {
+                subParts.push(typeLabel);
+            }
+            if (subParts.length === 0) subParts.push(catName);
             if (refundLinks[t.id]) {
                 const linkedExp = appData.transactions.find(x => x.id === refundLinks[t.id]);
-                if (linkedExp) {
-                    displayType += `<br><small style="color:var(--text-color);">↪ Remboursement de: ${linkedExp.note || getCategoryPath(linkedExp.categoryId)}</small>`;
-                }
+                if (linkedExp) subParts.push('remboursement de ' + (linkedExp.note || getCategoryPath(linkedExp.categoryId)));
             }
-        } else if (t.type === 'salary') {
-            displayType = 'Salaire';
-            typeColor = 'text-primary'; // Using primary color for salary
-            if (t.savedAmount) {
-                formattedAmount += ` <br><small style="color:var(--text-color);">(Épargné: ${Number(t.savedAmount).toFixed(2)} €)</small>`;
-            }
-        } else if (t.type === 'investment_transfer') {
-            displayType = '<span class="badge" style="background-color:rgba(10,132,255,0.1);color:var(--accent-color);">Transfert (Actif)</span>';
-            typeColor = 'text-red'; // Leaves the account
-        } else if (t.type === 'investment_return') {
-            displayType = '<span class="badge" style="background-color:rgba(48,209,88,0.1);color:var(--success-color);">Retour (Actif)</span>';
-            typeColor = 'text-green'; // Enters the account
-        } else {
-            displayType = 'Dépense';
-            typeColor = 'text-red';
-            let amountHtml = `-${Number(t.amount).toFixed(2)} €`;
 
-            if (t.mealVoucherPart > 0) {
-                amountHtml += ` <br><small style="color:var(--accent-color);">dont ${Number(t.mealVoucherPart).toFixed(2)} € (CR)</small><br><small style="color:var(--text-color);">Reste (Argent): -${Number(t.amount - t.mealVoucherPart).toFixed(2)} €</small>`;
-            }
-            if (refundsByExpense[t.id]) {
-                const remains = Math.max(0, t.amount - refundsByExpense[t.id]);
-                amountHtml += `<br><small style="color:var(--success-color); font-weight:bold;">Reste à charge: -${remains.toFixed(2)} €</small>`;
-            }
-            formattedAmount = amountHtml;
-        }
-
-        let checkboxHtml = '';
-        if (isTransactionSelectionMode) {
-            const isChecked = selectedTransactionIds.has(t.id) ? 'checked' : '';
-            checkboxHtml = `<td class="col-checkbox" style="width: 40px; text-align: center;"><input type="checkbox" class="transaction-checkbox" data-id="${t.id}" ${isChecked} style="cursor: pointer; transform: scale(1.2);"></td>`;
-        }
-
-        let tagsCellHtml = tagsHtml ? `<div style="display: flex; gap: 4px; flex-wrap: wrap;">${tagsHtml}</div>` : '';
-
-        tr.innerHTML = `
-            ${checkboxHtml}
-            <td data-label="Date">${t.date || 'Erreur'}</td>
-            <td data-label="Type"><span class="${typeColor}">${displayType}</span></td>
-            <td data-label="Catégorie">${catName} ${isCorrupted ? '<span class="cat-type-badge badge-expense" style="margin-left: 5px;">Corrompu</span>' : ''}</td>
-            <td data-label="Note">${t.note || ''}</td>
-            <td data-label="Tags">${tagsCellHtml}</td>
-            <td data-label="Montant" class="${t.type === 'expense' ? 'text-red' : 'text-green'}">${formattedAmount}</td>
-            <td data-label="Actions">
-                <div style="display: flex; gap: 0.2rem; flex-wrap: wrap;">
-                    <button class="btn btn-secondary btn-small icon-btn-mobile" title="Modifier" onclick="editTransaction('${t.id}')"><span class="btn-text">Modifier</span><svg class="mobile-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
-                    ${t.type === 'expense' ? `<button class="btn btn-small icon-btn-mobile" style="background-color: var(--success-color); color: white;" title="Remboursement" onclick="addRefund('${t.id}')"><span class="btn-text">💰</span><svg class="mobile-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></button>` : ''}
-                    <button class="btn btn-danger btn-small icon-btn-mobile" title="Supprimer" onclick="deleteTransaction('${t.id}')"><span class="btn-text">Supprimer</span><svg class="mobile-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
-                </div>
-            </td>
-        `;
-        tbody.appendChild(tr);
-
-        if (isTransactionSelectionMode) {
-            const checkbox = tr.querySelector('.transaction-checkbox');
-            if (checkbox) {
-                checkbox.addEventListener('change', (e) => {
-                    if (e.target.checked) {
-                        selectedTransactionIds.add(t.id);
-                    } else {
-                        selectedTransactionIds.delete(t.id);
+            let tagsHtml = '';
+            if (t.tagIds && t.tagIds.length > 0) {
+                t.tagIds.forEach(tagId => {
+                    const tag = appData.tags.find(g => g.id === tagId);
+                    if (tag) {
+                        tagsHtml += '<span class="tag-chip tag-display"><span class="tag-dot" style="background-color:' + tag.color + '"></span>' + tag.name + '</span>';
                     }
-                    updateTransactionSelectionTotal();
                 });
             }
-        }
+
+            // Montant et détails
+            let amountHtml;
+            let extras = [];
+            if (isCorrupted) {
+                amountHtml = '<span class="text-red">Erreur (NaN)</span>';
+            } else {
+                const sign = isIncome ? '+' : '-';
+                amountHtml = '<span class="' + (isIncome ? 'text-green' : 'text-red') + '">' + sign + Number(t.amount).toFixed(2) + ' €</span>';
+
+                if (t.type === 'salary' && t.savedAmount) {
+                    extras.push('épargné ' + Number(t.savedAmount).toFixed(2) + ' €');
+                }
+                if (t.type === 'expense' && t.mealVoucherPart > 0) {
+                    extras.push('dont ' + Number(t.mealVoucherPart).toFixed(2) + ' € en CR');
+                }
+                if (t.type === 'expense' && refundsByExpense[t.id]) {
+                    const remains = Math.max(0, t.amount - refundsByExpense[t.id]);
+                    extras.push('reste à charge ' + remains.toFixed(2) + ' €');
+                }
+            }
+
+            row.innerHTML =
+                '<div class="txn-lead">' + leadHtml + '</div>' +
+                '<div class="txn-main">' +
+                    '<div class="txn-title">' + title + (isCorrupted ? ' <span class="cat-type-badge badge-expense">Corrompu</span>' : '') + '</div>' +
+                    '<div class="txn-sub">' + subParts.join(' · ') + '</div>' +
+                    (tagsHtml ? '<div class="txn-tags">' + tagsHtml + '</div>' : '') +
+                '</div>' +
+                '<div class="txn-right">' +
+                    '<div class="txn-amount">' + amountHtml + '</div>' +
+                    (extras.length ? '<div class="txn-extra">' + extras.join(' · ') + '</div>' : '') +
+                '</div>' +
+                '<div class="txn-actions">' +
+                    '<button class="icon-action" title="Modifier" aria-label="Modifier" data-action="edit">' + ICONS.edit + '</button>' +
+                    (t.type === 'expense' ? '<button class="icon-action is-refund" title="Ajouter un remboursement" aria-label="Remboursement" data-action="refund">' + ICONS.refund + '</button>' : '') +
+                    '<button class="icon-action is-delete" title="Supprimer" aria-label="Supprimer" data-action="delete">' + ICONS.del + '</button>' +
+                '</div>';
+
+            row.querySelectorAll('[data-action]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const action = btn.getAttribute('data-action');
+                    if (action === 'edit') editTransaction(t.id);
+                    else if (action === 'refund') addRefund(t.id);
+                    else if (action === 'delete') deleteTransaction(t.id);
+                });
+            });
+
+            const checkbox = row.querySelector('.transaction-checkbox');
+            if (checkbox) {
+                checkbox.addEventListener('change', (e) => {
+                    if (e.target.checked) selectedTransactionIds.add(t.id);
+                    else selectedTransactionIds.delete(t.id);
+                    row.classList.toggle('is-selected', e.target.checked);
+                    updateTransactionSelectionTotal();
+                });
+                if (checkbox.checked) row.classList.add('is-selected');
+            }
+
+            group.appendChild(row);
+        });
+
+        list.appendChild(group);
     });
 
     updateFilterChips();
@@ -980,9 +1034,9 @@ function handleChartClick(e, canvasId) {
     const regions = chartInteractions[canvasId];
     if (!regions) return;
 
-    // Use scaling if the canvas uses CSS to resize
-    const scaleX = e.target.width / rect.width;
-    const scaleY = e.target.height / rect.height;
+    // Les régions sont stockées en pixels logiques (voir prepareCanvas)
+    const scaleX = (e.target._logicalW || e.target.width) / rect.width;
+    const scaleY = (e.target._logicalH || e.target.height) / rect.height;
 
     const clickX = x * scaleX;
     const clickY = y * scaleY;
@@ -992,7 +1046,7 @@ function handleChartClick(e, canvasId) {
             const dx = clickX - region.cx;
             const dy = clickY - region.cy;
             const distance = Math.sqrt(dx*dx + dy*dy);
-            if (distance <= region.radius) {
+            if (distance <= region.radius && distance >= (region.innerRadius || 0)) {
                 let angle = Math.atan2(dy, dx);
                 if (angle < 0) angle += 2 * Math.PI; // Normalize to 0 - 2PI
 
@@ -1039,8 +1093,10 @@ function attachChartClickListener(canvasId) {
     // Add hover effect
     canvas.addEventListener('mousemove', (e) => {
         const rect = e.target.getBoundingClientRect();
-        const x = (e.clientX - rect.left) * (e.target.width / rect.width);
-        const y = (e.clientY - rect.top) * (e.target.height / rect.height);
+        const logicalW = e.target._logicalW || e.target.width;
+        const logicalH = e.target._logicalH || e.target.height;
+        const x = (e.clientX - rect.left) * (logicalW / rect.width);
+        const y = (e.clientY - rect.top) * (logicalH / rect.height);
 
         let hovered = false;
         const regions = chartInteractions[canvasId] || [];
@@ -1322,249 +1378,421 @@ function showMonthDetails(year, month, label, totalIncome, totalExpense) {
     document.getElementById('data-modal-overlay').classList.add('active');
 }
 
+/* -------------------------------------------------------------------------
+   Socle commun des graphiques
+   Les canvas sont dimensionnés selon la largeur réelle de leur conteneur et
+   la densité de l'écran (devicePixelRatio) : le rendu reste net sur Retina
+   et sur mobile, et aucun graphique ne déborde horizontalement.
+   ------------------------------------------------------------------------- */
+const CHART_FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+
+function chartColor(name, fallback) {
+    const v = getComputedStyle(document.body).getPropertyValue(name).trim();
+    return v || fallback;
+}
+
+// Prépare le canvas et renvoie le contexte + les dimensions logiques (en CSS px)
+function prepareCanvas(canvas, logicalHeight, forcedWidth) {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const parent = canvas.parentElement;
+    let width = forcedWidth || (parent ? parent.clientWidth : 0) || canvas.clientWidth;
+    if (!width || width < 60) width = 640; // section masquée : on redessine à l'affichage
+    width = Math.floor(width);
+
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(logicalHeight * dpr);
+    canvas.style.width = '100%';
+    canvas.style.height = 'auto';
+    canvas._logicalW = width;
+    canvas._logicalH = logicalHeight;
+
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, logicalHeight);
+    return { ctx, W: width, H: logicalHeight };
+}
+
+function chartEmptyState(ctx, W, H, message) {
+    ctx.fillStyle = chartColor('--text-muted', '#999');
+    ctx.font = '14px ' + CHART_FONT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(message, W / 2, H / 2);
+}
+
+function fitText(ctx, text, maxWidth) {
+    if (ctx.measureText(text).width <= maxWidth) return text;
+    let out = text;
+    while (out.length > 3 && ctx.measureText(out + '…').width > maxWidth) {
+        out = out.slice(0, -1);
+    }
+    return out + '…';
+}
+
+const CHART_PALETTE = ['#0a6cff', '#12a150', '#f5a524', '#e5484d', '#8b5cf6', '#06b6d4', '#ec4899', '#64748b'];
+
+/* ---------- Camembert (anneau) + légende ---------- */
 function drawPieChart(canvasId, dataObj) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const entries = Object.entries(dataObj).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]);
+    const probe = canvas.parentElement ? canvas.parentElement.clientWidth : 0;
+    const narrow = (probe || 640) < 460;
+
+    const rowH = 24;
+    const donut = narrow ? 170 : 200;
+    const height = narrow ? donut + 28 + Math.max(1, entries.length) * rowH : Math.max(donut + 20, 40 + entries.length * rowH);
+
+    const { ctx, W, H } = prepareCanvas(canvas, height);
 
     chartInteractions[canvasId] = [];
     attachChartClickListener(canvasId);
 
-    const entries = Object.entries(dataObj).filter(e => e[1] > 0);
     if (entries.length === 0) {
-        ctx.fillStyle = '#999';
-        ctx.font = '16px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText("Aucune donnée", canvas.width/2, canvas.height/2);
+        chartEmptyState(ctx, W, H, 'Aucune dépense sur la période');
         return;
     }
 
     const total = entries.reduce((sum, e) => sum + e[1], 0);
-    const colors = ['#e74c3c', '#3498db', '#f1c40f', '#9b59b6', '#2ecc71', '#e67e22', '#1abc9c', '#34495e'];
+    const cx = narrow ? W / 2 : donut / 2 + 10;
+    const cy = donut / 2 + 10;
+    const outer = donut / 2 - 8;
+    const inner = outer * 0.62;
 
-    let startAngle = 0;
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
-    const radius = Math.min(cx, cy) - 20;
-
+    let startAngle = -Math.PI / 2;
     entries.forEach((entry, i) => {
-        const [label, val] = entry;
-        const sliceAngle = (val / total) * 2 * Math.PI;
-
-        // Draw slice
+        const sliceAngle = (entry[1] / total) * 2 * Math.PI;
         ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.arc(cx, cy, radius, startAngle, startAngle + sliceAngle);
+        ctx.arc(cx, cy, outer, startAngle, startAngle + sliceAngle);
+        ctx.arc(cx, cy, inner, startAngle + sliceAngle, startAngle, true);
         ctx.closePath();
-        ctx.fillStyle = colors[i % colors.length];
+        ctx.fillStyle = CHART_PALETTE[i % CHART_PALETTE.length];
         ctx.fill();
 
-        // Draw Label text
-        const middleAngle = startAngle + sliceAngle / 2;
-        const textX = cx + Math.cos(middleAngle) * (radius + 15);
-        const textY = cy + Math.sin(middleAngle) * (radius + 15);
-
-        // Get text color from CSS variable for dark mode support
-        const computedStyle = getComputedStyle(document.body);
-        const textColor = computedStyle.getPropertyValue('--text-color').trim() || '#333';
-
-        ctx.fillStyle = textColor;
-        ctx.font = '12px Arial';
-        ctx.textAlign = Math.cos(middleAngle) > 0 ? 'left' : 'right';
-        ctx.textBaseline = 'middle';
-
-        // Only show label if slice is > 5% to avoid clutter
-        if ((val / total) > 0.05) {
-            ctx.fillText(`${label} (${Math.round((val/total)*100)}%)`, textX, textY);
-        }
-
-        // Store hit region
         chartInteractions[canvasId].push({
-            type: 'arc', cx, cy, radius, startAngle, endAngle: startAngle + sliceAngle,
-            label, amount: val
+            type: 'arc', cx, cy, radius: outer, innerRadius: inner,
+            startAngle: startAngle < 0 ? startAngle + 2 * Math.PI : startAngle,
+            endAngle: (startAngle + sliceAngle) < 0 ? startAngle + sliceAngle + 2 * Math.PI : startAngle + sliceAngle,
+            label: entry[0], amount: entry[1]
         });
 
         startAngle += sliceAngle;
     });
+
+    // Total au centre de l'anneau
+    ctx.fillStyle = chartColor('--text-color', '#333');
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '600 17px ' + CHART_FONT;
+    ctx.fillText(total.toFixed(0) + ' €', cx, cy - 2);
+    ctx.fillStyle = chartColor('--text-muted', '#888');
+    ctx.font = '11px ' + CHART_FONT;
+    ctx.fillText('Total', cx, cy + 16);
+
+    // Légende
+    const legendX = narrow ? 12 : donut + 26;
+    const legendTop = narrow ? donut + 26 : Math.max(14, (H - entries.length * rowH) / 2);
+    const legendW = W - legendX - 12;
+
+    ctx.textBaseline = 'middle';
+    entries.forEach((entry, i) => {
+        const y = legendTop + i * rowH + rowH / 2;
+        ctx.fillStyle = CHART_PALETTE[i % CHART_PALETTE.length];
+        ctx.beginPath();
+        ctx.roundRect(legendX, y - 5, 10, 10, 3);
+        ctx.fill();
+
+        const amountText = entry[1].toFixed(2) + ' € · ' + Math.round((entry[1] / total) * 100) + '%';
+        ctx.font = '600 12px ' + CHART_FONT;
+        const amountW = ctx.measureText(amountText).width;
+
+        ctx.fillStyle = chartColor('--text-color', '#333');
+        ctx.textAlign = 'right';
+        ctx.fillText(amountText, legendX + legendW, y);
+
+        ctx.font = '12px ' + CHART_FONT;
+        ctx.textAlign = 'left';
+        ctx.fillText(fitText(ctx, entry[0], legendW - amountW - 32), legendX + 18, y);
+
+        chartInteractions[canvasId].push({
+            type: 'rect', x: legendX, y: y - rowH / 2, w: legendW, h: rowH,
+            action: 'showCategory', label: entry[0], amount: entry[1]
+        });
+    });
 }
 
+/* ---------- Histogramme revenus / dépenses ---------- */
 function drawBarChart(canvasId, dataArr) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const { ctx, W, H } = prepareCanvas(canvas, 280);
 
     chartInteractions[canvasId] = [];
     attachChartClickListener(canvasId);
 
-    if (dataArr.length === 0) return;
+    if (!dataArr || dataArr.length === 0) {
+        chartEmptyState(ctx, W, H, 'Aucune donnée');
+        return;
+    }
 
-    const maxVal = Math.max(...dataArr.map(d => Math.max(d.income, d.expense, 0.1)));
+    const textColor = chartColor('--text-color', '#333');
+    const mutedColor = chartColor('--text-muted', '#888');
+    const gridColor = chartColor('--border-color', 'rgba(0,0,0,0.1)');
+    const incomeColor = chartColor('--success-color', '#12a150');
+    const expenseColor = chartColor('--danger-color', '#e5484d');
 
-    const padding = 40;
-    const width = canvas.width - padding * 2;
-    const height = canvas.height - padding * 2;
+    const padLeft = 46;
+    const padRight = 10;
+    const padTop = 30;
+    const padBottom = 26;
+    const chartW = W - padLeft - padRight;
+    const chartH = H - padTop - padBottom;
 
-    // Draw axes
-    ctx.beginPath();
-    ctx.moveTo(padding, padding);
-    ctx.lineTo(padding, canvas.height - padding);
-    ctx.lineTo(canvas.width - padding, canvas.height - padding);
-    ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--border-color').trim() || '#ccc';
-    ctx.stroke();
+    const maxVal = Math.max(...dataArr.map(d => Math.max(d.income, d.expense)), 1);
+    const niceMax = Math.ceil(maxVal / 100) * 100 || 100;
 
-    const barGroupWidth = width / dataArr.length;
-    const barWidth = barGroupWidth * 0.35;
-    const textColor = getComputedStyle(document.body).getPropertyValue('--text-color').trim() || '#333';
+    // Grille + échelle
+    ctx.font = '11px ' + CHART_FONT;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'right';
+    for (let i = 0; i <= 4; i++) {
+        const y = padTop + chartH * (i / 4);
+        ctx.strokeStyle = gridColor;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(padLeft, Math.round(y) + 0.5);
+        ctx.lineTo(W - padRight, Math.round(y) + 0.5);
+        ctx.stroke();
+
+        ctx.fillStyle = mutedColor;
+        ctx.fillText(Math.round(niceMax * (1 - i / 4)) + '€', padLeft - 8, y);
+    }
+
+    // Légende
+    ctx.textAlign = 'left';
+    ctx.fillStyle = incomeColor;
+    ctx.beginPath(); ctx.roundRect(padLeft, 8, 9, 9, 2); ctx.fill();
+    ctx.fillStyle = mutedColor;
+    ctx.fillText('Revenus', padLeft + 15, 13);
+    const off = padLeft + 15 + ctx.measureText('Revenus').width + 16;
+    ctx.fillStyle = expenseColor;
+    ctx.beginPath(); ctx.roundRect(off, 8, 9, 9, 2); ctx.fill();
+    ctx.fillStyle = mutedColor;
+    ctx.fillText('Dépenses', off + 15, 13);
+
+    const groupW = chartW / dataArr.length;
+    const barW = Math.max(6, Math.min(18, groupW * 0.3));
+    const baseY = padTop + chartH;
 
     dataArr.forEach((d, i) => {
-        const x = padding + i * barGroupWidth + barGroupWidth * 0.15;
+        const center = padLeft + groupW * (i + 0.5);
+        const incomeH = (d.income / niceMax) * chartH;
+        const expenseH = (d.expense / niceMax) * chartH;
 
-        // Income Bar (Green)
-        const incomeH = (d.income / maxVal) * height;
-        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--success-color').trim() || '#2ecc71';
-        ctx.fillRect(x, canvas.height - padding - incomeH, barWidth, incomeH);
+        ctx.fillStyle = incomeColor;
+        ctx.beginPath();
+        ctx.roundRect(center - barW - 2, baseY - incomeH, barW, Math.max(incomeH, 1), [4, 4, 0, 0]);
+        ctx.fill();
 
-        // Expense Bar (Red)
-        const expenseH = (d.expense / maxVal) * height;
-        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--danger-color').trim() || '#e74c3c';
-        ctx.fillRect(x + barWidth, canvas.height - padding - expenseH, barWidth, expenseH);
+        ctx.fillStyle = expenseColor;
+        ctx.beginPath();
+        ctx.roundRect(center + 2, baseY - expenseH, barW, Math.max(expenseH, 1), [4, 4, 0, 0]);
+        ctx.fill();
 
-        // Month label
-        ctx.fillStyle = textColor;
-        ctx.font = '12px Arial';
+        ctx.fillStyle = mutedColor;
+        ctx.font = '11px ' + CHART_FONT;
         ctx.textAlign = 'center';
-        ctx.fillText(d.label, x + barWidth, canvas.height - padding + 15);
-
-        // Store hit region for the whole group (both bars + label)
-        const hitX = x - barWidth * 0.5;
-        const hitY = canvas.height - padding - Math.max(incomeH, expenseH);
-        const hitW = barWidth * 3;
-        const hitH = Math.max(incomeH, expenseH) + 20;
+        ctx.textBaseline = 'top';
+        ctx.fillText(d.label, center, baseY + 8);
+        ctx.textBaseline = 'middle';
 
         chartInteractions[canvasId].push({
-            type: 'rect', x: hitX, y: hitY, w: hitW, h: hitH,
+            type: 'rect', x: center - groupW / 2, y: padTop, w: groupW, h: chartH + 20,
             action: 'showMonth', label: d.label, year: d.year, month: d.month,
             income: d.income, expense: d.expense
         });
     });
-
-    // Legend
-    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--success-color').trim() || '#2ecc71';
-    ctx.fillRect(padding + 10, 10, 10, 10);
-    ctx.fillStyle = textColor;
-    ctx.textAlign = 'left';
-    ctx.fillText("Revenus", padding + 25, 20);
-
-    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--danger-color').trim() || '#e74c3c';
-    ctx.fillRect(padding + 100, 10, 10, 10);
-    ctx.fillStyle = textColor;
-    ctx.fillText("Dépenses", padding + 115, 20);
 }
 
+/* ---------- Barres horizontales par catégorie ---------- */
 function drawHorizontalBarChart(canvasId, dataObj) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
 
-    // Sort entries descending by amount
     const entries = Object.entries(dataObj).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]);
 
-    // Auto-adjust canvas height based on number of entries to ensure bars fit nicely
-    const barHeight = 30;
-    const barSpacing = 20;
-    const topPadding = 20;
-    const bottomPadding = 30;
-    const requiredHeight = topPadding + bottomPadding + (entries.length * (barHeight + barSpacing));
+    const rowH = 46;
+    const padTop = 8;
+    const padBottom = 8;
+    const height = Math.max(120, padTop + padBottom + entries.length * rowH);
 
-    // Set internal resolution height, but keep CSS max-width/height logic from HTML
-    canvas.height = Math.max(300, requiredHeight);
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const { ctx, W, H } = prepareCanvas(canvas, height);
 
     chartInteractions[canvasId] = [];
     attachChartClickListener(canvasId);
 
     if (entries.length === 0) {
-        ctx.fillStyle = '#999';
-        ctx.font = '16px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText("Aucune dépense pour cette période", canvas.width/2, canvas.height/2);
+        chartEmptyState(ctx, W, H, 'Aucune dépense pour cette période');
         return;
     }
 
     const maxVal = Math.max(...entries.map(e => e[1]));
+    const total = entries.reduce((s, e) => s + e[1], 0);
 
-    // Label padding (left area for text)
-    const labelWidth = 250;
-    const paddingRight = 80; // space for amount text on the right
-    const width = canvas.width - labelWidth - paddingRight;
+    const textColor = chartColor('--text-color', '#333');
+    const mutedColor = chartColor('--text-muted', '#888');
+    const trackColor = chartColor('--surface-2', '#eee');
+    const accent = chartColor('--accent-color', '#0a6cff');
 
-    const textColor = getComputedStyle(document.body).getPropertyValue('--text-color').trim() || '#333';
-    const barColor = getComputedStyle(document.body).getPropertyValue('--accent-color').trim() || '#4299e1';
-    const borderColor = getComputedStyle(document.body).getPropertyValue('--border-color').trim() || '#e2e8f0';
-
-    // Draw vertical axis line
-    ctx.beginPath();
-    ctx.moveTo(labelWidth, topPadding);
-    ctx.lineTo(labelWidth, canvas.height - bottomPadding);
-    ctx.strokeStyle = borderColor;
-    ctx.stroke();
+    const left = 2;
+    const right = W - 2;
+    const trackW = right - left;
 
     entries.forEach((entry, i) => {
         const [label, val] = entry;
-        const y = topPadding + i * (barHeight + barSpacing);
+        const top = padTop + i * rowH;
+        const isSelected = isCategorySelectionMode && selectedCategories.has(label);
+        const dimmed = isCategorySelectionMode && !isSelected;
 
-        // Calculate bar width based on max value
-        const currentBarWidth = (val / maxVal) * width;
-
-        // Draw category label
-        ctx.fillStyle = textColor;
-        ctx.font = '14px Arial';
+        // Montant à droite
+        ctx.font = '600 13px ' + CHART_FONT;
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
+        ctx.fillStyle = dimmed ? mutedColor : textColor;
+        const amountText = val.toFixed(2) + ' €';
+        ctx.fillText(amountText, right, top + 12);
+        const amountW = ctx.measureText(amountText).width;
 
-        // Truncate label if too long
-        let displayLabel = label;
-        if (ctx.measureText(displayLabel).width > labelWidth - 10) {
-            displayLabel = displayLabel.substring(0, 30) + '...';
-        }
+        // Part en pourcentage
+        ctx.font = '11px ' + CHART_FONT;
+        ctx.fillStyle = mutedColor;
+        const pctText = Math.round((val / total) * 100) + '%';
+        ctx.fillText(pctText, right - amountW - 8, top + 12);
+        const pctW = ctx.measureText(pctText).width;
 
-        ctx.fillText(displayLabel, labelWidth - 10, y + barHeight / 2);
-
-        // Draw bar
-        let isSelected = isCategorySelectionMode && selectedCategories.has(label);
-
-        ctx.fillStyle = barColor;
-        if (isCategorySelectionMode && !isSelected) {
-            ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--border-color').trim() || '#e2e8f0';
-            ctx.globalAlpha = 0.5;
-        }
-
-        ctx.beginPath();
-        ctx.roundRect(labelWidth, y, currentBarWidth, barHeight, [0, 4, 4, 0]);
-        ctx.fill();
-        ctx.globalAlpha = 1.0;
-
-        if (isSelected) {
-            ctx.strokeStyle = textColor;
-            ctx.lineWidth = 2;
-            ctx.stroke();
-        }
-
-        // Draw amount value
-        ctx.fillStyle = textColor;
+        // Libellé de catégorie
+        ctx.font = (isSelected ? '600 13px ' : '13px ') + CHART_FONT;
         ctx.textAlign = 'left';
-        ctx.font = 'bold 13px Arial';
-        ctx.fillText(`${val.toFixed(2)} €`, labelWidth + currentBarWidth + 10, y + barHeight / 2);
+        ctx.fillStyle = dimmed ? mutedColor : textColor;
+        ctx.fillText(fitText(ctx, label, trackW - amountW - pctW - 26), left, top + 12);
 
-        // Store hit region
+        // Piste + barre
+        const barY = top + 26;
+        ctx.fillStyle = trackColor;
+        ctx.beginPath();
+        ctx.roundRect(left, barY, trackW, 9, 5);
+        ctx.fill();
+
+        ctx.fillStyle = dimmed ? mutedColor : accent;
+        ctx.globalAlpha = dimmed ? 0.35 : 1;
+        ctx.beginPath();
+        ctx.roundRect(left, barY, Math.max(4, (val / maxVal) * trackW), 9, 5);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
         chartInteractions[canvasId].push({
-            type: 'rect', x: 0, y: y, w: canvas.width, h: barHeight,
+            type: 'rect', x: 0, y: top, w: W, h: rowH - 4,
             action: 'showCategory', label: label, amount: val
         });
     });
+}
+
+/* ---------- Courbe (patrimoine, portefeuille) ---------- */
+function drawAreaLineChart(canvasId, points, options) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    const opts = options || {};
+    const { ctx, W, H } = prepareCanvas(canvas, opts.height || 200);
+
+    if (!points || points.length === 0) {
+        chartEmptyState(ctx, W, H, opts.emptyMessage || 'Aucune donnée à afficher');
+        return;
+    }
+
+    const textColor = chartColor('--text-color', '#333');
+    const mutedColor = chartColor('--text-muted', '#888');
+    const gridColor = chartColor('--border-color', 'rgba(0,0,0,0.1)');
+    const accent = opts.color || chartColor('--accent-color', '#0a6cff');
+
+    const padLeft = 48;
+    const padRight = 10;
+    const padTop = 14;
+    const padBottom = 24;
+    const chartW = W - padLeft - padRight;
+    const chartH = H - padTop - padBottom;
+
+    const values = points.map(p => p.value);
+    let minVal = Math.min(...values, 0);
+    let maxVal = Math.max(...values, 0);
+    if (maxVal === minVal) maxVal = minVal + 1;
+    const range = maxVal - minVal;
+
+    const xAt = (i) => points.length === 1 ? padLeft + chartW / 2 : padLeft + (i / (points.length - 1)) * chartW;
+    const yAt = (v) => padTop + chartH - ((v - minVal) / range) * chartH;
+
+    // Grille horizontale + échelle
+    ctx.font = '11px ' + CHART_FONT;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i <= 3; i++) {
+        const v = maxVal - (range * i / 3);
+        const y = yAt(v);
+        ctx.strokeStyle = gridColor;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(padLeft, Math.round(y) + 0.5);
+        ctx.lineTo(W - padRight, Math.round(y) + 0.5);
+        ctx.stroke();
+        ctx.fillStyle = mutedColor;
+        ctx.fillText(Math.round(v) + '€', padLeft - 8, y);
+    }
+
+    // Aire sous la courbe
+    const gradient = ctx.createLinearGradient(0, padTop, 0, padTop + chartH);
+    gradient.addColorStop(0, accent + '55');
+    gradient.addColorStop(1, accent + '00');
+    ctx.beginPath();
+    ctx.moveTo(xAt(0), yAt(values[0]));
+    values.forEach((v, i) => ctx.lineTo(xAt(i), yAt(v)));
+    ctx.lineTo(xAt(values.length - 1), padTop + chartH);
+    ctx.lineTo(xAt(0), padTop + chartH);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // Courbe
+    ctx.beginPath();
+    values.forEach((v, i) => {
+        const x = xAt(i), y = yAt(v);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Dernier point mis en avant
+    const lastX = xAt(values.length - 1);
+    const lastY = yAt(values[values.length - 1]);
+    ctx.fillStyle = chartColor('--card-bg', '#fff');
+    ctx.beginPath(); ctx.arc(lastX, lastY, 5, 0, 2 * Math.PI); ctx.fill();
+    ctx.strokeStyle = accent; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(lastX, lastY, 5, 0, 2 * Math.PI); ctx.stroke();
+
+    // Libellés de l'axe des abscisses (premier, milieu, dernier)
+    ctx.fillStyle = mutedColor;
+    ctx.font = '11px ' + CHART_FONT;
+    ctx.textBaseline = 'top';
+    const idx = points.length <= 2 ? [0, points.length - 1] : [0, Math.floor((points.length - 1) / 2), points.length - 1];
+    idx.forEach((i, n) => {
+        ctx.textAlign = n === 0 ? 'left' : (n === idx.length - 1 ? 'right' : 'center');
+        ctx.fillText(points[i].label, xAt(i), padTop + chartH + 8);
+    });
+    ctx.textBaseline = 'middle';
 }
 
 
@@ -4174,6 +4402,7 @@ function updatePredictionChart() {
 }
 
 function drawCustomLineChart(ctx, labels, dataPoints, baselinePoints, textColor, gridColor) {
+    baselinePoints = baselinePoints || [];
     const width = ctx.canvas.width;
     const height = ctx.canvas.height;
     ctx.clearRect(0, 0, width, height);
@@ -4236,7 +4465,7 @@ function drawCustomLineChart(ctx, labels, dataPoints, baselinePoints, textColor,
         ctx.setLineDash([]);
     };
 
-    drawLine(baselinePoints, '#888888', true); // Baseline
+    if (baselinePoints.length) drawLine(baselinePoints, '#888888', true); // Baseline
     drawLine(dataPoints, '#0066cc', false); // Simulated
 
     // X Labels (every 3 months)
@@ -4723,59 +4952,42 @@ window.deleteInvestmentHistoryEntry = async function(invId, entryId) {
     }
 };
 
-let portfolioChartInstance = null;
+/* -------------------------------------------------------------------------
+   Évolution du portefeuille d'investissement
+   ------------------------------------------------------------------------- */
+function getPortfolioValueAt(dateStr) {
+    let total = 0;
+    if (!appData.investments) return 0;
+    appData.investments.forEach(inv => {
+        if (inv.status !== 'active' || !inv.valueHistory || inv.valueHistory.length === 0) return;
+        const past = inv.valueHistory
+            .filter(vh => vh.date <= dateStr)
+            .sort((a, b) => (a.date < b.date ? 1 : -1));
+        if (past.length > 0) total += Number(past[0].value) || 0;
+    });
+    return total;
+}
 
 function renderPortfolioChart() {
     const canvas = document.getElementById('portfolioChart');
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
 
-    if (!appData.investments || appData.investments.length === 0) {
-        return; // nothing to draw
+    const activeInvs = (appData.investments || []).filter(i => i.status === 'active' && i.valueHistory && i.valueHistory.length > 0);
+
+    if (activeInvs.length === 0) {
+        drawAreaLineChart('portfolioChart', [], { height: 220, emptyMessage: "Ajoutez une valeur à un actif pour voir l'évolution" });
+        return;
     }
 
-    // Gather all unique dates across all active investments
-    const allDatesSet = new Set();
-    const activeInvs = appData.investments.filter(i => i.status === 'active' && i.valueHistory && i.valueHistory.length > 0);
+    // Toutes les dates de valorisation, dans l'ordre chronologique
+    const allDates = Array.from(new Set(activeInvs.flatMap(inv => inv.valueHistory.map(vh => vh.date)))).sort();
 
-    if (activeInvs.length === 0) return;
+    const points = allDates.map(date => ({
+        label: new Date(date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }),
+        value: getPortfolioValueAt(date)
+    }));
 
-    activeInvs.forEach(inv => {
-        inv.valueHistory.forEach(vh => allDatesSet.add(vh.date));
-    });
-
-    const allDates = Array.from(allDatesSet).sort((a, b) => new Date(a) - new Date(b));
-
-    // For each date, compute total portfolio value
-    const totals = [];
-
-    allDates.forEach(date => {
-        let totalVal = 0;
-        activeInvs.forEach(inv => {
-            // Find value on or before this date
-            const pastValues = inv.valueHistory.filter(vh => new Date(vh.date) <= new Date(date));
-            if (pastValues.length > 0) {
-                pastValues.sort((a, b) => new Date(b.date) - new Date(a.date));
-                totalVal += pastValues[0].value;
-            }
-        });
-        totals.push(totalVal);
-    });
-
-    // Vanilla JS Canvas drawing (line chart) based on the app's existing logic
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Create arrays for drawing
-    const dataPoints = totals;
-    const labels = allDates;
-
-    const isDarkMode = document.body.classList.contains('dark-mode');
-    const textColor = isDarkMode ? '#f2f2f7' : '#1c1c1e';
-    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-
-    if (typeof drawCustomLineChart === 'function') {
-        drawCustomLineChart(ctx, labels, dataPoints, null, textColor, gridColor);
-    }
+    drawAreaLineChart('portfolioChart', points, { height: 220 });
 }
 
 window.showCategoryDetails = showCategoryDetails;
@@ -5063,6 +5275,25 @@ function renderDashboardExtras(year, month) {
     const elSavings = document.getElementById('dash-savings-month');
     if (elSavings) elSavings.textContent = fmtEuro(current.savings);
 
+    // Légende de l'objectif
+    const elTarget = document.getElementById('goal-value-target');
+    if (elTarget) elTarget.textContent = goal ? fmtEuro(goal) : 'Non défini';
+    const elSpent = document.getElementById('goal-value-spent');
+    if (elSpent) elSpent.textContent = fmtEuro(current.expense);
+    const elGoalLeft = document.getElementById('goal-value-left');
+    if (elGoalLeft) {
+        if (!goal) {
+            elGoalLeft.textContent = '—';
+            elGoalLeft.style.color = '';
+        } else {
+            elGoalLeft.textContent = fmtEuro(Math.max(0, remaining));
+            elGoalLeft.style.color = remaining < 0 ? 'var(--danger-color)' : 'var(--success-color)';
+        }
+    }
+
+    // Courbe du patrimoine
+    renderPatrimonyChart(year, month);
+
     // --- Dernières transactions ---
     const feed = document.getElementById('dash-recent-list');
     if (feed) {
@@ -5167,6 +5398,59 @@ function renderDashboardExtras(year, month) {
 }
 
 /* -------------------------------------------------------------------------
+   Courbe d'évolution du patrimoine
+   Patrimoine = trésorerie cumulée (salaires compris, épargne incluse)
+   + valeur du portefeuille d'investissement à la fin de chaque mois.
+   ------------------------------------------------------------------------- */
+function renderPatrimonyChart(year, month) {
+    const canvas = document.getElementById('dashPatrimonyChart');
+    if (!canvas) return;
+
+    const transactions = (appData.transactions || []).filter(t => t.date);
+    const MONTHS_BACK = 12;
+
+    // Bornes de fin de mois, du plus ancien au plus récent
+    const bounds = [];
+    for (let i = MONTHS_BACK - 1; i >= 0; i--) {
+        let m = month - i;
+        let y = year;
+        while (m <= 0) { m += 12; y -= 1; }
+        const lastDay = new Date(y, m, 0).getDate();
+        bounds.push({
+            key: y + '-' + String(m).padStart(2, '0') + '-' + String(lastDay).padStart(2, '0'),
+            label: MONTH_NAMES_FR[m - 1].slice(0, 4) + ' ' + String(y).slice(2)
+        });
+    }
+
+    const points = bounds.map(b => {
+        let treasury = 0;
+        transactions.forEach(t => {
+            if (t.date > b.key) return;
+            const amount = Number(t.amount) || 0;
+            if (t.type === 'income' || t.type === 'salary' || t.type === 'investment_return') treasury += amount;
+            else if (t.type === 'expense' || t.type === 'investment_transfer') treasury -= amount;
+        });
+        const portfolio = typeof getPortfolioValueAt === 'function' ? getPortfolioValueAt(b.key) : 0;
+        return { label: b.label, value: treasury + portfolio };
+    });
+
+    const totalEl = document.getElementById('dash-patrimony-total');
+    if (totalEl && points.length) {
+        const last = points[points.length - 1].value;
+        const first = points[0].value;
+        const diff = last - first;
+        totalEl.textContent = fmtEuro(last) + (diff ? '  (' + (diff > 0 ? '+' : '-') + Math.abs(diff).toFixed(0) + ' € sur 12 mois)' : '');
+        totalEl.style.color = last >= 0 ? 'var(--text-color)' : 'var(--danger-color)';
+    }
+
+    const hasData = points.some(p => p.value !== 0);
+    drawAreaLineChart('dashPatrimonyChart', hasData ? points : [], {
+        height: 200,
+        emptyMessage: 'Ajoutez des transactions pour suivre votre patrimoine'
+    });
+}
+
+/* -------------------------------------------------------------------------
    Initialisation de l'interface
    ------------------------------------------------------------------------- */
 document.addEventListener('DOMContentLoaded', () => {
@@ -5201,4 +5485,40 @@ document.addEventListener('DOMContentLoaded', () => {
     highlightNavGroup('dashboard');
 
     initQuickAdd();
+    initAdvancedFields();
+
+    // Les graphiques sont redessinés à la largeur du conteneur
+    let resizeTimer = null;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            const active = document.querySelector('.view-section.active');
+            if (!active) return;
+            document.dispatchEvent(new CustomEvent('viewChanged', { detail: active.id }));
+        }, 250);
+    });
 });
+
+// Ouvre le bloc "Options avancées" dès qu'un champ conditionnel devient utile
+function initAdvancedFields() {
+    const details = document.getElementById('trans-advanced');
+    if (!details) return;
+
+    const conditionalIds = ['trans-savings-group', 'trans-investment-group', 'trans-mv-group', 'trans-linked-expense-group'];
+    const sync = () => {
+        const needed = conditionalIds.some(id => {
+            const el = document.getElementById(id);
+            return el && el.style.display !== 'none';
+        });
+        if (needed) details.open = true;
+    };
+
+    ['trans-type', 'trans-category'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', () => setTimeout(sync, 0));
+    });
+
+    document.addEventListener('viewChanged', (e) => {
+        if (e.detail === 'transactions') setTimeout(sync, 0);
+    });
+}

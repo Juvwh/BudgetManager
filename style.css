@@ -28,27 +28,27 @@
     --warning-soft: rgba(245, 165, 36, 0.12);
 
     /* Surfaces */
-    --bg-color: #f4f5f7;
+    --bg-color: #e9ecf1;
     --card-bg: #ffffff;
-    --surface-2: #f7f8fa;
-    --sidebar-bg: #ffffff;
-    --header-bg: rgba(255, 255, 255, 0.82);
-    --secondary-color: #f4f5f7;
+    --surface-2: #f0f2f6;
+    --sidebar-bg: #f6f7f9;
+    --header-bg: rgba(246, 247, 249, 0.88);
+    --secondary-color: #e9ecf1;
 
     /* Texte */
-    --text-color: #16181d;
-    --text-muted: #6b7280;
+    --text-color: #12141a;
+    --text-muted: #5a6373;
 
     /* Bordures & champs */
-    --border-color: rgba(16, 24, 40, 0.10);
-    --border-strong: rgba(16, 24, 40, 0.18);
+    --border-color: rgba(16, 24, 40, 0.16);
+    --border-strong: rgba(16, 24, 40, 0.30);
     --input-bg: #ffffff;
-    --input-text: #16181d;
+    --input-text: #12141a;
 
     /* Élévation */
-    --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
-    --shadow-md: 0 4px 16px rgba(16, 24, 40, 0.07);
-    --shadow-lg: 0 18px 48px rgba(16, 24, 40, 0.18);
+    --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.07);
+    --shadow-md: 0 6px 20px rgba(16, 24, 40, 0.10);
+    --shadow-lg: 0 18px 48px rgba(16, 24, 40, 0.22);
 
     /* Rayons */
     --r-sm: 8px;
@@ -384,7 +384,8 @@ main#app-content {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 0.5rem;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.5rem;
     margin-top: 0.9rem;
     padding-top: 0.75rem;
     border-top: 1px solid var(--border-color);
@@ -474,8 +475,42 @@ main#app-content {
 .goal-wrap {
     position: relative;
     height: 16px;
-    margin: 2.4rem 0 3.2rem;
+    margin: 0.5rem 0 1rem;
 }
+
+/* Les anciens repères restent dans le DOM (pilotés par le JS) mais ne sont
+   plus affichés : la légende ci-dessous est plus lisible. */
+#progress-current-text,
+#progress-limit-text,
+#progress-remaining-text,
+#progress-current-marker,
+#progress-limit-marker { display: none !important; }
+
+.goal-legend {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.6rem;
+    margin-top: 1rem;
+}
+
+.goal-legend-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding-left: 0.75rem;
+    border-left: 3px solid var(--border-color);
+    position: relative;
+}
+
+.goal-legend-item .mini-label { font-size: 0.72rem; }
+
+.goal-legend-value { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em; }
+
+.goal-dot { display: none; }
+
+.goal-legend-item:nth-child(1) { border-left-color: var(--text-muted); }
+.goal-legend-item:nth-child(2) { border-left-color: var(--accent-color); }
+.goal-legend-item:nth-child(3) { border-left-color: var(--success-color); }
 
 .progress-track {
     width: 100%;
@@ -695,6 +730,204 @@ main#app-content {
 
 .form-feedback.is-success { background: var(--success-soft); color: var(--success-color); }
 
+/* ---- Composeur de transaction ---- */
+.composer-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.composer-grid .form-group { margin-bottom: 0; }
+.composer-wide { grid-column: span 2; }
+
+.advanced {
+    margin-top: 0.9rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+}
+
+.advanced > summary {
+    cursor: pointer;
+    padding: 0.6rem 0.85rem;
+    font-size: 0.88rem;
+    font-weight: 600;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: var(--r-md);
+}
+
+.advanced > summary::-webkit-details-marker { display: none; }
+
+.advanced > summary::before {
+    content: '';
+    width: 0;
+    height: 0;
+    border-left: 5px solid currentColor;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    transition: transform 0.15s ease;
+    flex-shrink: 0;
+    opacity: 0.6;
+}
+
+.advanced[open] > summary::before { transform: rotate(90deg); }
+
+.advanced-hint {
+    font-weight: 400;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.advanced-body {
+    padding: 0.25rem 0.85rem 0.85rem;
+    border-top: 1px solid var(--border-color);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 0 0.9rem;
+    align-items: start;
+    padding-top: 0.85rem;
+}
+
+.composer-actions {
+    display: flex;
+    gap: 0.6rem;
+    margin-top: 0.9rem;
+}
+
+.composer-actions .btn { min-width: 140px; }
+
+/* ---- Liste des transactions ---- */
+.txn-list { display: flex; flex-direction: column; gap: 1.1rem; }
+
+.txn-group { display: flex; flex-direction: column; }
+
+.txn-day {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0 0.2rem 0.4rem;
+    margin-bottom: 0.2rem;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    position: sticky;
+    top: 0;
+    background: var(--card-bg);
+    z-index: 2;
+    padding-right: calc(104px + 1.25rem);
+}
+
+.txn-day .text-green, .txn-day .text-red { font-size: 0.82rem; }
+
+.txn-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.5rem;
+    border-radius: var(--r-md);
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.12s ease;
+}
+
+.txn-row:last-child { border-bottom: none; }
+.txn-row:hover { background: var(--surface-2); }
+.txn-row.is-selected { background: var(--accent-soft); }
+
+.txn-row.is-corrupted {
+    background: var(--danger-soft);
+    box-shadow: inset 3px 0 0 var(--danger-color);
+}
+
+.txn-lead { display: flex; align-items: center; }
+
+.txn-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+    background: var(--surface-2);
+    color: var(--text-muted);
+}
+
+.txn-avatar.is-in { background: var(--success-soft); color: var(--success-color); }
+.txn-avatar.is-out { background: var(--danger-soft); color: var(--danger-color); }
+.txn-avatar.is-neutral { background: var(--accent-soft); color: var(--accent-color); }
+
+.txn-main { min-width: 0; }
+
+.txn-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.txn-sub {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.txn-tags { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-top: 0.3rem; }
+.txn-tags .tag-chip { font-size: 0.72rem; padding: 0.1rem 0.5rem; }
+
+.txn-right { text-align: right; white-space: nowrap; }
+.txn-amount { font-size: 1rem; font-weight: 700; }
+.txn-extra { font-size: 0.74rem; color: var(--text-muted); }
+
+.txn-actions {
+    display: flex;
+    gap: 0.25rem;
+    width: 104px;
+    justify-content: flex-end;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+.txn-row:hover .txn-actions, .txn-row:focus-within .txn-actions { opacity: 1; }
+
+.icon-action {
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--border-color);
+    border-radius: 9px;
+    background: var(--card-bg);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.icon-action:hover { color: var(--accent-color); border-color: var(--accent-color); }
+.icon-action.is-refund:hover { color: var(--success-color); border-color: var(--success-color); }
+.icon-action.is-delete:hover { color: var(--danger-color); border-color: var(--danger-color); }
+
+.filters-top {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.filters-top input[type="month"] { max-width: 190px; }
+
 /* -------------------------------------------------------------------------
    7. BANNIÈRES
    ------------------------------------------------------------------------- */
@@ -734,6 +967,9 @@ main#app-content {
     gap: 1.1rem;
     align-items: start;
 }
+
+/* Transactions : le composeur est une bande pleine largeur au-dessus de la liste */
+#transactions .split-layout { grid-template-columns: minmax(0, 1fr); }
 
 .split-layout > .card { margin-bottom: 0; }
 
@@ -829,6 +1065,7 @@ input[type="date"] {
 .multi-select[multiple] { background-image: none; padding-right: 0.75rem; }
 
 #dashboard-category-month-selector { max-width: 190px; font-size: 0.85rem; }
+#dashboard-category-chart-card .card-head { align-items: flex-start; }
 
 .form-group input:focus,
 .form-group select:focus,
@@ -1531,28 +1768,32 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
 
     .card { padding: 1rem; border-radius: var(--r-md); }
 
-    .summary-cards { grid-template-columns: repeat(3, 1fr); gap: 0.55rem; }
-    .summary-cards .card { padding: 0.7rem 0.6rem; }
-    .stat-head { gap: 0.35rem; margin-bottom: 0.3rem; }
-    .stat-head h3 { font-size: 0.66rem; letter-spacing: 0.02em; }
-    .stat-icon { display: none; }
-    .stat-card p { font-size: 1.05rem; }
-    .stat-delta { font-size: 0.7rem; }
+    .summary-cards { grid-template-columns: 1fr; gap: 0.7rem; }
+    .dash-grid .summary-cards { grid-template-columns: repeat(3, 1fr); gap: 0.55rem; }
+    .dash-grid .summary-cards .card { padding: 0.7rem 0.55rem; }
+    /* Le montant s'adapte a la largeur pour ne jamais etre tronque */
+    .dash-grid .stat-card p { font-size: clamp(0.8rem, 3.7vw, 1.15rem); }
+    .stat-head { gap: 0.4rem; margin-bottom: 0.35rem; }
+    .dash-grid .stat-head h3 { font-size: 0.66rem; letter-spacing: 0.02em; }
+    .dash-grid .stat-icon { display: none; }
+    .stat-delta { font-size: 0.74rem; }
 
     .dash-side { grid-template-columns: 1fr; }
 
-    /* Ordre de lecture sur mobile : saisie, indicateurs, objectif, détails */
+    /* Ordre de lecture sur mobile : indicateurs d'abord, puis saisie */
     .dash-grid { display: flex; flex-direction: column; gap: 1.1rem; }
     .dash-main, .dash-side { display: contents; }
-    .dash-grid > * > * { margin-bottom: 0; }
-    .quick-add { order: 1; }
-    .summary-cards { order: 2; margin-bottom: 0; }
+    /* min-width:0 evite qu'un contenu long elargisse une carte au-dela de l'ecran */
+    .dash-grid > * > * { margin-bottom: 0; min-width: 0; max-width: 100%; }
+    .summary-cards { order: 1; margin-bottom: 0; }
+    .quick-add { order: 2; }
     #goal-progress-card { order: 3; }
-    #dash-card-top { order: 4; }
-    #dash-card-upcoming { order: 5; }
-    #dashboard-category-chart-card { order: 6; }
-    #dash-card-recent { order: 7; }
-    #dashboard-patrimony-widget { order: 8; }
+    #dash-card-patrimony { order: 4; }
+    #dash-card-top { order: 5; }
+    #dash-card-upcoming { order: 6; }
+    #dashboard-category-chart-card { order: 7; }
+    #dash-card-recent { order: 8; }
+    #dashboard-patrimony-widget { order: 9; }
 
     .mini-stats { grid-template-columns: repeat(2, 1fr); }
 
@@ -1578,12 +1819,8 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
 
     .toolbar-right { justify-content: space-between; }
 
-    /* Les graphiques restent lisibles : défilement horizontal plutôt que compression */
-    .canvas-wrap { overflow-x: auto; }
-    #dashboardBarChartCategory,
-    #horizontalBarChartCategory,
-    #portfolioChart,
-    #predictionChart { min-width: 540px; }
+    /* Aucun défilement horizontal : les graphiques sont dessinés à la largeur réelle */
+    .canvas-wrap { overflow-x: hidden; }
 
     /* --- Tableaux transformés en cartes --- */
     .table-container { overflow-x: visible; }
@@ -1698,6 +1935,38 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
     }
 
     .col-checkbox { display: none !important; }
+
+    /* Composeur : une colonne */
+    .composer-grid { grid-template-columns: 1fr; }
+    .composer-wide { grid-column: span 1; }
+    .composer-actions .btn { flex: 1; min-width: 0; }
+    .advanced-hint { display: none; }
+
+    /* Liste des transactions : actions toujours visibles */
+    .txn-row {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-areas: "lead main right" "actions actions actions";
+        padding: 0.65rem 0.35rem;
+        gap: 0.6rem;
+    }
+
+    .txn-lead { grid-area: lead; }
+    .txn-main { grid-area: main; }
+    .txn-right { grid-area: right; }
+
+    .txn-actions {
+        grid-area: actions;
+        opacity: 1;
+        justify-content: flex-end;
+        gap: 0.4rem;
+    }
+
+    .txn-title { white-space: normal; }
+    .txn-day { position: static; padding-right: 0.2rem; }
+    .txn-actions { width: auto; }
+    .goal-legend { grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
+    .goal-legend-item { padding-left: 0.5rem; }
+    .goal-legend-value { font-size: 0.98rem; }
 
     /* Note et tags sur toute la largeur de la carte */
     tbody td[data-label="Note"],

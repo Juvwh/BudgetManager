@@ -102,7 +102,7 @@
 
     <div class="page-head">
         <div class="page-head-text">
-            <h2>Tableau de bord</h2>
+            <h2 id="dash-greeting">Bonjour Justin</h2>
             <p class="page-sub" id="dash-period-label">Vue du mois en cours</p>
         </div>
         <div class="page-head-actions">
@@ -165,7 +165,7 @@
                 </div>
                 <div class="card stat-card stat-balance">
                     <div class="stat-head">
-                        <span class="stat-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg></span>
+                        <span class="stat-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v8"/><path d="M8 8h8"/><path d="M8 18h8"/></svg></span>
                         <h3>Solde du mois</h3>
                     </div>
                     <p id="dash-balance">0.00 €</p>
@@ -197,6 +197,24 @@
                     Dépassement de <span id="progress-over-value">0.00€</span>
                 </div>
 
+                <div class="goal-legend">
+                    <div class="goal-legend-item">
+                        <span class="goal-dot dot-goal"></span>
+                        <span class="mini-label">Objectif</span>
+                        <span class="goal-legend-value" id="goal-value-target">0.00 €</span>
+                    </div>
+                    <div class="goal-legend-item">
+                        <span class="goal-dot dot-spent"></span>
+                        <span class="mini-label">Dépense</span>
+                        <span class="goal-legend-value" id="goal-value-spent">0.00 €</span>
+                    </div>
+                    <div class="goal-legend-item">
+                        <span class="goal-dot dot-left"></span>
+                        <span class="mini-label">Reste</span>
+                        <span class="goal-legend-value" id="goal-value-left">0.00 €</span>
+                    </div>
+                </div>
+
                 <!-- Repères de rythme calculés côté JS -->
                 <div class="mini-stats" id="dash-pace-stats">
                     <div class="mini-stat">
@@ -215,6 +233,17 @@
                         <span class="mini-label">Épargne du mois</span>
                         <span class="mini-value" id="dash-savings-month">0.00 €</span>
                     </div>
+                </div>
+            </div>
+
+            <!-- Évolution du patrimoine -->
+            <div class="card" id="dash-card-patrimony">
+                <div class="card-head">
+                    <h3>Évolution du patrimoine</h3>
+                    <span class="muted" id="dash-patrimony-total">0.00 €</span>
+                </div>
+                <div class="canvas-wrap">
+                    <canvas id="dashPatrimonyChart"></canvas>
                 </div>
             </div>
 
@@ -356,94 +385,121 @@
     </nav>
 
     <div class="split-layout">
-        <div class="form-panel card">
-            <h3>Ajouter une transaction</h3>
+        <!-- Composeur : saisie sur une ligne, options avancées repliées -->
+        <div class="form-panel card composer">
+            <div class="card-head">
+                <h3>Ajouter une transaction</h3>
+            </div>
             <form id="form-transaction">
-                <div class="form-group">
-                    <label>Type</label>
-                    <select id="trans-type" required>
-                        <option value="expense">Dépense</option>
-                        <option value="income">Revenu</option>
-                        <option value="salary">Salaire</option>
-                        <option value="investment_transfer" class="opt-investment">Transfert vers investissement</option>
-                        <option value="investment_return" class="opt-investment">Retour d'investissement</option>
-                    </select>
-                </div>
-                <div class="form-group" id="trans-amount-group">
-                    <label id="trans-amount-label">Montant (€)</label>
-                    <input type="number" id="trans-amount" step="0.01" min="0" inputmode="decimal" required>
-                </div>
-                <div class="form-group" id="trans-savings-group" style="display: none;">
-                    <label>Montant à épargner (€)</label>
-                    <input type="number" id="trans-savings-amount" step="0.01" min="0" value="0">
-                </div>
-                <div class="form-group">
-                    <label>Date</label>
-                    <input type="date" id="trans-date" required>
-                </div>
-                <div class="form-group">
-                    <label>Catégorie</label>
-                    <select id="trans-category" required></select>
-                </div>
-                <div class="form-group form-group-accent" id="trans-investment-group" style="display: none;">
-                    <label>Actif lié</label>
-                    <select id="trans-investment-id" style="margin-bottom: 0.5rem;">
-                        <option value="">-- Créer un nouvel actif --</option>
-                    </select>
-                    <div id="trans-investment-new-fields">
-                        <input type="text" id="trans-investment-name" placeholder="Nom du nouvel actif (ex: Livret A)" style="margin-bottom: 0.5rem;">
-                        <select id="trans-investment-type">
-                            <option value="metaux">Métaux précieux</option>
-                            <option value="actions">Actions et ETF</option>
-                            <option value="crypto">Cryptomonnaies</option>
-                            <option value="immo">Immobilier</option>
-                            <option value="epargne">Épargne réglementée</option>
-                            <option value="autre">Autre</option>
+                <div class="composer-grid">
+                    <div class="form-group">
+                        <label for="trans-type">Type</label>
+                        <select id="trans-type" required>
+                            <option value="expense">Dépense</option>
+                            <option value="income">Revenu</option>
+                            <option value="salary">Salaire</option>
+                            <option value="investment_transfer" class="opt-investment">Transfert vers investissement</option>
+                            <option value="investment_return" class="opt-investment">Retour d&#39;investissement</option>
                         </select>
                     </div>
-                </div>
-                <div class="form-group form-group-accent" id="trans-mv-group" style="display: none;">
-                    <label for="trans-mv-part">Part payée en chèques repas (€)</label>
-                    <input type="number" id="trans-mv-part" step="0.01" min="0">
-                    <div id="trans-mv-suggestion" class="form-hint" style="display: none;">
-                        Vous avez des chèques repas disponibles : pensez à renseigner ce champ si vous en avez utilisé.
+                    <div class="form-group" id="trans-amount-group">
+                        <label id="trans-amount-label" for="trans-amount">Montant (€)</label>
+                        <input type="number" id="trans-amount" step="0.01" min="0" inputmode="decimal" placeholder="0.00" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="trans-date">Date</label>
+                        <input type="date" id="trans-date" required>
+                    </div>
+                    <div class="form-group composer-wide">
+                        <label for="trans-category">Catégorie</label>
+                        <select id="trans-category" required></select>
+                    </div>
+                    <div class="form-group composer-wide">
+                        <label for="trans-note">Note</label>
+                        <input type="text" id="trans-note" placeholder="Ex: Plein d&#39;essence">
                     </div>
                 </div>
-                <div class="form-group form-group-success" id="trans-linked-expense-group" style="display: none;">
-                    <label>Lié à une dépense (remboursement)</label>
-                    <select id="trans-linked-expense">
-                        <option value="">-- Aucune (Revenu standard) --</option>
-                    </select>
-                    <small>Ce revenu viendra déduire le coût de la dépense sélectionnée dans vos statistiques.</small>
-                </div>
-                <div class="form-group">
-                    <label>Tags</label>
-                    <div id="trans-tags-container" class="tags-container"></div>
-                    <div class="inline-row">
-                        <input type="text" id="trans-new-tag-name" placeholder="Nouveau tag (ex: Londres)" style="flex: 1;">
-                        <input type="color" id="trans-new-tag-color" value="#888888" class="color-input">
-                        <button type="button" id="btn-add-tag" class="btn btn-secondary btn-small">Créer</button>
+
+                <details class="advanced" id="trans-advanced">
+                    <summary>Options avancées <span class="advanced-hint">tags, épargne, chèques repas, remboursement, actif lié</span></summary>
+                    <div class="advanced-body">
+                        <div class="form-group" id="trans-savings-group" style="display: none;">
+                            <label for="trans-savings-amount">Montant à épargner (€)</label>
+                            <input type="number" id="trans-savings-amount" step="0.01" min="0" value="0">
+                        </div>
+
+                        <div class="form-group form-group-accent" id="trans-investment-group" style="display: none;">
+                            <label>Actif lié</label>
+                            <select id="trans-investment-id" style="margin-bottom: 0.5rem;">
+                                <option value="">-- Créer un nouvel actif --</option>
+                            </select>
+                            <div id="trans-investment-new-fields">
+                                <input type="text" id="trans-investment-name" placeholder="Nom du nouvel actif (ex: Livret A)" style="margin-bottom: 0.5rem;">
+                                <select id="trans-investment-type">
+                                    <option value="metaux">Métaux précieux</option>
+                                    <option value="actions">Actions et ETF</option>
+                                    <option value="crypto">Cryptomonnaies</option>
+                                    <option value="immo">Immobilier</option>
+                                    <option value="epargne">Épargne réglementée</option>
+                                    <option value="autre">Autre</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group form-group-accent" id="trans-mv-group" style="display: none;">
+                            <label for="trans-mv-part">Part payée en chèques repas (€)</label>
+                            <input type="number" id="trans-mv-part" step="0.01" min="0">
+                            <div id="trans-mv-suggestion" class="form-hint" style="display: none;">
+                                Vous avez des chèques repas disponibles : pensez à renseigner ce champ si vous en avez utilisé.
+                            </div>
+                        </div>
+
+                        <div class="form-group form-group-success" id="trans-linked-expense-group" style="display: none;">
+                            <label>Lié à une dépense (remboursement)</label>
+                            <select id="trans-linked-expense">
+                                <option value="">-- Aucune (Revenu standard) --</option>
+                            </select>
+                            <small>Ce revenu viendra déduire le coût de la dépense sélectionnée dans vos statistiques.</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Tags</label>
+                            <div id="trans-tags-container" class="tags-container"></div>
+                            <div class="inline-row">
+                                <input type="text" id="trans-new-tag-name" placeholder="Nouveau tag (ex: Londres)" style="flex: 1;">
+                                <input type="color" id="trans-new-tag-color" value="#888888" class="color-input">
+                                <button type="button" id="btn-add-tag" class="btn btn-secondary btn-small">Créer</button>
+                            </div>
+                            <input type="hidden" id="trans-selected-tags" value="[]">
+                        </div>
                     </div>
-                    <input type="hidden" id="trans-selected-tags" value="[]">
-                </div>
-                <div class="form-group">
-                    <label>Note (optionnelle)</label>
-                    <input type="text" id="trans-note" placeholder="Ex: Plein d'essence">
-                </div>
+                </details>
+
                 <input type="hidden" id="trans-id">
-                <button type="submit" id="btn-submit-trans" class="btn btn-primary btn-block">Ajouter</button>
-                <button type="button" id="btn-cancel-edit-trans" class="btn btn-secondary btn-block" style="display:none;">Annuler</button>
+                <div class="composer-actions">
+                    <button type="submit" id="btn-submit-trans" class="btn btn-primary">Ajouter</button>
+                    <button type="button" id="btn-cancel-edit-trans" class="btn btn-secondary" style="display:none;">Annuler</button>
+                </div>
             </form>
         </div>
 
+        <!-- Historique -->
         <div class="list-panel card">
             <div class="card-head">
                 <h3>Historique</h3>
-                <small class="muted">Double-clic pour modifier</small>
+                <div class="card-head-actions">
+                    <span id="transaction-selection-total-container" class="selection-total" style="display: none;">
+                        Sélection : <span id="transaction-selection-total">0.00</span> €
+                    </span>
+                    <button id="btn-toggle-transaction-selection" class="btn btn-secondary btn-small">Mode sélection</button>
+                </div>
             </div>
 
             <div class="filters">
-                <input type="month" id="filter-month">
+                <div class="filters-top">
+                    <input type="month" id="filter-month">
+                    <span class="muted" id="transactions-count"></span>
+                </div>
                 <div id="quick-filters" class="chip-row">
                     <button class="btn btn-small filter-chip active" data-filter="all">Toutes</button>
                     <button class="btn btn-small filter-chip chip-income" data-filter="income">Revenus</button>
@@ -453,30 +509,7 @@
                 <div id="tag-filters" class="chip-row"></div>
             </div>
 
-            <div class="toolbar-right">
-                <div id="transaction-selection-total-container" class="selection-total" style="display: none;">
-                    Total sélectionné : <span id="transaction-selection-total">0.00</span> €
-                </div>
-                <button id="btn-toggle-transaction-selection" class="btn btn-secondary btn-small">Mode sélection</button>
-            </div>
-
-            <div class="table-container">
-                <table id="table-transactions">
-                    <thead>
-                        <tr>
-                            <th class="col-checkbox" style="display: none; width: 40px;"></th>
-                            <th>Date</th>
-                            <th>Type</th>
-                            <th>Catégorie</th>
-                            <th>Note</th>
-                            <th>Tags</th>
-                            <th>Montant</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
+            <div id="transactions-list" class="txn-list"></div>
         </div>
     </div>
 </section>
