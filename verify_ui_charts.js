@@ -150,6 +150,60 @@ const inkOf = (id) => {
     check('compteur de transactions', /transactions/.test(list.count), list.count);
     check('reste à charge affiché sur la dépense remboursée', list.refundInfo);
 
+    // Filtres : type et categorie se cumulent
+    await page.click('#type-filters .seg-btn[data-filter="expense"]');
+    await page.waitForTimeout(300);
+    const onlyExpenses = await page.evaluate(() => document.querySelectorAll('#transactions-list .txn-row').length);
+    check('filtre par type', onlyExpenses === 4, onlyExpenses + ' depenses');
+
+    await page.selectOption('#filter-category', 'cat-exp-3');
+    await page.waitForTimeout(300);
+    const combined = await page.evaluate(() => ({
+        rows: document.querySelectorAll('#transactions-list .txn-row').length,
+        clearVisible: document.getElementById('btn-clear-filters').style.display !== 'none'
+    }));
+    check('filtre categorie cumule au type (sous-categories incluses)', combined.rows === 2, combined.rows + ' lignes');
+    check('bouton de reinitialisation propose', combined.clearVisible);
+
+    // Menu deroulant des tags
+    await page.click('#btn-tag-filter');
+    await page.waitForTimeout(250);
+    const popOpen = await page.isVisible('#tag-filters .tag-filter-chip');
+    check('menu deroulant des tags', popOpen);
+    await page.click('#tag-filters .tag-filter-chip');
+    await page.waitForTimeout(300);
+    const tagged = await page.evaluate(() => ({
+        rows: document.querySelectorAll('#transactions-list .txn-row').length,
+        badge: document.getElementById('tag-filter-count').textContent
+    }));
+    check('filtre par tag', tagged.badge === '1', tagged.rows + ' ligne(s), badge ' + tagged.badge);
+
+    await page.click('#btn-clear-filters');
+    await page.waitForTimeout(300);
+    const restored = await page.evaluate(() => document.querySelectorAll('#transactions-list .txn-row').length);
+    check('reinitialisation des filtres', restored === 8, restored + ' lignes');
+
+    // Totaux de journee uniquement quand le jour compte plusieurs operations
+    const totals = await page.evaluate(() => {
+        const groups = Array.from(document.querySelectorAll('#transactions-list .txn-group'));
+        return groups.map(g => ({
+            rows: g.querySelectorAll('.txn-row').length,
+            hasTotal: !!g.querySelector('.txn-day-total')
+        }));
+    });
+    check('total du jour seulement si plusieurs operations',
+        totals.every(g => g.hasTotal === (g.rows > 1)), JSON.stringify(totals));
+
+    // Pastilles de couleur
+    const dots = await page.evaluate(() => ({
+        letters: document.querySelectorAll('#transactions-list .txn-avatar').length,
+        out: document.querySelectorAll('#transactions-list .txn-dot.is-out').length,
+        income: document.querySelectorAll('#transactions-list .txn-dot.is-in').length,
+        salary: document.querySelectorAll('#transactions-list .txn-dot.is-salary').length
+    }));
+    check('pastilles de couleur (rouge / vert / bleu)',
+        dots.letters === 0 && dots.out === 5 && dots.income === 1 && dots.salary === 2, JSON.stringify(dots));
+
     // Mode sélection
     await page.click('#btn-toggle-transaction-selection');
     await page.waitForTimeout(300);

@@ -175,6 +175,7 @@ function generateId() {
 
 // --- TRANSACTIONS MANAGEMENT ---
 let currentTransactionFilter = 'all';
+let currentCategoryFilter = '';
 let currentTransactionTagFilters = [];
 
 function toggleTransactionTagFilter(tagId) {
@@ -278,11 +279,21 @@ function renderTransactions() {
         filteredTrans = filteredTrans.filter(t => t.type === 'expense');
     } else if (currentTransactionFilter === 'salary') {
         filteredTrans = filteredTrans.filter(t => t.type === 'salary');
-    } else if (currentTransactionFilter.startsWith('cat-')) {
-        filteredTrans = filteredTrans.filter(t => {
-            const cat = appData.categories.find(c => c.id === t.categoryId);
-            return t.categoryId === currentTransactionFilter || (cat && cat.parentId === currentTransactionFilter);
-        });
+    }
+
+    if (currentCategoryFilter) {
+        // La catégorie choisie inclut ses sous-catégories, à tous les niveaux
+        const matchesCategory = (categoryId) => {
+            let cursor = appData.categories.find(c => c.id === categoryId);
+            const guard = new Set();
+            while (cursor && !guard.has(cursor.id)) {
+                if (cursor.id === currentCategoryFilter) return true;
+                guard.add(cursor.id);
+                cursor = appData.categories.find(c => c.id === cursor.parentId);
+            }
+            return false;
+        };
+        filteredTrans = filteredTrans.filter(t => matchesCategory(t.categoryId));
     }
 
     if (currentTransactionTagFilters.length > 0) {
@@ -352,8 +363,10 @@ function renderTransactions() {
         const head = document.createElement('div');
         head.className = 'txn-day';
         head.innerHTML = '<span>' + dayLabel + '</span>'
-            + '<span class="' + (dayNet >= 0 ? 'text-green' : 'text-red') + '">'
-            + (dayNet >= 0 ? '+' : '-') + Math.abs(dayNet).toFixed(2) + ' €</span>';
+            + (items.length > 1
+                ? '<span class="txn-day-total ' + (dayNet >= 0 ? 'text-green' : 'text-red') + '">'
+                  + (dayNet >= 0 ? '+' : '-') + Math.abs(dayNet).toFixed(2) + ' €</span>'
+                : '');
         group.appendChild(head);
 
         items.forEach(t => {
@@ -372,8 +385,11 @@ function renderTransactions() {
                 const checked = selectedTransactionIds.has(t.id) ? 'checked' : '';
                 leadHtml = '<input type="checkbox" class="transaction-checkbox" data-id="' + t.id + '" ' + checked + '>';
             } else {
-                const cls = isIncome ? 'is-in' : (t.type === 'investment_transfer' ? 'is-neutral' : 'is-out');
-                leadHtml = '<span class="txn-avatar ' + cls + '">' + (catName || '?').trim().charAt(0).toUpperCase() + '</span>';
+                // Rouge = dépense, vert = revenu, bleu = salaire
+                let cls = 'is-out';
+                if (t.type === 'salary') cls = 'is-salary';
+                else if (isIncome) cls = 'is-in';
+                leadHtml = '<span class="txn-dot ' + cls + '" aria-hidden="true"></span>';
             }
 
             // Titre + sous-titre
@@ -470,43 +486,76 @@ function renderTransactions() {
 }
 
 function setTransactionFilter(filter) {
-    currentTransactionFilter = filter;
+    // Les catégories et les types sont deux filtres indépendants qui se cumulent
+    if (typeof filter === 'string' && filter.startsWith('cat-')) {
+        currentCategoryFilter = currentCategoryFilter === filter ? '' : filter;
+    } else {
+        currentTransactionFilter = filter;
+    }
+    renderTransactions();
+}
+
+function setCategoryFilter(categoryId) {
+    currentCategoryFilter = categoryId || '';
+    renderTransactions();
+}
+
+function clearTransactionFilters() {
+    currentTransactionFilter = 'all';
+    currentCategoryFilter = '';
+    currentTransactionTagFilters = [];
+    const month = document.getElementById('filter-month');
+    if (month) month.value = '';
     renderTransactions();
 }
 
 function updateFilterChips() {
-    const container = document.getElementById('quick-filters');
-    if (!container) return;
-
-    // Keep the static first 3 buttons (All, Income, Expense)
-    const staticChipsHtml = `
-        <button class="btn btn-small filter-chip ${currentTransactionFilter === 'all' ? 'active' : ''}" onclick="setTransactionFilter('all')">Toutes</button>
-        <button class="btn btn-small filter-chip ${currentTransactionFilter === 'income' ? 'active' : ''}" onclick="setTransactionFilter('income')" style="background-color: ${currentTransactionFilter === 'income' ? 'var(--success-color)' : 'transparent'}; border-color: var(--success-color); color: ${currentTransactionFilter === 'income' ? 'white' : 'var(--success-color)'};">Revenus</button>
-        <button class="btn btn-small filter-chip ${currentTransactionFilter === 'expense' ? 'active' : ''}" onclick="setTransactionFilter('expense')" style="background-color: ${currentTransactionFilter === 'expense' ? 'var(--danger-color)' : 'transparent'}; border-color: var(--danger-color); color: ${currentTransactionFilter === 'expense' ? 'white' : 'var(--danger-color)'};">Dépenses</button>
-    `;
-
-    // Dynamic Top Categories (Main level)
-    let dynChipsHtml = '';
-    const mainCategories = appData.categories.filter(c => c.parentId === null);
-
-    mainCategories.forEach(cat => {
-        const isActive = currentTransactionFilter === cat.id;
-        dynChipsHtml += `<button class="btn btn-small filter-chip ${isActive ? 'active' : ''}" onclick="setTransactionFilter('${cat.id}')">${cat.name}</button>`;
+    // --- Type (contrôle segmenté) ---
+    document.querySelectorAll('#type-filters .seg-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === currentTransactionFilter);
     });
 
-    container.innerHTML = staticChipsHtml + dynChipsHtml;
+    // --- Catégorie (liste déroulante) ---
+    const catSelect = document.getElementById('filter-category');
+    if (catSelect) {
+        const mainCategories = appData.categories.filter(c => c.parentId === null);
+        const wanted = '<option value="">Toutes les catégories</option>'
+            + mainCategories.map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('');
+        if (catSelect.dataset.signature !== wanted) {
+            catSelect.innerHTML = wanted;
+            catSelect.dataset.signature = wanted;
+        }
+        catSelect.value = currentCategoryFilter || '';
+        catSelect.classList.toggle('is-active', !!currentCategoryFilter);
+    }
 
-    // Mettre à jour les filtres de tags
+    // --- Tags (menu déroulant à cocher) ---
     const tagsContainer = document.getElementById('tag-filters');
-    if (!tagsContainer) return;
+    if (tagsContainer) {
+        tagsContainer.innerHTML = appData.tags.map(tag => {
+            const isSelected = currentTransactionTagFilters.includes(tag.id);
+            return '<button type="button" class="btn btn-small filter-chip tag-filter-chip ' + (isSelected ? 'active' : '') + '"'
+                + ' onclick="toggleTransactionTagFilter(\'' + tag.id + '\')">'
+                + '<span class="tag-dot" style="background-color: ' + tag.color + ';"></span>' + tag.name + '</button>';
+        }).join('') || '<span class="muted">Aucun tag pour le moment.</span>';
+    }
 
-    let tagChipsHtml = '';
-    appData.tags.forEach(tag => {
-        const isSelected = currentTransactionTagFilters.includes(tag.id);
-        const activeClass = isSelected ? 'active' : '';
-        tagChipsHtml += `<button class="btn btn-small filter-chip tag-filter-chip ${activeClass}" onclick="toggleTransactionTagFilter('${tag.id}')"><span class="tag-dot" style="background-color: ${tag.color};"></span>${tag.name}</button>`;
-    });
-    tagsContainer.innerHTML = tagChipsHtml;
+    const tagCount = document.getElementById('tag-filter-count');
+    if (tagCount) {
+        tagCount.textContent = currentTransactionTagFilters.length;
+        tagCount.style.display = currentTransactionTagFilters.length ? 'inline-flex' : 'none';
+    }
+    const tagBtn = document.getElementById('btn-tag-filter');
+    if (tagBtn) tagBtn.classList.toggle('is-active', currentTransactionTagFilters.length > 0);
+
+    // --- Bouton de réinitialisation ---
+    const clearBtn = document.getElementById('btn-clear-filters');
+    if (clearBtn) {
+        const monthValue = (document.getElementById('filter-month') || {}).value;
+        const dirty = currentTransactionFilter !== 'all' || !!currentCategoryFilter
+            || currentTransactionTagFilters.length > 0 || !!monthValue;
+        clearBtn.style.display = dirty ? 'inline-flex' : 'none';
+    }
 }
 
 window.addRefund = function(expenseId) {
@@ -4693,6 +4742,7 @@ window.viewTagHistory = viewTagHistory;
 
 window.openDataModal = openDataModal;
 window.setTransactionFilter = setTransactionFilter;
+window.setCategoryFilter = setCategoryFilter;
 
 // --- ADVANCE SUBSCRIPTIONS ---
 async function advanceSubscription(subId) {
@@ -5537,6 +5587,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initQuickAdd();
     initAdvancedFields();
     initSubscriptionSummary();
+    initTransactionFilters();
 
     // Les graphiques sont redessinés uniquement si la largeur change.
     // (Sur mobile, l'apparition de la barre d'URL déclenche un resize en
@@ -5554,6 +5605,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 250);
     });
 });
+
+// Barre de filtres de l'historique : type, catégorie, tags
+function initTransactionFilters() {
+    document.querySelectorAll('#type-filters .seg-btn').forEach(btn => {
+        btn.addEventListener('click', () => setTransactionFilter(btn.dataset.filter));
+    });
+
+    const catSelect = document.getElementById('filter-category');
+    if (catSelect) catSelect.addEventListener('change', () => setCategoryFilter(catSelect.value));
+
+    const clearBtn = document.getElementById('btn-clear-filters');
+    if (clearBtn) clearBtn.addEventListener('click', clearTransactionFilters);
+
+    // Menu déroulant des tags
+    const drop = document.getElementById('tag-filter-drop');
+    const tagBtn = document.getElementById('btn-tag-filter');
+    if (drop && tagBtn) {
+        tagBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            drop.classList.toggle('open');
+        });
+        document.addEventListener('click', (e) => {
+            if (!drop.contains(e.target)) drop.classList.remove('open');
+        });
+    }
+}
 
 // Résume en une phrase la récurrence en cours de saisie
 function initSubscriptionSummary() {

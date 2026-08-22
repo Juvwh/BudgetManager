@@ -874,38 +874,46 @@ main#app-content {
 }
 
 /* ---- Liste des transactions ---- */
-.txn-list { display: flex; flex-direction: column; gap: 1.1rem; }
+.txn-list { display: flex; flex-direction: column; gap: 0.9rem; }
 
 .txn-group { display: flex; flex-direction: column; }
+
+/* Sur grand écran, l'historique se lit sur deux colonnes : les montants
+   restent près des libellés et la page est deux fois plus courte. */
+@media (min-width: 1250px) {
+    .txn-list {
+        display: block;
+        columns: 2;
+        column-gap: 2.5rem;
+    }
+
+    .txn-group {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        margin-bottom: 0.9rem;
+    }
+}
 
 .txn-day {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
     gap: 0.75rem;
-    padding: 0 0.2rem 0.4rem;
-    margin-bottom: 0.2rem;
-    border-bottom: 1px solid var(--border-color);
-    font-size: 0.78rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    padding: 0 0.2rem 0.3rem;
+    font-size: 0.74rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
     color: var(--text-muted);
-    position: sticky;
-    top: 0;
-    background: var(--card-bg);
-    z-index: 2;
-    padding-right: calc(104px + 1.25rem);
 }
 
-.txn-day .text-green, .txn-day .text-red { font-size: 0.82rem; }
+.txn-day-total { font-size: 0.76rem; font-weight: 700; opacity: 0.85; }
 
 .txn-row {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-columns: 10px minmax(0, 1fr) auto auto;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.6rem 0.5rem;
+    gap: 0.7rem;
+    padding: 0.5rem 0.5rem;
     border-radius: var(--r-md);
     border-bottom: 1px solid var(--border-color);
     transition: background-color 0.12s ease;
@@ -920,23 +928,26 @@ main#app-content {
     box-shadow: inset 3px 0 0 var(--danger-color);
 }
 
-.txn-lead { display: flex; align-items: center; }
-
-.txn-avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 11px;
-    display: grid;
-    place-items: center;
-    font-size: 0.85rem;
-    font-weight: 700;
-    background: var(--surface-2);
-    color: var(--text-muted);
+.txn-lead {
+    display: flex;
+    justify-content: center;
+    /* alignee sur la ligne du titre, pas sur le centre de la ligne */
+    align-self: start;
+    margin-top: 0.42rem;
 }
 
-.txn-avatar.is-in { background: var(--success-soft); color: var(--success-color); }
-.txn-avatar.is-out { background: var(--danger-soft); color: var(--danger-color); }
-.txn-avatar.is-neutral { background: var(--accent-soft); color: var(--accent-color); }
+/* Rouge = dépense, vert = revenu, bleu = salaire */
+.txn-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: block;
+    flex-shrink: 0;
+}
+
+.txn-dot.is-out { background: var(--danger-color); }
+.txn-dot.is-in { background: var(--success-color); }
+.txn-dot.is-salary { background: var(--accent-color); }
 
 .txn-main { min-width: 0; }
 
@@ -960,7 +971,7 @@ main#app-content {
 .txn-tags .tag-chip { font-size: 0.72rem; padding: 0.1rem 0.5rem; }
 
 .txn-right { text-align: right; white-space: nowrap; }
-.txn-amount { font-size: 1rem; font-weight: 700; }
+.txn-amount { font-size: 0.98rem; font-weight: 700; }
 .txn-extra { font-size: 0.74rem; color: var(--text-muted); }
 
 .txn-actions {
@@ -990,14 +1001,94 @@ main#app-content {
 .icon-action.is-refund:hover { color: var(--success-color); border-color: var(--success-color); }
 .icon-action.is-delete:hover { color: var(--danger-color); border-color: var(--danger-color); }
 
-.filters-top {
+.filter-bar {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.filter-bar input[type="month"] {
+    width: auto;
+    max-width: 165px;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.86rem;
+}
+
+.segmented-sm { margin-bottom: 0; width: auto; display: inline-flex; gap: 2px; padding: 3px; }
+.segmented-sm .seg-btn { padding: 0.32rem 0.7rem; font-size: 0.83rem; }
+
+.filter-select {
+    width: auto;
+    max-width: 200px;
+    padding: 0.42rem 2rem 0.42rem 0.7rem;
+    font-size: 0.86rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--r-md);
+    background-color: var(--input-bg);
+    color: var(--input-text);
+    font-family: inherit;
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--text-muted) 50%), linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+    background-position: calc(100% - 17px) calc(50% + 2px), calc(100% - 12px) calc(50% + 2px);
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+}
+
+.filter-select.is-active {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+    font-weight: 600;
+}
+
+.filter-drop { position: relative; }
+
+#btn-tag-filter { gap: 0.4rem; }
+#btn-tag-filter.is-active {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+.filter-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: var(--accent-color);
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+.filter-pop {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 30;
+    min-width: 210px;
+    max-width: 320px;
+    max-height: 260px;
+    overflow-y: auto;
+    padding: 0.6rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-md);
+    gap: 0.35rem;
     flex-wrap: wrap;
 }
 
-.filters-top input[type="month"] { max-width: 190px; }
+.filter-drop.open .filter-pop { display: flex; }
+
+.filter-count-label { margin-left: auto; white-space: nowrap; }
 
 /* -------------------------------------------------------------------------
    7. BANNIÈRES
@@ -2037,8 +2128,15 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
     }
 
     .txn-title { white-space: normal; }
-    .txn-day { position: static; padding-right: 0.2rem; }
+    .txn-day { padding-right: 0.2rem; }
     .txn-actions { width: auto; }
+
+    .filter-bar { gap: 0.4rem; }
+    .filter-bar input[type="month"] { flex: 1; max-width: none; font-size: 16px; }
+    .segmented-sm { width: 100%; display: grid; grid-template-columns: repeat(4, 1fr); }
+    .filter-select { flex: 1; max-width: none; font-size: 16px; }
+    .filter-count-label { margin-left: 0; width: 100%; }
+    .filter-pop { left: auto; right: 0; }
 
     .sub-card {
         grid-template-columns: auto minmax(0, 1fr) auto;
