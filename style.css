@@ -874,53 +874,47 @@ main#app-content {
 }
 
 /* ---- Liste des transactions ---- */
-.txn-list { display: flex; flex-direction: column; gap: 0.9rem; }
+.txn-list { display: flex; flex-direction: column; gap: 1.35rem; }
 
 .txn-group { display: flex; flex-direction: column; }
 
-/* Sur grand écran, l'historique se lit sur deux colonnes : les montants
-   restent près des libellés et la page est deux fois plus courte. */
-@media (min-width: 1250px) {
-    .txn-list {
-        display: block;
-        columns: 2;
-        column-gap: 2.5rem;
-    }
-
-    .txn-group {
-        break-inside: avoid;
-        page-break-inside: avoid;
-        margin-bottom: 0.9rem;
-    }
+/* Chaque journée forme un bloc distinct */
+.txn-group-body {
+    border: 1px solid var(--border-color);
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+    overflow: hidden;
 }
+
+/* L'onglet garde une largeur de lecture confortable : sur un très grand
+   écran, une ligne pleine largeur éloignerait trop le montant du libellé. */
+#transactions .split-layout { max-width: 1080px; }
 
 .txn-day {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
     gap: 0.75rem;
-    padding: 0 0.2rem 0.3rem;
-    font-size: 0.74rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    color: var(--text-muted);
+    padding: 0 0.35rem 0.4rem;
+    font-size: 0.8rem;
+    font-weight: 650;
+    color: var(--text-color);
 }
 
-.txn-day-total { font-size: 0.76rem; font-weight: 700; opacity: 0.85; }
+.txn-day-total { font-size: 0.8rem; font-weight: 700; }
 
 .txn-row {
     display: grid;
-    grid-template-columns: 10px minmax(0, 1fr) auto auto;
+    grid-template-columns: 10px minmax(0, 1fr) 132px 104px;
     align-items: center;
     gap: 0.7rem;
-    padding: 0.5rem 0.5rem;
-    border-radius: var(--r-md);
+    padding: 0.6rem 0.85rem;
     border-bottom: 1px solid var(--border-color);
     transition: background-color 0.12s ease;
 }
 
 .txn-row:last-child { border-bottom: none; }
-.txn-row:hover { background: var(--surface-2); }
+.txn-row:hover { background: var(--card-bg); }
 .txn-row.is-selected { background: var(--accent-soft); }
 
 .txn-row.is-corrupted {
@@ -2128,8 +2122,10 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
     }
 
     .txn-title { white-space: normal; }
-    .txn-day { padding-right: 0.2rem; }
+    .txn-day { padding: 0 0.15rem 0.35rem; }
     .txn-actions { width: auto; }
+    .txn-list { gap: 1.1rem; }
+    #transactions .split-layout { max-width: none; }
 
     .filter-bar { gap: 0.4rem; }
     .filter-bar input[type="month"] { flex: 1; max-width: none; font-size: 16px; }

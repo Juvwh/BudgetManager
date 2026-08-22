@@ -360,6 +360,8 @@ function renderTransactions() {
 
         const group = document.createElement('div');
         group.className = 'txn-group';
+        const body = document.createElement('div');
+        body.className = 'txn-group-body';
         const head = document.createElement('div');
         head.className = 'txn-day';
         head.innerHTML = '<span>' + dayLabel + '</span>'
@@ -476,9 +478,10 @@ function renderTransactions() {
                 if (checkbox.checked) row.classList.add('is-selected');
             }
 
-            group.appendChild(row);
+            body.appendChild(row);
         });
 
+        group.appendChild(body);
         list.appendChild(group);
     });
 
