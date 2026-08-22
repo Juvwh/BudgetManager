@@ -2,1080 +2,1316 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestion de Budget</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0a84ff">
+    <title>Mon Budget</title>
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header>
-        <div class="header-left">
-            <h1>Mon Budget</h1>
+
+<!-- =========================================================================
+     SQUELETTE APPLICATIF
+     - Desktop : volet de navigation fixe à gauche + zone de contenu
+     - Mobile  : barre supérieure + volet coulissant + barre d'onglets en bas
+     ========================================================================= -->
+<div class="app-shell">
+
+    <!-- ------------------------------- VOLET LATÉRAL ------------------------------- -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <span class="brand-mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17V9"/><path d="M9 17V5"/><path d="M15 17v-6"/><path d="M21 17V8"/></svg>
+            </span>
+            <span class="brand-name">Mon Budget</span>
+            <button id="btn-close-sidebar" class="icon-btn sidebar-close" aria-label="Fermer le menu">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
         </div>
-        <nav class="header-center">
+
+        <nav class="sidebar-nav">
             <ul id="nav-menu">
-                <li><a href="#" class="nav-link active" data-target="dashboard">Tableau de bord</a></li>
-                <li><a href="#" class="nav-link" data-target="charts">Graphiques</a></li>
-                <li><a href="#" class="nav-link" data-target="transactions">Transactions</a></li>
-                <li><a href="#" class="nav-link" data-target="subscriptions">Abonnements</a></li>
-                <li><a href="#" class="nav-link" data-target="categories">Catégories</a></li>
-                <li><a href="#" class="nav-link" data-target="tags">Tags</a></li>
-                <li><a href="#" class="nav-link" data-target="savings">Économies</a></li>
-                <li style="display: none;"><a href="#" class="nav-link" data-target="prediction">Prédiction</a></li>
-                <li id="nav-item-investments"><a href="#" class="nav-link" data-target="investments">Investissements</a></li>
-                <li id="nav-item-meal-vouchers" style="display: none;"><a href="#" class="nav-link" data-target="meal-vouchers">Chèques Repas</a></li>
+                <li>
+                    <a href="#" class="nav-link side-link active is-group-active" data-target="dashboard" data-group="dashboard">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+                        <span class="side-label">Accueil</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="nav-link side-link" data-target="transactions" data-group="transactions subscriptions">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 6h18"/><path d="m7 22-4-4 4-4"/><path d="M21 18H3"/></svg>
+                        <span class="side-label">Transactions</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="nav-link side-link" data-target="charts" data-group="charts savings tags">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                        <span class="side-label">Analyse</span>
+                    </a>
+                </li>
+                <li id="nav-item-investments">
+                    <a href="#" class="nav-link side-link" data-target="investments" data-group="investments">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                        <span class="side-label">Investissements</span>
+                    </a>
+                </li>
+                <li id="nav-item-meal-vouchers" style="display: none;">
+                    <a href="#" class="nav-link side-link" data-target="meal-vouchers" data-group="meal-vouchers">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg>
+                        <span class="side-label">Chèques repas</span>
+                    </a>
+                </li>
+                <li style="display: none;">
+                    <a href="#" class="nav-link side-link" data-target="prediction" data-group="prediction"><span class="side-label">Prédiction</span></a>
+                </li>
             </ul>
         </nav>
 
-        <!-- Navigation Mobile (Barre en bas) -->
-        <div class="header-right">
-            <button id="theme-toggle" class="icon-btn" aria-label="Changer le thème">
+        <div class="sidebar-footer">
+            <a href="#" class="nav-link side-link" data-target="settings" data-group="settings categories">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.36.43.65.79.79H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <span class="side-label">Réglages</span>
+            </a>
+            <button id="theme-toggle" class="side-link side-btn" aria-label="Changer le thème">
                 <svg id="theme-icon-light" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
                 <svg id="theme-icon-dark" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>
+                <span class="side-label">Thème</span>
             </button>
-            <a href="#" class="nav-link icon-btn" data-target="settings" aria-label="Paramètres">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-            </a>
         </div>
-    </header>
+    </aside>
 
-    <!-- Navigation Mobile (Barre en bas) -->
-    <nav id="mobile-nav">
-        <a href="#" class="nav-link active" data-target="dashboard" aria-label="Tableau de bord">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-        </a>
-        <a href="#" class="nav-link" data-target="transactions" aria-label="Transactions">Transaction</a>
-        <a href="#" class="nav-link" data-target="subscriptions" aria-label="Abonnements">Abo</a>
-        <a href="#" class="nav-link" data-target="categories" aria-label="Catégories">Cat.</a>
-        <a href="#" class="nav-link" data-target="tags" aria-label="Tags">Tags</a>
-        <a href="#" class="nav-link" data-target="savings" aria-label="Économies">Éco.</a>
-        <a href="#" class="nav-link" data-target="prediction" aria-label="Prédiction" style="display: none;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
-        </a>
-        <a href="#" class="nav-link" id="mobile-nav-investments" data-target="investments" aria-label="Investissements">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        </a>
-        <a href="#" class="nav-link" id="mobile-nav-meal-vouchers" data-target="meal-vouchers" aria-label="Chèques Repas" style="display: none;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M6 21v-4"/><path d="M10 21v-4"/><path d="M14 21v-4"/><path d="M18 21v-4"/><path d="M3 13h18"/><rect x="3" y="3" width="18" height="10" rx="2"/></svg>
-        </a>
+    <div class="sidebar-scrim" id="sidebar-scrim"></div>
+
+    <!-- ------------------------------- COLONNE PRINCIPALE ------------------------------- -->
+    <div class="app-body">
+
+        <header class="topbar">
+            <button id="btn-open-sidebar" class="icon-btn" aria-label="Ouvrir le menu">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+            </button>
+            <span class="topbar-title" id="topbar-title">Accueil</span>
+            <button id="theme-toggle-mobile" class="icon-btn" aria-label="Changer le thème">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+            </button>
+        </header>
+
+        <main id="app-content" style="display: none;">
+
+<!-- ============================== ACCUEIL / TABLEAU DE BORD ============================== -->
+<section id="dashboard" class="view-section active">
+
+    <div class="page-head">
+        <div class="page-head-text">
+            <h2>Tableau de bord</h2>
+            <p class="page-sub" id="dash-period-label">Vue du mois en cours</p>
+        </div>
+        <div class="page-head-actions">
+            <div class="mv-chart-toggle-container field-inline" style="display: none;">
+                <label for="dashboard-mv-toggle">Mode</label>
+                <select id="dashboard-mv-toggle">
+                    <option value="real">Argent réel</option>
+                    <option value="total">Montant total</option>
+                </select>
+            </div>
+            <div class="field-inline">
+                <label for="dash-filter-month">Période</label>
+                <input type="month" id="dash-filter-month">
+            </div>
+        </div>
+    </div>
+
+    <!-- Bannières d'alerte -->
+    <div id="dashboard-warning-banner" class="banner banner-danger" style="display: none;">
+        <strong>Transactions ou abonnements corrompus détectés</strong>
+        <p>Des éléments ont un montant invalide (NaN). Rendez-vous dans <strong>Transactions</strong> ou <strong>Récurrences</strong> pour corriger les lignes surlignées en rouge.</p>
+    </div>
+
+    <div id="dashboard-mv-reconciliation-banner" class="banner banner-accent" style="display: none;">
+        <div class="banner-row">
+            <div>
+                <strong>Réconciliation chèques repas</strong>
+                <p>Des dépenses alimentaires du mois précédent n'ont pas de part chèques repas renseignée.</p>
+            </div>
+            <div class="banner-actions">
+                <button id="btn-open-mv-reconciliation" class="btn btn-primary btn-small">Vérifier</button>
+                <button id="btn-close-mv-reconciliation" class="btn btn-ghost btn-icon-round" aria-label="Fermer">&times;</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grille principale du tableau de bord -->
+    <div class="dash-grid">
+
+        <!-- Colonne principale -->
+        <div class="dash-main">
+
+            <!-- Les 3 indicateurs clés -->
+            <div class="summary-cards">
+                <div class="card stat-card stat-income">
+                    <div class="stat-head">
+                        <span class="stat-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></span>
+                        <h3>Revenus</h3>
+                    </div>
+                    <p id="dash-income">0.00 €</p>
+                    <span class="stat-delta" id="dash-income-delta"></span>
+                </div>
+                <div class="card stat-card stat-expense">
+                    <div class="stat-head">
+                        <span class="stat-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></span>
+                        <h3>Dépenses</h3>
+                    </div>
+                    <p id="dash-expense">0.00 €</p>
+                    <span class="stat-delta" id="dash-expense-delta"></span>
+                </div>
+                <div class="card stat-card stat-balance">
+                    <div class="stat-head">
+                        <span class="stat-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg></span>
+                        <h3>Solde du mois</h3>
+                    </div>
+                    <p id="dash-balance">0.00 €</p>
+                    <span class="stat-delta" id="dash-balance-delta"></span>
+                </div>
+            </div>
+
+            <!-- Objectif de dépense -->
+            <div class="card" id="goal-progress-card">
+                <div class="card-head">
+                    <h3>Objectif de dépense du mois</h3>
+                    <a href="#" class="nav-link link-quiet" data-target="settings">Modifier</a>
+                </div>
+
+                <div class="goal-wrap">
+                    <div class="progress-track" style="margin-top: 0; position: absolute; width: 100%;"></div>
+                    <div id="goal-progress-bar" class="progress-fill" style="position: absolute; z-index: 1;"></div>
+                    <div id="progress-current-marker" style="position: absolute; width: 4px; height: 32px; background-color: var(--accent-color); top: -8px; border-radius: 2px; z-index: 2; transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.4s ease;"></div>
+                    <div id="progress-current-text" style="position: absolute; top: 28px; transform: translateX(-50%); text-align: center; color: var(--accent-color); font-weight: bold; font-size: 0.9rem; line-height: 1.2; z-index: 2; transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s ease; background-color: var(--card-bg); padding: 0 4px; border-radius: 4px;">
+                        <span id="progress-spent-value">0.00€</span><br>
+                        <span id="progress-spent-percent" style="color: var(--text-color);">0%</span>
+                    </div>
+                    <div id="progress-remaining-text" style="position: absolute; top: 50%; transform: translate(-50%, -50%); text-align: center; font-weight: bold; font-size: 0.95rem; color: var(--text-color); z-index: 2;">0.00€</div>
+                    <div id="progress-limit-marker" style="position: absolute; left: 100%; width: 4px; height: 32px; background-color: var(--text-color); top: -8px; border-radius: 2px; z-index: 2; transform: translateX(-50%); transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.4s ease;"></div>
+                    <div id="progress-limit-text" style="position: absolute; left: 100%; top: -30px; transform: translateX(-50%); font-weight: bold; font-size: 0.95rem; color: var(--text-color); z-index: 2; transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s ease; background-color: var(--card-bg); padding: 0 4px; border-radius: 4px; text-align: center;">0.00€</div>
+                </div>
+
+                <div id="progress-over-warning" style="display: none;" class="goal-over">
+                    Dépassement de <span id="progress-over-value">0.00€</span>
+                </div>
+
+                <!-- Repères de rythme calculés côté JS -->
+                <div class="mini-stats" id="dash-pace-stats">
+                    <div class="mini-stat">
+                        <span class="mini-label">Dépense / jour</span>
+                        <span class="mini-value" id="dash-daily-avg">0.00 €</span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="mini-label">Budget restant / jour</span>
+                        <span class="mini-value" id="dash-daily-left">0.00 €</span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="mini-label">Projection fin de mois</span>
+                        <span class="mini-value" id="dash-projection">0.00 €</span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="mini-label">Épargne du mois</span>
+                        <span class="mini-value" id="dash-savings-month">0.00 €</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dépenses par catégorie -->
+            <div class="card" id="dashboard-category-chart-card">
+                <div class="card-head">
+                    <h3>Dépenses par catégorie</h3>
+                    <div class="card-head-actions">
+                        <select id="dashboard-category-month-selector" multiple size="3" class="multi-select"></select>
+                        <button id="btn-toggle-category-selection" class="btn btn-secondary btn-small">Mode sélection</button>
+                    </div>
+                </div>
+                <div id="category-selection-total-container" class="selection-total" style="display: none;">
+                    Total sélectionné : <span id="category-selection-total">0.00</span> €
+                </div>
+                <div class="canvas-wrap">
+                    <canvas id="dashboardBarChartCategory" width="800" height="400"></canvas>
+                </div>
+            </div>
+
+            <!-- Dernières transactions -->
+            <div class="card" id="dash-card-recent">
+                <div class="card-head">
+                    <h3>Dernières transactions</h3>
+                    <a href="#" class="nav-link link-quiet" data-target="transactions">Tout voir</a>
+                </div>
+                <div id="dash-recent-list" class="feed"></div>
+            </div>
+        </div>
+
+        <!-- Colonne latérale du tableau de bord -->
+        <div class="dash-side">
+
+            <!-- SAISIE RAPIDE -->
+            <div class="card card-accent quick-add">
+                <div class="card-head">
+                    <h3>Nouvelle transaction</h3>
+                </div>
+                <form id="form-quick-add" autocomplete="off">
+                    <div class="segmented" id="qa-type-group" role="tablist">
+                        <button type="button" class="seg-btn active" data-type="expense">Dépense</button>
+                        <button type="button" class="seg-btn" data-type="income">Revenu</button>
+                        <button type="button" class="seg-btn" data-type="salary">Salaire</button>
+                    </div>
+                    <input type="hidden" id="qa-type" value="expense">
+
+                    <div class="form-group amount-group">
+                        <label for="qa-amount">Montant</label>
+                        <div class="amount-field">
+                            <input type="number" id="qa-amount" step="0.01" min="0" inputmode="decimal" placeholder="0.00" required>
+                            <span class="amount-suffix">€</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group" id="qa-savings-group" style="display: none;">
+                        <label for="qa-savings-amount">Dont épargné</label>
+                        <input type="number" id="qa-savings-amount" step="0.01" min="0" value="0" inputmode="decimal">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="qa-category">Catégorie</label>
+                        <select id="qa-category" required></select>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="qa-date">Date</label>
+                            <input type="date" id="qa-date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="qa-note">Note</label>
+                            <input type="text" id="qa-note" placeholder="Optionnel">
+                        </div>
+                    </div>
+
+                    <p id="qa-feedback" class="form-feedback" style="display: none;"></p>
+
+                    <div class="quick-add-actions">
+                        <button type="submit" class="btn btn-primary btn-block">Ajouter</button>
+                        <button type="button" id="btn-qa-advanced" class="btn btn-ghost btn-block">Plus d'options…</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Patrimoine (piloté par le JS existant) -->
+            <div id="dashboard-patrimony-widget" class="card" style="display: none;">
+                <div class="mini-stats">
+                    <div class="mini-stat">
+                        <span class="mini-label">Trésorerie</span>
+                        <span class="mini-value" id="dash-treasury">0.00 €</span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="mini-label">Portefeuille</span>
+                        <span class="mini-value" id="dash-portfolio">0.00 €</span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="mini-label">Patrimoine net</span>
+                        <span class="mini-value" id="dash-net-worth">0.00 €</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prochaines échéances -->
+            <div class="card" id="dash-card-upcoming">
+                <div class="card-head">
+                    <h3>Prochaines échéances</h3>
+                    <a href="#" class="nav-link link-quiet" data-target="subscriptions">Gérer</a>
+                </div>
+                <div id="dash-upcoming-list" class="feed feed-compact"></div>
+                <div class="card-foot">
+                    <span>Total récurrent / mois</span>
+                    <strong id="dash-recurring-total">0.00 €</strong>
+                </div>
+            </div>
+
+            <!-- Top dépenses du mois -->
+            <div class="card" id="dash-card-top">
+                <div class="card-head">
+                    <h3>Top catégories du mois</h3>
+                </div>
+                <div id="dash-top-categories" class="bar-list"></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============================== TRANSACTIONS ============================== -->
+<section id="transactions" class="view-section hidden">
+    <div class="page-head">
+        <div class="page-head-text">
+            <h2>Transactions</h2>
+            <p class="page-sub">Historique complet et récurrences</p>
+        </div>
+    </div>
+
+    <nav class="subnav">
+        <a href="#" class="nav-link subnav-link active" data-target="transactions">Historique</a>
+        <a href="#" class="nav-link subnav-link" data-target="subscriptions">Récurrences</a>
     </nav>
 
-    <!-- ECRAN DE CONNEXION -->
-    <div id="login-overlay" class="login-overlay active">
-        <div class="login-card card card-elegant">
-            <h2>Connexion</h2>
-            <p>Veuillez entrer votre mot de passe pour accéder à vos données.</p>
-            <form id="form-login">
+    <div class="split-layout">
+        <div class="form-panel card">
+            <h3>Ajouter une transaction</h3>
+            <form id="form-transaction">
                 <div class="form-group">
-                    <label for="login-password">Mot de passe</label>
-                    <input type="password" id="login-password" required>
+                    <label>Type</label>
+                    <select id="trans-type" required>
+                        <option value="expense">Dépense</option>
+                        <option value="income">Revenu</option>
+                        <option value="salary">Salaire</option>
+                        <option value="investment_transfer" class="opt-investment">Transfert vers investissement</option>
+                        <option value="investment_return" class="opt-investment">Retour d'investissement</option>
+                    </select>
                 </div>
-                <button type="submit" class="btn btn-primary" style="width: 100%;">Se connecter</button>
+                <div class="form-group" id="trans-amount-group">
+                    <label id="trans-amount-label">Montant (€)</label>
+                    <input type="number" id="trans-amount" step="0.01" min="0" inputmode="decimal" required>
+                </div>
+                <div class="form-group" id="trans-savings-group" style="display: none;">
+                    <label>Montant à épargner (€)</label>
+                    <input type="number" id="trans-savings-amount" step="0.01" min="0" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" id="trans-date" required>
+                </div>
+                <div class="form-group">
+                    <label>Catégorie</label>
+                    <select id="trans-category" required></select>
+                </div>
+                <div class="form-group form-group-accent" id="trans-investment-group" style="display: none;">
+                    <label>Actif lié</label>
+                    <select id="trans-investment-id" style="margin-bottom: 0.5rem;">
+                        <option value="">-- Créer un nouvel actif --</option>
+                    </select>
+                    <div id="trans-investment-new-fields">
+                        <input type="text" id="trans-investment-name" placeholder="Nom du nouvel actif (ex: Livret A)" style="margin-bottom: 0.5rem;">
+                        <select id="trans-investment-type">
+                            <option value="metaux">Métaux précieux</option>
+                            <option value="actions">Actions et ETF</option>
+                            <option value="crypto">Cryptomonnaies</option>
+                            <option value="immo">Immobilier</option>
+                            <option value="epargne">Épargne réglementée</option>
+                            <option value="autre">Autre</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group form-group-accent" id="trans-mv-group" style="display: none;">
+                    <label for="trans-mv-part">Part payée en chèques repas (€)</label>
+                    <input type="number" id="trans-mv-part" step="0.01" min="0">
+                    <div id="trans-mv-suggestion" class="form-hint" style="display: none;">
+                        Vous avez des chèques repas disponibles : pensez à renseigner ce champ si vous en avez utilisé.
+                    </div>
+                </div>
+                <div class="form-group form-group-success" id="trans-linked-expense-group" style="display: none;">
+                    <label>Lié à une dépense (remboursement)</label>
+                    <select id="trans-linked-expense">
+                        <option value="">-- Aucune (Revenu standard) --</option>
+                    </select>
+                    <small>Ce revenu viendra déduire le coût de la dépense sélectionnée dans vos statistiques.</small>
+                </div>
+                <div class="form-group">
+                    <label>Tags</label>
+                    <div id="trans-tags-container" class="tags-container"></div>
+                    <div class="inline-row">
+                        <input type="text" id="trans-new-tag-name" placeholder="Nouveau tag (ex: Londres)" style="flex: 1;">
+                        <input type="color" id="trans-new-tag-color" value="#888888" class="color-input">
+                        <button type="button" id="btn-add-tag" class="btn btn-secondary btn-small">Créer</button>
+                    </div>
+                    <input type="hidden" id="trans-selected-tags" value="[]">
+                </div>
+                <div class="form-group">
+                    <label>Note (optionnelle)</label>
+                    <input type="text" id="trans-note" placeholder="Ex: Plein d'essence">
+                </div>
+                <input type="hidden" id="trans-id">
+                <button type="submit" id="btn-submit-trans" class="btn btn-primary btn-block">Ajouter</button>
+                <button type="button" id="btn-cancel-edit-trans" class="btn btn-secondary btn-block" style="display:none;">Annuler</button>
             </form>
-            <p id="login-error" class="text-red" style="display: none; margin-top: 1rem;"></p>
         </div>
-    </div>
 
-    <!-- ECRAN DE MIGRATION -->
-    <div id="migration-overlay" class="login-overlay">
-        <div class="login-card card card-elegant">
-            <h2>Nouvelle sauvegarde en ligne</h2>
-            <p>Des données locales (non sauvegardées en ligne) ont été détectées sur cet appareil.</p>
-            <p>Voulez-vous les transférer vers la nouvelle base de données en ligne ?</p>
-            <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-                <button id="btn-migrate-yes" class="btn btn-primary" style="flex: 1;">Oui, transférer</button>
-                <button id="btn-migrate-no" class="btn btn-secondary" style="flex: 1;">Non, effacer</button>
-            </div>
-            <p id="migration-status" style="display: none; margin-top: 1rem; font-weight: bold;"></p>
-        </div>
-    </div>
-
-    <!-- MODALE GENERIQUE (Transactions par catégorie, mois, abonnement) -->
-    <div id="data-modal-overlay" class="login-overlay">
-        <div class="login-card card card-elegant" style="max-width: 800px; width: 95%;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem; margin-bottom: 1rem;">
-                <h2 id="data-modal-title" style="border: none; margin: 0; padding: 0;">Détails</h2>
-                <button id="btn-close-modal" class="btn btn-secondary btn-small" style="font-size: 1.2rem; padding: 0.2rem 0.6rem; border-radius: 50%;">&times;</button>
-            </div>
-            <div style="text-align: left; margin-bottom: 1rem;">
-                <h3 style="margin: 0; color: var(--text-color);">Total : <span id="data-modal-total" class="text-red">0.00 €</span></h3>
-            </div>
-            <div id="data-modal-filters-container" style="display: none; background-color: var(--bg-color); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 1rem;">
-                <div id="data-modal-cat-mode-group" style="display: flex; flex-direction: column; gap: 0.3rem;">
-                    <label for="data-modal-cat-mode" style="font-weight: bold; font-size: 0.85rem; color: var(--text-color);">Mode d'inclusion :</label>
-                    <select id="data-modal-cat-mode" style="padding: 0.4rem; border: 1px solid var(--border-color); border-radius: 4px; background-color: var(--input-bg); color: var(--input-text);">
-                        <option value="with_subcategories">Catégorie + sous-catégories</option>
-                        <option value="category_only">Catégorie seule</option>
-                    </select>
-                </div>
-                <div style="display: flex; flex-direction: column; gap: 0.3rem;">
-                    <label for="data-modal-period" style="font-weight: bold; font-size: 0.85rem; color: var(--text-color);">Période :</label>
-                    <select id="data-modal-period" style="padding: 0.4rem; border: 1px solid var(--border-color); border-radius: 4px; background-color: var(--input-bg); color: var(--input-text);">
-                        <option value="inherited">Période du tableau de bord (Hérité)</option>
-                        <option value="all_time">All time</option>
-                        <option value="last_month">30 derniers jours</option>
-                        <option value="last_year">365 derniers jours</option>
-                        <option value="custom">Intervalle personnalisé</option>
-                    </select>
-                </div>
-                <div id="data-modal-custom-dates" style="display: none; gap: 0.5rem; align-items: end;">
-                    <div style="display: flex; flex-direction: column; gap: 0.3rem;">
-                        <label for="data-modal-date-start" style="font-size: 0.8rem; color: var(--text-color);">Du</label>
-                        <input type="date" id="data-modal-date-start" style="padding: 0.4rem; border: 1px solid var(--border-color); border-radius: 4px; background-color: var(--input-bg); color: var(--input-text);">
-                    </div>
-                    <div style="display: flex; flex-direction: column; gap: 0.3rem;">
-                        <label for="data-modal-date-end" style="font-size: 0.8rem; color: var(--text-color);">Au</label>
-                        <input type="date" id="data-modal-date-end" style="padding: 0.4rem; border: 1px solid var(--border-color); border-radius: 4px; background-color: var(--input-bg); color: var(--input-text);">
-                    </div>
-                </div>
+        <div class="list-panel card">
+            <div class="card-head">
+                <h3>Historique</h3>
+                <small class="muted">Double-clic pour modifier</small>
             </div>
 
-            <div class="table-container" style="max-height: 400px; overflow-y: auto;">
-                <table id="table-modal-transactions">
+            <div class="filters">
+                <input type="month" id="filter-month">
+                <div id="quick-filters" class="chip-row">
+                    <button class="btn btn-small filter-chip active" data-filter="all">Toutes</button>
+                    <button class="btn btn-small filter-chip chip-income" data-filter="income">Revenus</button>
+                    <button class="btn btn-small filter-chip chip-salary" data-filter="salary">Salaires</button>
+                    <button class="btn btn-small filter-chip chip-expense" data-filter="expense">Dépenses</button>
+                </div>
+                <div id="tag-filters" class="chip-row"></div>
+            </div>
+
+            <div class="toolbar-right">
+                <div id="transaction-selection-total-container" class="selection-total" style="display: none;">
+                    Total sélectionné : <span id="transaction-selection-total">0.00</span> €
+                </div>
+                <button id="btn-toggle-transaction-selection" class="btn btn-secondary btn-small">Mode sélection</button>
+            </div>
+
+            <div class="table-container">
+                <table id="table-transactions">
                     <thead>
                         <tr>
+                            <th class="col-checkbox" style="display: none; width: 40px;"></th>
                             <th>Date</th>
                             <th>Type</th>
                             <th>Catégorie</th>
                             <th>Note</th>
+                            <th>Tags</th>
                             <th>Montant</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <!-- Injected by JS -->
-                    </tbody>
+                    <tbody></tbody>
                 </table>
             </div>
         </div>
     </div>
+</section>
 
-    <!-- MODALE RECONCILIATION CHEQUES REPAS -->
-    <div id="mv-reconciliation-modal-overlay" class="login-overlay">
-        <div class="login-card card card-elegant" style="max-width: 800px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; text-align: left;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem; margin-bottom: 1rem;">
-                <h2 style="border: none; margin: 0; padding: 0; font-size: 1.5rem; color: var(--accent-color);">Réconciliation Chèques Repas</h2>
-                <button id="btn-close-mv-reconciliation-modal" class="btn btn-secondary btn-small" style="font-size: 1.2rem; padding: 0.2rem 0.6rem; border-radius: 50%;">&times;</button>
+<!-- ============================== RÉCURRENCES ============================== -->
+<section id="subscriptions" class="view-section hidden">
+    <div class="page-head">
+        <div class="page-head-text">
+            <h2>Transactions</h2>
+            <p class="page-sub">Abonnements et paiements récurrents</p>
+        </div>
+    </div>
+
+    <nav class="subnav">
+        <a href="#" class="nav-link subnav-link" data-target="transactions">Historique</a>
+        <a href="#" class="nav-link subnav-link active" data-target="subscriptions">Récurrences</a>
+    </nav>
+
+    <div class="split-layout">
+        <div class="form-panel card">
+            <h3>Ajouter une récurrence</h3>
+            <form id="form-subscription">
+                <div class="form-group">
+                    <label>Type</label>
+                    <select id="sub-type" required>
+                        <option value="expense">Dépense</option>
+                        <option value="income">Revenu</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Nom</label>
+                    <input type="text" id="sub-name" placeholder="Ex: Assurance Auto" required>
+                </div>
+                <div class="form-group">
+                    <label>Fréquence</label>
+                    <select id="sub-frequency" required>
+                        <option value="weekly">Hebdomadaire</option>
+                        <option value="monthly">Tous les X du mois</option>
+                        <option value="yearly">Annuelle</option>
+                        <option value="installments">Paiement en plusieurs fois</option>
+                    </select>
+                </div>
+                <div class="form-group" id="sub-amount-group">
+                    <label>Montant (€)</label>
+                    <input type="number" id="sub-amount" step="0.01" min="0" inputmode="decimal" required>
+                </div>
+                <div class="form-group" id="sub-installments-group" style="display: none;">
+                    <label>Montant total (€)</label>
+                    <input type="number" id="sub-total-amount" step="0.01" min="0">
+                    <label style="margin-top: 0.5rem;">Nombre de mois</label>
+                    <input type="number" id="sub-installments-count" step="1" min="2">
+                </div>
+                <div class="form-group">
+                    <label>Catégorie</label>
+                    <select id="sub-category" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Date de début</label>
+                    <input type="date" id="sub-start-date" required>
+                </div>
+                <div class="form-group" id="sub-end-date-group">
+                    <label>Date de fin (optionnelle)</label>
+                    <input type="date" id="sub-end-date">
+                    <small>Si définie, les transactions cesseront d'être générées après cette date.</small>
+                </div>
+                <div class="form-group check-row" id="sub-apply-past-container" style="display: none;">
+                    <input type="checkbox" id="sub-apply-past">
+                    <label for="sub-apply-past">Appliquer les modifications de montant / nom / catégorie aux anciennes transactions</label>
+                </div>
+                <input type="hidden" id="sub-id">
+                <button type="submit" id="btn-submit-sub" class="btn btn-primary btn-block">Ajouter</button>
+                <button type="button" id="btn-cancel-edit-sub" class="btn btn-secondary btn-block" style="display:none;">Annuler</button>
+            </form>
+        </div>
+
+        <div class="list-panel card">
+            <div class="card-head">
+                <h3>Vos récurrences</h3>
             </div>
-            <p style="margin-bottom: 1rem;">Voici les dépenses alimentaires du mois précédent sans part chèques repas. Double-cliquez pour modifier rapidement la transaction, ou utilisez le champ ci-dessous.</p>
-            <div class="table-container" style="flex: 1; overflow-y: auto;">
-                <table id="table-mv-reconciliation">
+            <div class="table-container">
+                <table id="table-subscriptions">
                     <thead>
                         <tr>
-                            <th>Date</th>
-                            <th>Description</th>
-                            <th>Catégorie</th>
+                            <th>Nom</th>
+                            <th>Type</th>
+                            <th>Fréquence</th>
                             <th>Montant</th>
-                            <th>Ajouter Part CR</th>
+                            <th>Prochaine date</th>
+                            <th>Date de fin</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <!-- Injected by JS -->
-                    </tbody>
+                    <tbody></tbody>
                 </table>
             </div>
-            <div style="text-align: right; margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
-                <button id="btn-save-mv-reconciliation" class="btn btn-primary">Enregistrer les parts ajoutées</button>
+        </div>
+    </div>
+</section>
+
+<!-- ============================== ANALYSE : GRAPHIQUES ============================== -->
+<section id="charts" class="view-section hidden">
+    <div class="page-head">
+        <div class="page-head-text">
+            <h2>Analyse</h2>
+            <p class="page-sub">Répartition, tendances et bilan</p>
+        </div>
+        <div class="page-head-actions">
+            <div class="mv-chart-toggle-container field-inline" style="display: none;">
+                <label for="charts-mv-toggle">Mode</label>
+                <select id="charts-mv-toggle">
+                    <option value="real">Argent réel</option>
+                    <option value="total">Montant total</option>
+                </select>
             </div>
         </div>
     </div>
 
-    <!-- MODALE MOBILE POUR AJOUTER/EDITER -->
-    <div id="mobile-form-modal" class="mobile-modal">
-        <div class="mobile-modal-header">
-            <h2 id="mobile-modal-title" style="border: none; margin: 0; padding: 0;">Ajouter</h2>
-            <button id="btn-close-mobile-modal" class="btn btn-secondary btn-small" style="font-size: 1.2rem; padding: 0.2rem 0.6rem; border-radius: 50%;">&times;</button>
-        </div>
-        <div id="mobile-form-container">
-            <!-- Le formulaire sera déplacé ici via JS quand on est sur mobile -->
-        </div>
-    </div>
+    <nav class="subnav">
+        <a href="#" class="nav-link subnav-link active" data-target="charts">Graphiques</a>
+        <a href="#" class="nav-link subnav-link" data-target="savings">Bilan &amp; épargne</a>
+        <a href="#" class="nav-link subnav-link" data-target="tags">Tags</a>
+    </nav>
 
-    <!-- MODALE DESKTOP & MOBILE POUR EDITER -->
-    <div id="edit-modal-overlay" class="login-overlay">
-        <div class="login-card card card-elegant" style="max-width: 600px; width: 95%; max-height: 90vh; overflow-y: auto; text-align: left;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem; margin-bottom: 1rem;">
-                <h2 id="edit-modal-title" style="border: none; margin: 0; padding: 0;">Modifier</h2>
-                <button id="btn-close-edit-modal" class="btn btn-secondary btn-small" style="font-size: 1.2rem; padding: 0.2rem 0.6rem; border-radius: 50%;">&times;</button>
-            </div>
-            <div id="edit-modal-container">
-                <!-- Le formulaire d'édition cloné sera inséré ici -->
-            </div>
-        </div>
-    </div>
-
-    <!-- BOUTON FAB POUR MOBILE -->
-    <button id="fab-add" class="fab-btn" aria-label="Ajouter">+</button>
-
-    <main id="app-content" style="display: none;">
-
-        <!-- SECTION TABLEAU DE BORD -->
-        <section id="dashboard" class="view-section active">
-            <div id="dashboard-warning-banner" class="card" style="display: none; background-color: rgba(255, 59, 48, 0.1); border-color: var(--danger-color); padding: 1rem; margin-bottom: 1rem;">
-                <h3 style="color: var(--danger-color); margin-top: 0; margin-bottom: 0.5rem;">⚠️ Attention : Transactions ou Abonnements corrompus détectés</h3>
-                <p style="margin: 0; font-size: 0.95rem;">Nous avons détecté des éléments avec des montants invalides (NaN) dans vos données. Veuillez vous rendre dans les onglets <strong>Transactions</strong> et/ou <strong>Abonnements</strong> pour supprimer ou corriger les lignes surlignées en rouge, afin que vos graphiques s'affichent correctement.</p>
-            </div>
-
-            <div id="dashboard-mv-reconciliation-banner" class="card" style="display: none; background-color: rgba(var(--accent-color-rgb, 10, 132, 255), 0.1); border-color: var(--accent-color); padding: 1rem; margin-bottom: 1rem;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;">
-                    <div>
-                        <h3 style="color: var(--accent-color); margin-top: 0; margin-bottom: 0.5rem;">Réconciliation Chèques Repas</h3>
-                        <p style="margin: 0; font-size: 0.95rem;">Il y a des dépenses alimentaires du mois précédent sans part chèques repas renseignée. Voulez-vous les vérifier ?</p>
-                    </div>
-                    <div style="display: flex; gap: 0.5rem; align-items: center; white-space: nowrap;">
-                        <button id="btn-open-mv-reconciliation" class="btn btn-primary btn-small">Vérifier</button>
-                        <button id="btn-close-mv-reconciliation" class="btn btn-secondary btn-small" style="font-size: 1.2rem; padding: 0.2rem 0.6rem; border-radius: 50%;">&times;</button>
-                    </div>
-                </div>
-            </div>
-
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary-color); margin-bottom: 1rem; padding-bottom: 0.5rem; flex-wrap: wrap; gap: 1rem;">
-                <h2 style="border: none; padding: 0; margin: 0;">Tableau de bord</h2>
-                <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
-                    <div class="mv-chart-toggle-container" style="display: none; align-items: center; gap: 0.5rem; background: var(--bg-color); padding: 0.2rem 0.5rem; border-radius: 20px; border: 1px solid var(--border-color);">
-                        <label for="dashboard-mv-toggle" style="font-size: 0.85rem; cursor: pointer; margin: 0;">Mode Graphiques :</label>
-                        <select id="dashboard-mv-toggle" style="border: none; background: transparent; font-size: 0.85rem; font-weight: bold; color: var(--primary-color); outline: none; cursor: pointer;">
-                            <option value="real">Argent Réel (Budget)</option>
-                            <option value="total">Montant Total (Conso)</option>
-                        </select>
-                    </div>
-                    <div class="month-selector">
-                        <label for="dash-filter-month" style="font-weight: bold; margin-right: 0.5rem; color: var(--text-color);">Période :</label>
-                        <input type="month" id="dash-filter-month" style="padding: 0.4rem; border: 1px solid var(--border-color); border-radius: 4px;">
-                    </div>
-                </div>
-            </div>
-
-            <div id="dashboard-patrimony-widget" class="card card-elegant" style="display: none; margin-bottom: 1rem; border-left: 4px solid var(--accent-color);">
-                <div style="display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between;">
-                    <div style="flex: 1; min-width: 150px;">
-                        <h3 style="margin-top: 0; color: var(--text-color); font-size: 0.9rem; text-transform: uppercase;">Trésorerie Disponible</h3>
-                        <p id="dash-treasury" style="font-size: 1.5rem; font-weight: bold; margin: 0;">0.00 €</p>
-                    </div>
-                    <div style="flex: 1; min-width: 150px;">
-                        <h3 style="margin-top: 0; color: var(--text-color); font-size: 0.9rem; text-transform: uppercase;">Portefeuille Investissements</h3>
-                        <p id="dash-portfolio" style="font-size: 1.5rem; font-weight: bold; margin: 0;">0.00 €</p>
-                    </div>
-                    <div style="flex: 1; min-width: 150px; border-left: 1px solid var(--border-color); padding-left: 1rem;">
-                        <h3 style="margin-top: 0; color: var(--accent-color); font-size: 0.9rem; text-transform: uppercase;">Patrimoine Net Total</h3>
-                        <p id="dash-net-worth" style="font-size: 1.8rem; font-weight: bold; margin: 0; color: var(--accent-color);">0.00 €</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="summary-cards">
-                <div class="card card-elegant card-income">
-                    <h3>Revenus (Mois)</h3>
-                    <p id="dash-income">0.00 €</p>
-                </div>
-                <div class="card card-elegant card-expense">
-                    <h3>Dépenses (Mois)</h3>
-                    <p id="dash-expense">0.00 €</p>
-                </div>
-                <div class="card card-elegant card-balance">
-                    <h3>+/- (Mois)</h3>
-                    <p id="dash-balance">0.00 €</p>
-                </div>
-            </div>
-
-            <div class="card card-elegant" id="goal-progress-card">
-                <h3>Progression de l'objectif de dépense (Ce mois)</h3>
-
-                <div style="position: relative; margin-top: 2rem; margin-bottom: 3rem; height: 16px;">
-                    <!-- Barre grise (fond) -->
-                    <div class="progress-track" style="margin-top: 0; position: absolute; width: 100%;"></div>
-
-                    <!-- Barre de progression -->
-                    <div id="goal-progress-bar" class="progress-fill" style="position: absolute; z-index: 1;"></div>
-
-                    <!-- Ligne verticale dépenses actuelles -->
-                    <div id="progress-current-marker" style="position: absolute; width: 4px; height: 32px; background-color: var(--accent-color); top: -8px; border-radius: 2px; z-index: 2; transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.4s ease;"></div>
-
-                    <!-- Texte dépenses actuelles (sous le repère) -->
-                    <div id="progress-current-text" style="position: absolute; top: 28px; transform: translateX(-50%); text-align: center; color: var(--accent-color); font-weight: bold; font-size: 0.9rem; line-height: 1.2; z-index: 2; transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s ease; background-color: var(--bg-color); padding: 0 4px; border-radius: 4px;">
-                        <span id="progress-spent-value">0.00€</span><br>
-                        <span id="progress-spent-percent" style="color: var(--text-color);">0%</span>
-                    </div>
-
-                    <!-- Texte reste à dépenser (au centre de l'espace vide) -->
-                    <div id="progress-remaining-text" style="position: absolute; top: 50%; transform: translate(-50%, -50%); text-align: center; font-weight: bold; font-size: 0.95rem; color: var(--text-color); z-index: 2;">
-                        0.00€
-                    </div>
-
-                    <!-- Ligne verticale de la limite d'objectif (au bout de la barre) -->
-                    <div id="progress-limit-marker" style="position: absolute; left: 100%; width: 4px; height: 32px; background-color: var(--text-color); top: -8px; border-radius: 2px; z-index: 2; transform: translateX(-50%); transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.4s ease;"></div>
-
-                    <!-- Texte de l'objectif (au bout) -->
-                    <div id="progress-limit-text" style="position: absolute; left: 100%; top: -30px; transform: translateX(-50%); font-weight: bold; font-size: 0.95rem; color: var(--text-color); z-index: 2; transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s ease; background-color: var(--bg-color); padding: 0 4px; border-radius: 4px; text-align: center;">
-                        0.00€
-                    </div>
-                </div>
-
-                <!-- Message d'alerte dépassement -->
-                <div id="progress-over-warning" style="display: none; color: var(--danger-color); font-weight: bold; text-align: center; font-size: 1.2rem; margin-top: 1rem;">
-                    Dépassement de <span id="progress-over-value">0.00€</span> !
-                </div>
-            </div>
-
-            <div class="card card-elegant" id="dashboard-category-chart-card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;">
-                    <h3 style="margin: 0;">Dépenses par catégorie et sous-catégorie</h3>
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <select id="dashboard-category-month-selector" multiple size="3" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 5px; font-family: inherit; background: var(--bg-color); color: var(--text-color);">
-                            <!-- Options generated by JS -->
-                        </select>
-                        <button id="btn-toggle-category-selection" class="btn btn-secondary btn-small">Mode sélection</button>
-                    </div>
-                </div>
-                <div id="category-selection-total-container" style="display: none; text-align: right; margin-bottom: 1rem; font-weight: bold; font-size: 1.1em; color: var(--primary-color);">
-                    Total sélectionné: <span id="category-selection-total">0.00</span> €
-                </div>
-                <canvas id="dashboardBarChartCategory" width="800" height="400" style="width: 100%; max-width: 800px; height: auto; display: block; margin: 0 auto;"></canvas>
-            </div>
-        </section>
-
-        <!-- SECTION GRAPHIQUES -->
-        <section id="charts" class="view-section hidden">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
-                <h2 style="border: none; margin: 0; padding: 0;">Graphiques</h2>
-                <div class="mv-chart-toggle-container" style="display: none; align-items: center; gap: 0.5rem; background: var(--bg-color); padding: 0.2rem 0.5rem; border-radius: 20px; border: 1px solid var(--border-color);">
-                    <label for="charts-mv-toggle" style="font-size: 0.85rem; cursor: pointer; margin: 0;">Mode Graphiques :</label>
-                    <select id="charts-mv-toggle" style="border: none; background: transparent; font-size: 0.85rem; font-weight: bold; color: var(--primary-color); outline: none; cursor: pointer;">
-                        <option value="real">Argent Réel (Budget)</option>
-                        <option value="total">Montant Total (Conso)</option>
+    <div class="charts-container">
+        <div class="card chart-box chart-wide">
+            <div class="card-head">
+                <h3 id="horizontalBarChartTitle">Dépenses par catégorie (précises)</h3>
+                <div class="field-inline">
+                    <label for="chart-period-select">Période</label>
+                    <select id="chart-period-select">
+                        <option value="1">1 mois</option>
+                        <option value="3">3 mois</option>
+                        <option value="6">6 mois</option>
+                        <option value="12">1 an</option>
                     </select>
                 </div>
             </div>
+            <div class="canvas-wrap">
+                <canvas id="horizontalBarChartCategory" width="800" height="400"></canvas>
+            </div>
+        </div>
+        <div class="card chart-box">
+            <h3>Répartition du mois</h3>
+            <div class="canvas-wrap">
+                <canvas id="pieChartCategory" width="520" height="330"></canvas>
+            </div>
+        </div>
+        <div class="card chart-box">
+            <h3>Évolution (6 derniers mois)</h3>
+            <div class="canvas-wrap">
+                <canvas id="barChartEvolution" width="520" height="330"></canvas>
+            </div>
+        </div>
+    </div>
+</section>
 
-            <div class="charts-container">
-                <div class="chart-box card-elegant" style="grid-column: 1 / -1;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h3 id="horizontalBarChartTitle" style="margin: 0;">Dépenses par catégorie (Précises)</h3>
-                        <div class="month-selector">
-                            <label for="chart-period-select" style="font-weight: bold; margin-right: 0.5rem; color: var(--text-color);">Période :</label>
-                            <select id="chart-period-select" style="padding: 0.4rem; border: 1px solid var(--border-color); border-radius: 4px; background-color: var(--input-bg); color: var(--input-text);">
-                                <option value="1">1 mois</option>
-                                <option value="3">3 mois</option>
-                                <option value="6">6 mois</option>
-                                <option value="12">1 an</option>
-                            </select>
-                        </div>
+<!-- ============================== ANALYSE : BILAN & ÉPARGNE ============================== -->
+<section id="savings" class="view-section hidden">
+    <div class="page-head">
+        <div class="page-head-text">
+            <h2>Analyse</h2>
+            <p class="page-sub">Bilan mensuel et épargne accumulée</p>
+        </div>
+    </div>
+
+    <nav class="subnav">
+        <a href="#" class="nav-link subnav-link" data-target="charts">Graphiques</a>
+        <a href="#" class="nav-link subnav-link active" data-target="savings">Bilan &amp; épargne</a>
+        <a href="#" class="nav-link subnav-link" data-target="tags">Tags</a>
+    </nav>
+
+    <div class="summary-cards">
+        <div class="card stat-card">
+            <div class="stat-head"><h3>Bénéfice réel</h3></div>
+            <p id="savings-view-total">0.00 €</p>
+            <span class="stat-delta">Cumul tous les mois</span>
+            <div class="card-foot">
+                <span>Ce mois-ci</span>
+                <strong id="savings-view-current-month">0.00 €</strong>
+            </div>
+        </div>
+        <div class="card stat-card stat-accent">
+            <div class="stat-head"><h3>Total épargné</h3></div>
+            <p id="savings-view-real-saved">0.00 €</p>
+            <span class="stat-delta">Mis de côté lors de l'ajout des salaires</span>
+        </div>
+        <div id="savings-view-mv-container" class="card stat-card stat-accent" style="display: none;">
+            <div class="stat-head"><h3>Valorisation chèques repas</h3></div>
+            <p id="savings-view-mv-val">0.00 €</p>
+            <span class="stat-delta">Pouvoir d'achat des 12 derniers mois</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head"><h3>Récapitulatif par mois</h3></div>
+        <div class="table-container">
+            <table id="table-savings-history">
+                <thead>
+                    <tr>
+                        <th>Mois</th>
+                        <th>Revenus réels</th>
+                        <th>Objectif</th>
+                        <th>Dépenses réelles</th>
+                        <th>Économie (Bilan)</th>
+                        <th>Épargne du mois</th>
+                        <th>Bénéfice Réel</th>
+                        <th class="col-investment-month" style="display: none;">Investi ce mois</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- ============================== ANALYSE : TAGS ============================== -->
+<section id="tags" class="view-section hidden">
+    <div class="page-head">
+        <div class="page-head-text">
+            <h2>Analyse</h2>
+            <p class="page-sub">Suivi transversal par tag (voyage, projet…)</p>
+        </div>
+    </div>
+
+    <nav class="subnav">
+        <a href="#" class="nav-link subnav-link" data-target="charts">Graphiques</a>
+        <a href="#" class="nav-link subnav-link" data-target="savings">Bilan &amp; épargne</a>
+        <a href="#" class="nav-link subnav-link active" data-target="tags">Tags</a>
+    </nav>
+
+    <div class="card">
+        <div class="card-head">
+            <h3>Vos tags</h3>
+            <small class="muted">Créez de nouveaux tags depuis le formulaire de transaction</small>
+        </div>
+        <div class="table-container">
+            <table id="table-tags-overview">
+                <thead>
+                    <tr>
+                        <th>Tag</th>
+                        <th>Revenus Totaux</th>
+                        <th>Dépenses Totales</th>
+                        <th>Bilan</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- ============================== INVESTISSEMENTS ============================== -->
+<section id="investments" class="view-section hidden">
+    <div class="page-head">
+        <div class="page-head-text">
+            <h2>Investissements</h2>
+            <p class="page-sub">Portefeuille et patrimoine</p>
+        </div>
+    </div>
+
+    <div class="summary-cards">
+        <div class="card stat-card">
+            <div class="stat-head"><h3>Montant total investi</h3></div>
+            <p id="inv-total-invested">0.00 €</p>
+        </div>
+        <div class="card stat-card stat-accent">
+            <div class="stat-head"><h3>Valeur actuelle estimée</h3></div>
+            <p id="inv-total-value">0.00 €</p>
+        </div>
+        <div class="card stat-card">
+            <div class="stat-head"><h3>Performance globale</h3></div>
+            <p id="inv-total-performance">0.00 € (0%)</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head"><h3>Évolution du portefeuille</h3></div>
+        <div class="canvas-wrap">
+            <canvas id="portfolioChart" width="800" height="300"></canvas>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head"><h3>Vos actifs</h3></div>
+        <div id="investments-list" class="asset-list"></div>
+    </div>
+</section>
+
+<!-- ============================== CHÈQUES REPAS ============================== -->
+<section id="meal-vouchers" class="view-section hidden">
+    <div class="page-head">
+        <div class="page-head-text">
+            <h2>Chèques repas</h2>
+            <p class="page-sub">Solde, lots reçus et dépenses associées</p>
+        </div>
+    </div>
+
+    <div class="summary-cards">
+        <div class="card stat-card stat-accent">
+            <div class="stat-head"><h3>Solde disponible</h3></div>
+            <p id="mv-available-balance">0.00 €</p>
+        </div>
+        <div class="card stat-card stat-income">
+            <div class="stat-head"><h3>Reçus (12 mois)</h3></div>
+            <p id="mv-received-12m">0.00 €</p>
+        </div>
+        <div class="card stat-card stat-expense">
+            <div class="stat-head"><h3>Dépensés (12 mois)</h3></div>
+            <p id="mv-spent-12m">0.00 €</p>
+        </div>
+    </div>
+
+    <div class="split-layout">
+        <div class="form-panel card">
+            <h3>Ajouter un lot de chèques</h3>
+            <form id="form-meal-voucher">
+                <div class="form-group">
+                    <label>Montant (€)</label>
+                    <input type="number" id="mv-amount" step="0.01" min="0" inputmode="decimal" required>
+                </div>
+                <div class="form-group">
+                    <label>Date de réception</label>
+                    <input type="date" id="mv-date" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Ajouter</button>
+            </form>
+        </div>
+
+        <div class="list-panel card">
+            <div class="card-head"><h3>Crédits (lots reçus)</h3></div>
+            <div class="table-container">
+                <table id="table-meal-vouchers">
+                    <thead>
+                        <tr>
+                            <th>Date Réception</th>
+                            <th>Montant</th>
+                            <th>Expiration (+12m)</th>
+                            <th>Statut</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="split-layout">
+        <div class="form-panel card">
+            <h3>Dépense partagée (hors budget)</h3>
+            <p class="muted">Ces dépenses déduisent le solde de chèques repas mais n'apparaissent pas dans les statistiques principales.</p>
+            <form id="form-meal-voucher-expense">
+                <div class="form-group">
+                    <label>Montant (€)</label>
+                    <input type="number" id="mv-expense-amount" step="0.01" min="0" inputmode="decimal" required>
+                </div>
+                <input type="hidden" id="mv-expense-id">
+                <button type="submit" id="btn-submit-mv-expense" class="btn btn-primary btn-block">Ajouter la dépense</button>
+                <button type="button" id="btn-cancel-edit-mv-expense" class="btn btn-secondary btn-block" style="display:none;">Annuler</button>
+            </form>
+        </div>
+
+        <div class="list-panel card">
+            <div class="card-head"><h3>Dépenses partagées</h3></div>
+            <div class="table-container">
+                <table id="table-meal-voucher-external-expenses">
+                    <thead>
+                        <tr>
+                            <th>Montant</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head"><h3>Historique des dépenses en chèques repas</h3></div>
+        <div class="table-container">
+            <table id="table-meal-voucher-transactions">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Note</th>
+                        <th>Catégorie</th>
+                        <th>Montant</th>
+                        <th>Part CR</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <small class="muted">Vue en lecture seule : pour modifier une transaction, utilisez l'onglet Transactions.</small>
+    </div>
+</section>
+
+<!-- ============================== RÉGLAGES ============================== -->
+<section id="settings" class="view-section hidden">
+    <div class="page-head">
+        <div class="page-head-text">
+            <h2>Réglages</h2>
+            <p class="page-sub">Objectifs, modules et sauvegardes</p>
+        </div>
+    </div>
+
+    <nav class="subnav">
+        <a href="#" class="nav-link subnav-link active" data-target="settings">Général</a>
+        <a href="#" class="nav-link subnav-link" data-target="categories">Catégories</a>
+    </nav>
+
+    <div class="settings-grid">
+        <div class="card">
+            <div class="card-head"><h3>Objectif de dépense mensuel</h3></div>
+            <form id="form-settings-goal">
+                <div class="form-group">
+                    <label>Mois (optionnel)</label>
+                    <input type="month" id="setting-spending-month">
+                    <small>Laissez vide pour définir l'objectif par défaut de tous les mois.</small>
+                </div>
+                <div class="form-group">
+                    <label>Objectif (€)</label>
+                    <input type="number" id="setting-spending-goal" step="1" min="0" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Enregistrer l'objectif</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <div class="card-head"><h3>Module chèques repas</h3></div>
+            <form id="form-settings-meal-vouchers">
+                <div class="form-group check-row">
+                    <input type="checkbox" id="setting-meal-vouchers-enabled">
+                    <label for="setting-meal-vouchers-enabled">Activer le module chèques repas</label>
+                </div>
+                <div id="settings-meal-vouchers-details" style="display: none;">
+                    <div class="form-group">
+                        <label>Catégories éligibles</label>
+                        <select id="setting-meal-vouchers-categories" multiple size="5" class="multi-select"></select>
+                        <small>Maintenez Ctrl / Cmd pour en sélectionner plusieurs.</small>
                     </div>
-                    <canvas id="horizontalBarChartCategory" width="800" height="400" style="width: 100%; max-width: 800px; height: auto; display: block; margin: 0 auto;"></canvas>
+                    <div class="form-group">
+                        <label>Montant mensuel habituel (€)</label>
+                        <input type="number" id="setting-meal-vouchers-expected" step="1" min="0">
+                    </div>
                 </div>
-                <div class="chart-box card-elegant">
-                    <h3>Dépenses par catégorie (Mois)</h3>
-                    <canvas id="pieChartCategory" width="400" height="300"></canvas>
+                <button type="submit" class="btn btn-primary">Enregistrer</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <div class="card-head"><h3>Module investissements</h3></div>
+            <form id="form-settings-investments">
+                <div class="form-group check-row">
+                    <input type="checkbox" id="setting-investments-enabled">
+                    <label for="setting-investments-enabled">Activer le module investissements</label>
                 </div>
-                <div class="chart-box card-elegant">
-                    <h3>Évolution (6 derniers mois)</h3>
-                    <canvas id="barChartEvolution" width="400" height="300"></canvas>
+                <button type="submit" class="btn btn-primary">Enregistrer</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <div class="card-head"><h3>Sauvegarde (JSON)</h3></div>
+            <p class="muted">Vos données sont synchronisées automatiquement. Vous pouvez aussi les exporter dans un fichier JSON, ou les importer depuis un autre appareil.</p>
+            <div class="settings-actions">
+                <button id="btn-export" class="btn btn-primary">Exporter en JSON</button>
+                <div class="import-group">
+                    <input type="file" id="file-import" accept=".json">
+                    <button id="btn-import" class="btn btn-secondary">Importer</button>
                 </div>
             </div>
-        </section>
-
-        <!-- SECTION TRANSACTIONS -->
-        <section id="transactions" class="view-section hidden">
-            <h2>Transactions</h2>
-
-            <div class="split-layout">
-                <div class="form-panel card">
-                    <h3>Ajouter une transaction</h3>
-                    <form id="form-transaction">
-                        <div class="form-group">
-                            <label>Type</label>
-                            <select id="trans-type" required>
-                                <option value="expense">Dépense</option>
-                                <option value="income">Revenu</option>
-                                <option value="salary">Salaire</option>
-                                <option value="investment_transfer" class="opt-investment">Transfert vers investissement</option>
-                                <option value="investment_return" class="opt-investment">Retour d'investissement</option>
-                            </select>
-                        </div>
-                        <div class="form-group" id="trans-amount-group">
-                            <label id="trans-amount-label">Montant (€)</label>
-                            <input type="number" id="trans-amount" step="0.01" min="0" required>
-                        </div>
-                        <div class="form-group" id="trans-savings-group" style="display: none;">
-                            <label>Montant à épargner (€)</label>
-                            <input type="number" id="trans-savings-amount" step="0.01" min="0" value="0">
-                        </div>
-                        <div class="form-group">
-                            <label>Date</label>
-                            <input type="date" id="trans-date" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Catégorie</label>
-                            <select id="trans-category" required>
-                                <!-- Injected by JS -->
-                            </select>
-                        </div>
-                        <div class="form-group" id="trans-investment-group" style="display: none; background-color: rgba(var(--accent-color-rgb, 10, 132, 255), 0.05); padding: 0.5rem; border-radius: 8px; border-left: 3px solid var(--accent-color);">
-                            <label style="color: var(--accent-color);">Actif lié</label>
-                            <select id="trans-investment-id" style="margin-bottom: 0.5rem;">
-                                <option value="">-- Créer un nouvel actif --</option>
-                                <!-- Injected by JS -->
-                            </select>
-                            <div id="trans-investment-new-fields">
-                                <input type="text" id="trans-investment-name" placeholder="Nom du nouvel actif (ex: Livret A)" style="margin-bottom: 0.5rem;">
-                                <select id="trans-investment-type">
-                                    <option value="metaux">Métaux précieux</option>
-                                    <option value="actions">Actions et ETF</option>
-                                    <option value="crypto">Cryptomonnaies</option>
-                                    <option value="immo">Immobilier</option>
-                                    <option value="epargne">Épargne réglementée</option>
-                                    <option value="autre">Autre</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-group" id="trans-mv-group" style="display: none; background-color: rgba(var(--accent-color-rgb, 10, 132, 255), 0.05); padding: 0.5rem; border-radius: 8px; border-left: 3px solid var(--accent-color);">
-                            <label for="trans-mv-part" style="color: var(--accent-color);">Part payée en chèques repas (€)</label>
-                            <input type="number" id="trans-mv-part" step="0.01" min="0">
-                            <div id="trans-mv-suggestion" style="display: none; font-size: 0.85rem; color: var(--text-color); margin-top: 0.5rem; opacity: 0.8;">
-                                💡 Vous avez des chèques repas disponibles. N'oubliez pas de renseigner ce champ si vous en avez utilisé.
-                            </div>
-                        </div>
-                        <div class="form-group" id="trans-linked-expense-group" style="display: none; background-color: rgba(var(--success-color-rgb, 40, 167, 69), 0.05); padding: 0.5rem; border-radius: 8px; border-left: 3px solid var(--success-color);">
-                            <label style="color: var(--success-color);">Lié à une dépense (Remboursement rétroactif)</label>
-                            <select id="trans-linked-expense">
-                                <option value="">-- Aucune (Revenu standard) --</option>
-                                <!-- Injected by JS -->
-                            </select>
-                            <small>Le montant de ce revenu viendra déduire le coût de la dépense sélectionnée dans vos statistiques.</small>
-                        </div>
-                        <div class="form-group">
-                            <label>Tags</label>
-                            <div id="trans-tags-container" class="tags-container" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
-                                <!-- Tags cliquables existants injectés par JS -->
-                            </div>
-                            <div style="display: flex; gap: 0.5rem;">
-                                <input type="text" id="trans-new-tag-name" placeholder="Nouveau tag (ex: Londres)" style="flex: 1;">
-                                <input type="color" id="trans-new-tag-color" value="#888888" style="width: 40px; height: 40px; padding: 0;">
-                                <button type="button" id="btn-add-tag" class="btn btn-secondary btn-small">Créer</button>
-                            </div>
-                            <input type="hidden" id="trans-selected-tags" value="[]">
-                        </div>
-                        <div class="form-group">
-                            <label>Note (Optionnelle)</label>
-                            <input type="text" id="trans-note" placeholder="Ex: Plein d'essence">
-                        </div>
-                        <input type="hidden" id="trans-id">
-                        <button type="submit" id="btn-submit-trans" class="btn btn-primary">Ajouter</button>
-                        <button type="button" id="btn-cancel-edit-trans" class="btn btn-secondary" style="display:none;">Annuler</button>
-                    </form>
-                </div>
-
-                <div class="list-panel card">
-                    <h3>Historique des transactions <small style="font-size: 0.8rem; font-weight: normal; color: var(--text-color); opacity: 0.7;">(Double-clic pour modifier)</small></h3>
-                    <div class="filters" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                        <input type="month" id="filter-month">
-                        <div id="quick-filters" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                            <button class="btn btn-small filter-chip active" data-filter="all">Toutes</button>
-                            <button class="btn btn-small filter-chip" data-filter="income" style="background-color: var(--success-color); color: white;">Revenus</button>
-                            <button class="btn btn-small filter-chip" data-filter="salary" style="background-color: var(--primary-color); color: white;">Salaires</button>
-                            <button class="btn btn-small filter-chip" data-filter="expense" style="background-color: var(--danger-color); color: white;">Dépenses</button>
-                            <!-- Top categories injected by JS -->
-                        </div>
-                        <div id="tag-filters" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
-                            <!-- Tags injected by JS -->
-                        </div>
-                    </div>
-                    <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 1rem; gap: 10px; flex-wrap: wrap;">
-                        <div id="transaction-selection-total-container" style="display: none; font-weight: bold; font-size: 1.1em; color: var(--primary-color);">
-                            Total sélectionné: <span id="transaction-selection-total">0.00</span> €
-                        </div>
-                        <button id="btn-toggle-transaction-selection" class="btn btn-secondary btn-small">Mode sélection</button>
-                    </div>
-
-                    <div class="table-container">
-                        <table id="table-transactions">
-                            <thead>
-                                <tr>
-                                    <th class="col-checkbox" style="display: none; width: 40px;"></th>
-                                    <th>Date</th>
-                                    <th>Type</th>
-                                    <th>Catégorie</th>
-                                    <th>Note</th>
-                                    <th>Tags</th>
-                                    <th>Montant</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- Injected by JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+            <div class="danger-zone">
+                <h3>Zone dangereuse</h3>
+                <button id="btn-reset" class="btn btn-danger">Effacer toutes les données</button>
             </div>
-        </section>
+        </div>
+    </div>
+</section>
 
-        <!-- SECTION ABONNEMENTS -->
-        <section id="subscriptions" class="view-section hidden">
-            <h2>Abonnements et Récurrences</h2>
-            <p>Ces abonnements génèrent automatiquement des transactions à chaque échéance.</p>
+<!-- ============================== CATÉGORIES ============================== -->
+<section id="categories" class="view-section hidden">
+    <div class="page-head">
+        <div class="page-head-text">
+            <h2>Réglages</h2>
+            <p class="page-sub">Arborescence des catégories et sous-catégories</p>
+        </div>
+    </div>
 
-            <div class="split-layout">
-                <div class="form-panel card">
-                    <h3>Ajouter un abonnement</h3>
-                    <form id="form-subscription">
-                        <div class="form-group">
-                            <label>Type</label>
-                            <select id="sub-type" required>
-                                <option value="expense">Dépense</option>
-                                <option value="income">Revenu</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Nom</label>
-                            <input type="text" id="sub-name" placeholder="Ex: Assurance Auto" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Fréquence</label>
-                            <select id="sub-frequency" required>
-                                <option value="weekly">Hebdomadaire</option>
-                                <option value="monthly">Tous les X du mois</option>
-                                <option value="yearly">Annuelle</option>
-                                <option value="installments">Paiement en plusieurs fois</option>
-                            </select>
-                        </div>
-                        <div class="form-group" id="sub-amount-group">
-                            <label>Montant (€)</label>
-                            <input type="number" id="sub-amount" step="0.01" min="0" required>
-                        </div>
-                        <div class="form-group" id="sub-installments-group" style="display: none;">
-                            <label>Montant Total (€)</label>
-                            <input type="number" id="sub-total-amount" step="0.01" min="0">
-                            <label style="margin-top: 0.5rem;">Nombre de mois</label>
-                            <input type="number" id="sub-installments-count" step="1" min="2">
-                        </div>
-                        <div class="form-group">
-                            <label>Catégorie</label>
-                            <select id="sub-category" required>
-                                <!-- Injected by JS -->
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Date de début</label>
-                            <input type="date" id="sub-start-date" required>
-                        </div>
-                        <div class="form-group" id="sub-end-date-group">
-                            <label>Date de fin (Optionnelle)</label>
-                            <input type="date" id="sub-end-date">
-                            <small>Si définie, les transactions cesseront d'être générées après cette date.</small>
-                        </div>
+    <nav class="subnav">
+        <a href="#" class="nav-link subnav-link" data-target="settings">Général</a>
+        <a href="#" class="nav-link subnav-link active" data-target="categories">Catégories</a>
+    </nav>
 
-                        <div class="form-group" id="sub-apply-past-container" style="display: none; align-items: center; gap: 0.5rem; margin-top: 1rem;">
-                            <input type="checkbox" id="sub-apply-past" style="width: auto;">
-                            <label for="sub-apply-past" style="margin: 0; font-weight: normal; cursor: pointer;">Appliquer les modifications de montant/nom/catégorie aux anciennes transactions (sans changer leurs dates)</label>
-                        </div>
-
-                        <input type="hidden" id="sub-id">
-                        <button type="submit" id="btn-submit-sub" class="btn btn-primary">Ajouter</button>
-                        <button type="button" id="btn-cancel-edit-sub" class="btn btn-secondary" style="display:none;">Annuler</button>
-                    </form>
+    <div class="split-layout">
+        <div class="form-panel card">
+            <h3>Ajouter une catégorie</h3>
+            <form id="form-category">
+                <div class="form-group">
+                    <label>Nom de la catégorie</label>
+                    <input type="text" id="cat-name" required>
                 </div>
-
-                <div class="list-panel card">
-                    <h3>Liste des abonnements</h3>
-                    <div class="table-container">
-                        <table id="table-subscriptions">
-                            <thead>
-                                <tr>
-                                    <th>Nom</th>
-                                    <th>Type</th>
-                                    <th>Fréquence</th>
-                                    <th>Montant</th>
-                                    <th>Prochaine date</th>
-                                    <th>Date de fin</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- Injected by JS -->
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="form-group">
+                    <label>Type</label>
+                    <select id="cat-type" required>
+                        <option value="expense">Dépense</option>
+                        <option value="income">Revenu</option>
+                    </select>
                 </div>
+                <div class="form-group">
+                    <label>Catégorie parente (optionnelle)</label>
+                    <select id="cat-parent">
+                        <option value="">-- Aucune (Catégorie principale) --</option>
+                    </select>
+                    <small>Avec un parent, la catégorie devient une sous-catégorie.</small>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Ajouter</button>
+            </form>
+        </div>
+
+        <div class="list-panel card">
+            <div class="card-head">
+                <h3>Arborescence</h3>
+                <small class="muted">Glissez-déposez pour réorganiser</small>
             </div>
-        </section>
+            <div id="category-tree"></div>
+        </div>
+    </div>
+</section>
 
-        <!-- SECTION CATEGORIES -->
-        <section id="categories" class="view-section hidden">
-            <h2>Gestion des Catégories</h2>
+<!-- ============================== PRÉDICTION (masquée) ============================== -->
+<section id="prediction" class="view-section hidden">
+    <div class="page-head">
+        <div class="page-head-text">
+            <h2>Prédiction</h2>
+            <p class="page-sub">Bac à sable : simulations sans impact sur vos données</p>
+        </div>
+    </div>
 
-            <div class="split-layout">
-                <div class="form-panel card">
-                    <h3>Ajouter une catégorie</h3>
-                    <form id="form-category">
-                        <div class="form-group">
-                            <label>Nom de la catégorie</label>
-                            <input type="text" id="cat-name" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Type</label>
-                            <select id="cat-type" required>
-                                <option value="expense">Dépense</option>
-                                <option value="income">Revenu</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Catégorie Parente (Optionnelle)</label>
-                            <select id="cat-parent">
-                                <option value="">-- Aucune (Catégorie principale) --</option>
-                                <!-- Injected by JS -->
-                            </select>
-                            <small>S'il y a un parent, c'est une sous-catégorie.</small>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Ajouter</button>
-                    </form>
+    <div class="split-layout">
+        <div class="form-panel card">
+            <h3>Simuler une opération</h3>
+            <form id="form-simulation">
+                <div class="form-group">
+                    <label>Nom de la simulation</label>
+                    <input type="text" id="sim-name" placeholder="Ex: Achat Voiture" required>
                 </div>
-
-                <div class="list-panel card">
-                    <h3>Arborescence des catégories</h3>
-                    <div id="category-tree">
-                        <!-- Injected by JS -->
-                    </div>
+                <div class="form-group">
+                    <label>Type</label>
+                    <select id="sim-type" required>
+                        <option value="expense">Dépense</option>
+                        <option value="income">Revenu</option>
+                    </select>
                 </div>
+                <div class="form-group">
+                    <label>Montant (€)</label>
+                    <input type="number" id="sim-amount" step="0.01" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Fréquence</label>
+                    <select id="sim-frequency" required>
+                        <option value="one-time">Ponctuelle (une fois)</option>
+                        <option value="monthly">Tous les X du mois</option>
+                        <option value="yearly">Annuelle</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Date (mois de début)</label>
+                    <input type="month" id="sim-date" required>
+                </div>
+                <input type="hidden" id="sim-id">
+                <button type="submit" id="btn-submit-sim" class="btn btn-primary btn-block">Ajouter la simulation</button>
+                <button type="button" id="btn-cancel-edit-sim" class="btn btn-secondary btn-block" style="display:none;">Annuler</button>
+            </form>
+            <div class="form-group" style="margin-top: 1.5rem;">
+                <label>Solde actuel (€)</label>
+                <input type="number" id="sim-current-balance" step="0.01" value="0">
+                <small>Point de départ de la courbe de projection.</small>
             </div>
-        </section>
+            <button id="btn-save-simulations" class="btn btn-secondary btn-block">Enregistrer les simulations</button>
+        </div>
 
-        <!-- SECTION TAGS -->
-        <section id="tags" class="view-section hidden">
-            <h2>Gestion des Tags</h2>
-            <p>Les tags permettent de catégoriser des transactions à travers plusieurs catégories (ex: un voyage, un projet spécifique).</p>
-
-            <div class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h3 style="margin: 0;">Liste de vos tags</h3>
-                </div>
-                <div class="table-container">
-                    <table id="table-tags-overview">
-                        <thead>
-                            <tr>
-                                <th>Tag</th>
-                                <th>Revenus Totaux</th>
-                                <th>Dépenses Totales</th>
-                                <th>Bilan</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Injected by JS -->
-                        </tbody>
-                    </table>
-                </div>
+        <div class="list-panel card">
+            <div class="card-head"><h3>Simulations actives</h3></div>
+            <div class="table-container">
+                <table id="table-simulations">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>Type</th>
+                            <th>Montant</th>
+                            <th>Fréquence</th>
+                            <th>Date début</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
             </div>
-        </section>
-
-        <!-- SECTION ECONOMIES -->
-        <section id="savings" class="view-section hidden">
-            <h2 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">Économies & Historique des objectifs</h2>
-
-            <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; margin-bottom: 2rem;">
-                <div class="card card-elegant" style="text-align: center; flex: 1; min-width: 280px; max-width: 400px;">
-                    <h3>Bénéfice Réel</h3>
-                    <div style="margin: 1rem 0;">
-                        <p id="savings-view-total" style="font-size: 2.5rem; font-weight: bold; margin: 0;">0.00 €</p>
-                        <span style="color: var(--text-color); opacity: 0.8; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;">Cumul Total (Tous les mois)</span>
-                    </div>
-                    <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
-                        <p id="savings-view-current-month" style="font-size: 1.5rem; font-weight: bold; margin: 0;">0.00 €</p>
-                        <span style="color: var(--text-color); opacity: 0.8; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;">Ce Mois-ci</span>
-                    </div>
-                </div>
-                <div class="card card-elegant" style="text-align: center; flex: 1; min-width: 280px; max-width: 400px; border-left: 4px solid var(--primary-color);">
-                    <h3>Total Épargné (Cumulé)</h3>
-                    <p id="savings-view-real-saved" style="font-size: 2.5rem; font-weight: bold; margin: 0.5rem 0 0 0; color: var(--primary-color);">0.00 €</p>
-                    <p style="color: var(--text-color); opacity: 0.8; font-size: 0.9rem;">Somme de l'épargne mise de côté lors de l'ajout de vos salaires.</p>
-                </div>
-                <div id="savings-view-mv-container" class="card card-elegant" style="text-align: center; flex: 1; min-width: 280px; max-width: 400px; border-left: 4px solid var(--accent-color); display: none;">
-                    <h3 style="color: var(--accent-color);">Valorisation Chèques Repas</h3>
-                    <p id="savings-view-mv-val" style="font-size: 2.5rem; font-weight: bold; margin: 0.5rem 0 0 0; color: var(--accent-color);">0.00 €</p>
-                    <p style="color: var(--text-color); opacity: 0.8; font-size: 0.9rem;">Équivalent pouvoir d'achat supplémentaire (Utilisés sur les 12 derniers mois).</p>
-                </div>
+            <h3 style="margin-top: 1.5rem;">Projection sur 24 mois</h3>
+            <div class="canvas-wrap">
+                <canvas id="predictionChart" width="800" height="400"></canvas>
             </div>
+        </div>
+    </div>
+</section>
 
-            <div class="card">
-                <h3>Récapitulatif par mois</h3>
-                <div class="table-container">
-                    <table id="table-savings-history">
-                        <thead>
-                            <tr>
-                                <th>Mois</th>
-                                <th>Revenus réels</th>
-                                <th>Objectif</th>
-                                <th>Dépenses réelles</th>
-                                <th>Économie (Bilan)</th>
-                                <th>Épargne du mois</th>
-                                <th>Bénéfice Réel</th>
-                                <th class="col-investment-month" style="display: none;">Investi ce mois</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Injected by JS -->
-                        </tbody>
-                    </table>
-                </div>
+        </main>
+    </div>
+</div>
+
+<!-- ------------------------------- BARRE D'ONGLETS MOBILE ------------------------------- -->
+<nav id="mobile-nav">
+    <a href="#" class="nav-link active" data-target="dashboard" data-group="dashboard" aria-label="Accueil">
+        <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>Accueil</span>
+    </a>
+    <a href="#" class="nav-link" data-target="transactions" data-group="transactions subscriptions" aria-label="Transactions">
+        <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 6h18"/><path d="m7 22-4-4 4-4"/><path d="M21 18H3"/></svg>
+        <span>Opérations</span>
+    </a>
+    <a href="#" class="nav-link" data-target="charts" data-group="charts savings tags" aria-label="Analyse">
+        <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+        <span>Analyse</span>
+    </a>
+    <a href="#" class="nav-link" id="mobile-nav-investments" data-target="investments" data-group="investments" aria-label="Investissements">
+        <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span>Invest.</span>
+    </a>
+    <a href="#" class="nav-link" id="mobile-nav-meal-vouchers" data-target="meal-vouchers" data-group="meal-vouchers" aria-label="Chèques repas" style="display: none;">
+        <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>
+        <span>Chèques</span>
+    </a>
+    <a href="#" class="nav-link" data-target="settings" data-group="settings categories" aria-label="Réglages">
+        <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.36.43.65.79.79H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Réglages</span>
+    </a>
+</nav>
+
+<!-- Bouton flottant d'ajout (mobile) -->
+<button id="fab-add" class="fab-btn" aria-label="Ajouter">
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+</button>
+
+<!-- ============================== OVERLAYS & MODALES ============================== -->
+
+<!-- Connexion -->
+<div id="login-overlay" class="login-overlay active">
+    <div class="login-card card">
+        <h2>Connexion</h2>
+        <p class="muted">Entrez votre mot de passe pour accéder à vos données.</p>
+        <form id="form-login">
+            <div class="form-group">
+                <label for="login-password">Mot de passe</label>
+                <input type="password" id="login-password" required>
             </div>
-        </section>
+            <button type="submit" class="btn btn-primary btn-block">Se connecter</button>
+        </form>
+        <p id="login-error" class="text-red" style="display: none; margin-top: 1rem;"></p>
+    </div>
+</div>
 
-        <!-- SECTION PREDICTION -->
-        <section id="prediction" class="view-section hidden">
-            <h2 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">Prédiction (Bac à sable)</h2>
-            <p style="margin-bottom: 2rem;">Simulez des achats ou des revenus futurs pour voir leur impact à long terme sur votre solde. Ces données sont virtuelles et n'affectent pas votre vrai budget.</p>
+<!-- Migration -->
+<div id="migration-overlay" class="login-overlay">
+    <div class="login-card card">
+        <h2>Nouvelle sauvegarde en ligne</h2>
+        <p class="muted">Des données locales non synchronisées ont été détectées sur cet appareil. Voulez-vous les transférer vers la base en ligne ?</p>
+        <div class="modal-actions">
+            <button id="btn-migrate-yes" class="btn btn-primary" style="flex: 1;">Oui, transférer</button>
+            <button id="btn-migrate-no" class="btn btn-secondary" style="flex: 1;">Non, effacer</button>
+        </div>
+        <p id="migration-status" style="display: none; margin-top: 1rem; font-weight: 600;"></p>
+    </div>
+</div>
 
-            <div class="split-layout">
-                <div class="form-panel card">
-                    <h3>Simuler une opération</h3>
-                    <form id="form-simulation">
-                        <div class="form-group">
-                            <label>Nom de la simulation</label>
-                            <input type="text" id="sim-name" placeholder="Ex: Achat Voiture, Nouveau Loyer" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Type</label>
-                            <select id="sim-type" required>
-                                <option value="expense">Dépense</option>
-                                <option value="income">Revenu</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Montant (€)</label>
-                            <input type="number" id="sim-amount" step="0.01" min="0" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Fréquence</label>
-                            <select id="sim-frequency" required>
-                                <option value="one-time">Ponctuelle (Une fois)</option>
-                                <option value="monthly">Tous les X du mois</option>
-                                <option value="yearly">Annuelle</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Date (Mois de début)</label>
-                            <input type="month" id="sim-date" required>
-                        </div>
-                        <input type="hidden" id="sim-id">
-                        <button type="submit" id="btn-submit-sim" class="btn btn-primary">Ajouter la simulation</button>
-                        <button type="button" id="btn-cancel-edit-sim" class="btn btn-secondary" style="display:none;">Annuler</button>
-                    </form>
-
-                    <div style="margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
-                        <div class="form-group">
-                            <label style="font-weight: bold; color: var(--accent-color);">Point de départ : Solde Actuel (€)</label>
-                            <input type="number" id="sim-current-balance" step="0.01" value="0" style="font-size: 1.2rem; font-weight: bold;">
-                            <small>Saisissez votre solde actuel pour calibrer la courbe de projection.</small>
-                        </div>
-                        <button id="btn-save-simulations" class="btn btn-secondary" style="width: 100%;">Enregistrer les simulations</button>
-                    </div>
-                </div>
-
-                <div class="list-panel card">
-                    <h3>Simulations actives</h3>
-                    <div class="table-container" style="max-height: 250px; overflow-y: auto; margin-bottom: 2rem;">
-                        <table id="table-simulations">
-                            <thead>
-                                <tr>
-                                    <th>Nom</th>
-                                    <th>Type</th>
-                                    <th>Montant</th>
-                                    <th>Fréquence</th>
-                                    <th>Date début</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- Injected by JS -->
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <h3>Projection sur 24 mois</h3>
-                    <div class="chart-box card-elegant" style="padding: 1rem; margin-top: 1rem;">
-                        <canvas id="predictionChart" width="800" height="400" style="width: 100%; max-width: 800px; height: auto; display: block; margin: 0 auto;"></canvas>
-                    </div>
-                </div>
+<!-- Modale générique de détails -->
+<div id="data-modal-overlay" class="login-overlay">
+    <div class="login-card card modal-lg">
+        <div class="modal-head">
+            <h2 id="data-modal-title">Détails</h2>
+            <button id="btn-close-modal" class="btn btn-ghost btn-icon-round" aria-label="Fermer">&times;</button>
+        </div>
+        <div class="modal-total">
+            Total : <span id="data-modal-total" class="text-red">0.00 €</span>
+        </div>
+        <div id="data-modal-filters-container" class="modal-filters" style="display: none;">
+            <div id="data-modal-cat-mode-group" class="form-group">
+                <label for="data-modal-cat-mode">Mode d'inclusion</label>
+                <select id="data-modal-cat-mode">
+                    <option value="with_subcategories">Catégorie + sous-catégories</option>
+                    <option value="category_only">Catégorie seule</option>
+                </select>
             </div>
-        </section>
-
-        <!-- SECTION INVESTISSEMENTS -->
-        <section id="investments" class="view-section hidden">
-            <h2 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">Investissements & Patrimoine</h2>
-
-            <div class="summary-cards" style="margin-bottom: 2rem;">
-                <div class="card card-elegant" style="text-align: center;">
-                    <h3>Montant Total Investi</h3>
-                    <p id="inv-total-invested" style="font-size: 1.5rem; font-weight: bold; margin: 0.5rem 0; color: var(--text-color);">0.00 €</p>
-                </div>
-                <div class="card card-elegant" style="text-align: center;">
-                    <h3>Valeur Actuelle Estimée</h3>
-                    <p id="inv-total-value" style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0; color: var(--accent-color);">0.00 €</p>
-                </div>
-                <div class="card card-elegant" style="text-align: center;">
-                    <h3>Performance Globale</h3>
-                    <p id="inv-total-performance" style="font-size: 1.5rem; font-weight: bold; margin: 0.5rem 0;">0.00 € (0%)</p>
-                </div>
+            <div class="form-group">
+                <label for="data-modal-period">Période</label>
+                <select id="data-modal-period">
+                    <option value="inherited">Période du tableau de bord</option>
+                    <option value="all_time">All time</option>
+                    <option value="last_month">30 derniers jours</option>
+                    <option value="last_year">365 derniers jours</option>
+                    <option value="custom">Intervalle personnalisé</option>
+                </select>
             </div>
-
-            <div class="card card-elegant" style="margin-bottom: 2rem;">
-                <h3>Évolution du portefeuille</h3>
-                <canvas id="portfolioChart" width="800" height="300" style="width: 100%; max-width: 800px; height: auto; display: block; margin: 0 auto;"></canvas>
-            </div>
-
-            <div class="card">
-                <h3>Vos Actifs</h3>
-                <div id="investments-list" style="display: flex; flex-direction: column; gap: 1rem;">
-                    <!-- Injected by JS -->
+            <div id="data-modal-custom-dates" class="modal-dates" style="display: none;">
+                <div class="form-group">
+                    <label for="data-modal-date-start">Du</label>
+                    <input type="date" id="data-modal-date-start">
                 </div>
-            </div>
-        </section>
-
-        <!-- MODALE DETAILS INVESTISSEMENT -->
-        <div id="investment-detail-modal-overlay" class="login-overlay">
-            <div class="login-card card card-elegant" style="max-width: 800px; width: 95%; max-height: 90vh; overflow-y: auto; text-align: left;">
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem; margin-bottom: 1rem;">
-                    <h2 id="inv-detail-title" style="border: none; margin: 0; padding: 0; color: var(--accent-color);">Détail de l'actif</h2>
-                    <button id="btn-close-inv-detail-modal" class="btn btn-secondary btn-small" style="font-size: 1.2rem; padding: 0.2rem 0.6rem; border-radius: 50%;">&times;</button>
-                </div>
-
-                <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
-                    <div style="flex: 1; min-width: 200px;">
-                        <p style="margin: 0;"><strong>Type:</strong> <span id="inv-detail-type"></span></p>
-                        <p style="margin: 0;"><strong>Acquis le:</strong> <span id="inv-detail-date"></span></p>
-                        <p style="margin: 0;"><strong>Statut:</strong> <span id="inv-detail-status"></span></p>
-                    </div>
-                    <div style="flex: 1; min-width: 200px; text-align: right;">
-                        <p style="margin: 0; font-size: 0.9rem; text-transform: uppercase;">Investi</p>
-                        <p id="inv-detail-invested" style="margin: 0; font-size: 1.2rem; font-weight: bold;">0.00 €</p>
-                    </div>
-                </div>
-
-                <div class="split-layout" style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
-                    <div class="form-panel" style="box-shadow: none; padding: 0;">
-                        <h3>Mettre à jour la valeur</h3>
-                        <form id="form-investment-value">
-                            <div class="form-group">
-                                <label>Nouvelle valeur estimée (€)</label>
-                                <input type="number" id="inv-val-amount" step="0.01" min="0" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Date de l'estimation</label>
-                                <input type="date" id="inv-val-date" required>
-                            </div>
-                            <input type="hidden" id="inv-val-asset-id">
-                            <button type="submit" class="btn btn-primary">Ajouter à l'historique</button>
-                        </form>
-                    </div>
-
-                    <div class="list-panel" style="box-shadow: none; padding: 0;">
-                        <h3>Historique des valeurs</h3>
-                        <div class="table-container" style="max-height: 250px; overflow-y: auto;">
-                            <table id="table-investment-history">
-                                <thead>
-                                    <tr>
-                                        <th>Date</th>
-                                        <th>Valeur</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <!-- Injected by JS -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                <div class="form-group">
+                    <label for="data-modal-date-end">Au</label>
+                    <input type="date" id="data-modal-date-end">
                 </div>
             </div>
         </div>
+        <div class="table-container modal-scroll">
+            <table id="table-modal-transactions">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Catégorie</th>
+                        <th>Note</th>
+                        <th>Montant</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
 
-        <!-- SECTION CHEQUES REPAS -->
-        <section id="meal-vouchers" class="view-section hidden">
-            <h2 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;">Chèques Repas</h2>
+<!-- Modale réconciliation chèques repas -->
+<div id="mv-reconciliation-modal-overlay" class="login-overlay">
+    <div class="login-card card modal-lg modal-tall">
+        <div class="modal-head">
+            <h2>Réconciliation chèques repas</h2>
+            <button id="btn-close-mv-reconciliation-modal" class="btn btn-ghost btn-icon-round" aria-label="Fermer">&times;</button>
+        </div>
+        <p class="muted">Dépenses alimentaires du mois précédent sans part chèques repas. Double-cliquez pour modifier la transaction, ou utilisez le champ ci-dessous.</p>
+        <div class="table-container modal-scroll">
+            <table id="table-mv-reconciliation">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Catégorie</th>
+                        <th>Montant</th>
+                        <th>Ajouter Part CR</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div class="modal-foot">
+            <button id="btn-save-mv-reconciliation" class="btn btn-primary">Enregistrer les parts ajoutées</button>
+        </div>
+    </div>
+</div>
 
-            <div class="summary-cards" style="margin-bottom: 2rem;">
-                <div class="card card-elegant" style="text-align: center;">
-                    <h3>Solde Disponible</h3>
-                    <p id="mv-available-balance" style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0; color: var(--accent-color);">0.00 €</p>
-                </div>
-                <div class="card card-elegant" style="text-align: center;">
-                    <h3>Reçus (12 derniers mois)</h3>
-                    <p id="mv-received-12m" style="font-size: 1.2rem; font-weight: bold; margin: 0.5rem 0; color: var(--success-color);">0.00 €</p>
-                </div>
-                <div class="card card-elegant" style="text-align: center;">
-                    <h3>Dépensés (12 derniers mois)</h3>
-                    <p id="mv-spent-12m" style="font-size: 1.2rem; font-weight: bold; margin: 0.5rem 0;">0.00 €</p>
-                </div>
+<!-- Modale mobile (formulaire déplacé par le JS) -->
+<div id="mobile-form-modal" class="mobile-modal">
+    <div class="mobile-modal-header">
+        <h2 id="mobile-modal-title">Ajouter</h2>
+        <button id="btn-close-mobile-modal" class="btn btn-ghost btn-icon-round" aria-label="Fermer">&times;</button>
+    </div>
+    <div id="mobile-form-container"></div>
+</div>
+
+<!-- Modale d'édition (desktop) -->
+<div id="edit-modal-overlay" class="login-overlay">
+    <div class="login-card card modal-md modal-tall">
+        <div class="modal-head">
+            <h2 id="edit-modal-title">Modifier</h2>
+            <button id="btn-close-edit-modal" class="btn btn-ghost btn-icon-round" aria-label="Fermer">&times;</button>
+        </div>
+        <div id="edit-modal-container"></div>
+    </div>
+</div>
+
+<!-- Modale détail d'un investissement -->
+<div id="investment-detail-modal-overlay" class="login-overlay">
+    <div class="login-card card modal-lg modal-tall">
+        <div class="modal-head">
+            <h2 id="inv-detail-title">Détail de l'actif</h2>
+            <button id="btn-close-inv-detail-modal" class="btn btn-ghost btn-icon-round" aria-label="Fermer">&times;</button>
+        </div>
+
+        <div class="inv-detail-head">
+            <div>
+                <p><strong>Type :</strong> <span id="inv-detail-type"></span></p>
+                <p><strong>Acquis le :</strong> <span id="inv-detail-date"></span></p>
+                <p><strong>Statut :</strong> <span id="inv-detail-status"></span></p>
             </div>
+            <div class="inv-detail-amount">
+                <span class="mini-label">Investi</span>
+                <strong id="inv-detail-invested">0.00 €</strong>
+            </div>
+        </div>
 
-            <div class="split-layout">
-                <div class="form-panel card">
-                    <h3>Ajouter un lot de chèques</h3>
-                    <form id="form-meal-voucher">
-                        <div class="form-group">
-                            <label>Montant (€)</label>
-                            <input type="number" id="mv-amount" step="0.01" min="0" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Date de réception</label>
-                            <input type="date" id="mv-date" required>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Ajouter</button>
-                    </form>
-                </div>
-
-                <div class="list-panel card">
-                    <h3>Crédits (Lots reçus)</h3>
-                    <div class="table-container" style="max-height: 250px; overflow-y: auto;">
-                        <table id="table-meal-vouchers">
-                            <thead>
-                                <tr>
-                                    <th>Date Réception</th>
-                                    <th>Montant</th>
-                                    <th>Expiration (+12m)</th>
-                                    <th>Statut</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- Injected by JS -->
-                            </tbody>
-                        </table>
+        <div class="split-layout">
+            <div class="form-panel">
+                <h3>Mettre à jour la valeur</h3>
+                <form id="form-investment-value">
+                    <div class="form-group">
+                        <label>Nouvelle valeur estimée (€)</label>
+                        <input type="number" id="inv-val-amount" step="0.01" min="0" required>
                     </div>
-                </div>
-            </div>
-
-            <div class="split-layout" style="margin-top: 2rem;">
-                <div class="form-panel card">
-                    <h3>Ajouter une dépense partagée (hors budget)</h3>
-                    <p style="font-size: 0.85rem; color: var(--text-color); opacity: 0.8; margin-bottom: 1rem;">Ces dépenses déduisent votre solde de chèques repas mais n'apparaissent pas dans vos statistiques et transactions principales.</p>
-                    <form id="form-meal-voucher-expense">
-                        <div class="form-group">
-                            <label>Montant (€)</label>
-                            <input type="number" id="mv-expense-amount" step="0.01" min="0" required>
-                        </div>
-                        <input type="hidden" id="mv-expense-id">
-                        <button type="submit" id="btn-submit-mv-expense" class="btn btn-primary">Ajouter la dépense</button>
-                        <button type="button" id="btn-cancel-edit-mv-expense" class="btn btn-secondary" style="display:none; margin-top: 0.5rem;">Annuler</button>
-                    </form>
-                </div>
-
-                <div class="list-panel card">
-                    <h3>Dépenses partagées</h3>
-                    <div class="table-container" style="max-height: 250px; overflow-y: auto;">
-                        <table id="table-meal-voucher-external-expenses">
-                            <thead>
-                                <tr>
-                                    <th>Montant</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- Injected by JS -->
-                            </tbody>
-                        </table>
+                    <div class="form-group">
+                        <label>Date de l'estimation</label>
+                        <input type="date" id="inv-val-date" required>
                     </div>
-                </div>
+                    <input type="hidden" id="inv-val-asset-id">
+                    <button type="submit" class="btn btn-primary btn-block">Ajouter à l'historique</button>
+                </form>
             </div>
-
-            <div class="card" style="margin-top: 2rem;">
-                <h3>Historique des dépenses en chèques repas</h3>
-                <div class="table-container">
-                    <table id="table-meal-voucher-transactions">
+            <div class="list-panel">
+                <h3>Historique des valeurs</h3>
+                <div class="table-container modal-scroll">
+                    <table id="table-investment-history">
                         <thead>
                             <tr>
                                 <th>Date</th>
-                                <th>Note</th>
-                                <th>Catégorie</th>
-                                <th>Montant</th>
-                                <th>Part CR</th>
+                                <th>Valeur</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <!-- Injected by JS -->
-                        </tbody>
+                        <tbody></tbody>
                     </table>
                 </div>
-                <small style="display: block; margin-top: 1rem; color: var(--text-color); opacity: 0.8;">Cette vue est en lecture seule. Pour modifier une transaction, utilisez l'onglet Transactions habituel.</small>
             </div>
-        </section>
+        </div>
+    </div>
+</div>
 
-        <!-- SECTION PARAMETRES -->
-        <section id="settings" class="view-section hidden">
-            <h2>Paramètres & Sauvegardes</h2>
-
-            <div class="card">
-                <h3>Objectif de dépense mensuel</h3>
-                <form id="form-settings-goal">
-                    <div class="form-group">
-                        <label>Mois (Optionnel)</label>
-                        <input type="month" id="setting-spending-month">
-                        <small>Laissez vide pour définir l'objectif par défaut pour tous les mois.</small>
-                    </div>
-                    <div class="form-group">
-                        <label>Objectif (€)</label>
-                        <input type="number" id="setting-spending-goal" step="1" min="0" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Enregistrer l'objectif</button>
-                </form>
-            </div>
-
-            <div class="card">
-                <h3>Module Chèques Repas</h3>
-                <form id="form-settings-meal-vouchers">
-                    <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
-                        <input type="checkbox" id="setting-meal-vouchers-enabled" style="width: auto;">
-                        <label for="setting-meal-vouchers-enabled" style="margin: 0; font-weight: bold; cursor: pointer;">Activer le module Chèques Repas</label>
-                    </div>
-                    <div id="settings-meal-vouchers-details" style="display: none; padding-top: 1rem; border-top: 1px solid var(--border-color);">
-                        <div class="form-group">
-                            <label>Catégories éligibles (Maintenez Ctrl/Cmd pour en sélectionner plusieurs)</label>
-                            <select id="setting-meal-vouchers-categories" multiple size="5" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 5px; font-family: inherit; background: var(--bg-color); color: var(--text-color);">
-                                <!-- Injected by JS -->
-                            </select>
-                            <small>Les dépenses dans ces catégories pourront comporter une part payée en chèques repas.</small>
-                        </div>
-                        <div class="form-group">
-                            <label>Montant mensuel habituel (€)</label>
-                            <input type="number" id="setting-meal-vouchers-expected" step="1" min="0">
-                            <small>Pour une future intégration dans la projection (Bac à sable).</small>
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Enregistrer les paramètres</button>
-                </form>
-            </div>
-
-            <div class="card">
-                <h3>Module Investissements & Patrimoine</h3>
-                <form id="form-settings-investments">
-                    <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
-                        <input type="checkbox" id="setting-investments-enabled" style="width: auto;">
-                        <label for="setting-investments-enabled" style="margin: 0; font-weight: bold; cursor: pointer;">Activer le module Investissements</label>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Enregistrer les paramètres</button>
-                </form>
-            </div>
-
-            <div class="card">
-                <h3>Sauvegarde (JSON)</h3>
-                <p>Vos données sont sauvegardées automatiquement sur votre navigateur. Vous pouvez également les exporter vers un fichier JSON pour les sécuriser, ou les importer depuis un autre appareil.</p>
-
-                <div class="settings-actions">
-                    <button id="btn-export" class="btn btn-primary">Exporter en JSON</button>
-
-                    <div class="import-group">
-                        <input type="file" id="file-import" accept=".json">
-                        <button id="btn-import" class="btn btn-secondary">Importer</button>
-                    </div>
-                </div>
-
-                <div class="danger-zone">
-                    <h3>Zone dangereuse</h3>
-                    <button id="btn-reset" class="btn btn-danger">Effacer toutes les données</button>
-                </div>
-            </div>
-        </section>
-
-    </main>
-    <script type="module" src="script.js"></script>
+<script type="module" src="script.js"></script>
 </body>
 </html>

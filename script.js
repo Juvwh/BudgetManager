@@ -2025,6 +2025,11 @@ function updateDashboard() {
     drawBarChart('barChartEvolution', last6Months);
 
     updateHorizontalBarChart(currentYear, currentMonth);
+
+    // Widgets additionnels du tableau de bord (voir bloc UI en fin de fichier)
+    if (typeof renderDashboardExtras === 'function') {
+        renderDashboardExtras(currentYear, currentMonth);
+    }
 }
 
 function updateHorizontalBarChart(year, month) {
@@ -2757,7 +2762,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle FAB display based on current view
     function updateFabVisibility(targetId) {
         const fab = document.getElementById('fab-add');
-        if (targetId === 'transactions' || targetId === 'subscriptions') {
+        if (targetId === 'dashboard' || targetId === 'transactions' || targetId === 'subscriptions') {
             fab.style.display = 'flex';
         } else {
             fab.style.display = 'none';
@@ -2835,6 +2840,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 activeSection = sec.id;
             }
         });
+
+        if (activeSection === 'dashboard') {
+            // Depuis l'accueil, on ouvre le formulaire complet pre-rempli
+            const advancedBtn = document.getElementById('btn-qa-advanced');
+            if (advancedBtn) advancedBtn.click();
+            return;
+        }
 
         if (activeSection === 'transactions') {
             modalTitle.textContent = "Ajouter une transaction";
@@ -4767,3 +4779,426 @@ function renderPortfolioChart() {
 }
 
 window.showCategoryDetails = showCategoryDetails;
+
+
+/* =========================================================================
+   UI 2.0 — Navigation latérale, saisie rapide et widgets du tableau de bord
+   Ce bloc complète la logique existante sans la remplacer :
+   - il ne fait que lire les données (appData) et piloter le DOM,
+   - la saisie rapide réutilise le formulaire complet #form-transaction.
+   ========================================================================= */
+
+// Correspondance onglet -> groupe de navigation affiché dans le volet latéral
+const NAV_GROUP_TITLES = {
+    dashboard: 'Accueil',
+    transactions: 'Transactions',
+    subscriptions: 'Transactions',
+    charts: 'Analyse',
+    savings: 'Analyse',
+    tags: 'Analyse',
+    investments: 'Investissements',
+    'meal-vouchers': 'Chèques repas',
+    settings: 'Réglages',
+    categories: 'Réglages',
+    prediction: 'Prédiction'
+};
+
+const MONTH_NAMES_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+
+function fmtEuro(value, withSign) {
+    const n = Number(value) || 0;
+    const sign = withSign ? (n > 0 ? '+' : (n < 0 ? '-' : '')) : (n < 0 ? '-' : '');
+    return sign + Math.abs(n).toFixed(2) + ' €';
+}
+
+function fmtShortDate(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+}
+
+/* -------------------------------------------------------------------------
+   Navigation : surlignage du groupe actif + volet coulissant mobile
+   ------------------------------------------------------------------------- */
+function highlightNavGroup(targetId) {
+    document.querySelectorAll('[data-group]').forEach(el => {
+        const groups = (el.getAttribute('data-group') || '').split(/\s+/);
+        el.classList.toggle('is-group-active', groups.includes(targetId));
+    });
+
+    const title = document.getElementById('topbar-title');
+    if (title) title.textContent = NAV_GROUP_TITLES[targetId] || 'Mon Budget';
+}
+
+function closeSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const scrim = document.getElementById('sidebar-scrim');
+    if (sidebar) sidebar.classList.remove('open');
+    if (scrim) scrim.classList.remove('open');
+}
+
+function openSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const scrim = document.getElementById('sidebar-scrim');
+    if (sidebar) sidebar.classList.add('open');
+    if (scrim) scrim.classList.add('open');
+}
+
+/* -------------------------------------------------------------------------
+   Saisie rapide (tableau de bord)
+   ------------------------------------------------------------------------- */
+function syncQuickAddCategories() {
+    const source = document.getElementById('trans-category');
+    const target = document.getElementById('qa-category');
+    if (!source || !target) return;
+
+    const previous = target.value;
+    target.innerHTML = source.innerHTML;
+    if (previous && target.querySelector('option[value="' + previous + '"]')) {
+        target.value = previous;
+    }
+}
+
+function setQuickAddType(type) {
+    const hidden = document.getElementById('qa-type');
+    if (!hidden) return;
+    hidden.value = type;
+
+    document.querySelectorAll('#qa-type-group .seg-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.type === type);
+    });
+
+    const savingsGroup = document.getElementById('qa-savings-group');
+    if (savingsGroup) savingsGroup.style.display = type === 'salary' ? 'block' : 'none';
+
+    // On aligne le formulaire complet pour récupérer les bonnes catégories
+    const transType = document.getElementById('trans-type');
+    if (transType && !document.getElementById('trans-id').value) {
+        transType.value = type;
+        transType.dispatchEvent(new Event('change'));
+        syncQuickAddCategories();
+    }
+}
+
+function showQuickFeedback(message, isSuccess) {
+    const el = document.getElementById('qa-feedback');
+    if (!el) return;
+    el.textContent = message;
+    el.classList.toggle('is-success', !!isSuccess);
+    el.style.display = 'block';
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => { el.style.display = 'none'; }, 3200);
+}
+
+function initQuickAdd() {
+    const form = document.getElementById('form-quick-add');
+    if (!form) return;
+
+    document.querySelectorAll('#qa-type-group .seg-btn').forEach(btn => {
+        btn.addEventListener('click', () => setQuickAddType(btn.dataset.type));
+    });
+
+    const dateInput = document.getElementById('qa-date');
+    if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().split('T')[0];
+
+    // Ouvre le formulaire complet, pré-rempli avec la saisie en cours
+    const advancedBtn = document.getElementById('btn-qa-advanced');
+    if (advancedBtn) {
+        advancedBtn.addEventListener('click', () => {
+            const type = document.getElementById('qa-type').value;
+            resetTransactionForm();
+            document.getElementById('trans-type').value = type;
+            document.getElementById('trans-type').dispatchEvent(new Event('change'));
+
+            const amount = document.getElementById('qa-amount').value;
+            if (amount) document.getElementById('trans-amount').value = amount;
+            document.getElementById('trans-date').value = document.getElementById('qa-date').value || new Date().toISOString().split('T')[0];
+            const cat = document.getElementById('qa-category').value;
+            if (cat) document.getElementById('trans-category').value = cat;
+            document.getElementById('trans-note').value = document.getElementById('qa-note').value || '';
+            document.getElementById('trans-category').dispatchEvent(new Event('change'));
+
+            if (window.innerWidth <= 768) {
+                const mobileModal = document.getElementById('mobile-form-modal');
+                const container = document.getElementById('mobile-form-container');
+                const panel = document.querySelector('#transactions .form-panel');
+                document.getElementById('mobile-modal-title').textContent = 'Nouvelle transaction';
+                if (panel && container) container.appendChild(panel);
+                if (mobileModal) mobileModal.classList.add('active');
+            } else {
+                openEditModal('form-transaction', 'Nouvelle transaction');
+            }
+        });
+    }
+
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+
+        const type = document.getElementById('qa-type').value;
+        const amount = parseFloat(document.getElementById('qa-amount').value);
+        const category = document.getElementById('qa-category').value;
+        const date = document.getElementById('qa-date').value;
+        const note = document.getElementById('qa-note').value;
+
+        if (isNaN(amount) || amount <= 0) {
+            showQuickFeedback('Indiquez un montant valide.');
+            return;
+        }
+        if (!category) {
+            showQuickFeedback('Créez d’abord une catégorie dans Réglages > Catégories.');
+            return;
+        }
+
+        // On alimente le formulaire complet : toute la logique métier est réutilisée
+        const transForm = document.getElementById('form-transaction');
+        resetTransactionForm();
+        document.getElementById('trans-type').value = type;
+        document.getElementById('trans-type').dispatchEvent(new Event('change'));
+        document.getElementById('trans-amount').value = amount;
+        document.getElementById('trans-date').value = date;
+        document.getElementById('trans-category').value = category;
+        document.getElementById('trans-category').dispatchEvent(new Event('change'));
+        document.getElementById('trans-mv-part').value = '';
+        document.getElementById('trans-note').value = note;
+        if (type === 'salary') {
+            document.getElementById('trans-savings-amount').value = document.getElementById('qa-savings-amount').value || 0;
+        }
+
+        if (!transForm.checkValidity()) {
+            showQuickFeedback('Vérifiez les champs de la transaction.');
+            return;
+        }
+
+        transForm.requestSubmit();
+
+        // Remise à zéro de la saisie rapide
+        document.getElementById('qa-amount').value = '';
+        document.getElementById('qa-note').value = '';
+        document.getElementById('qa-savings-amount').value = 0;
+        document.getElementById('qa-date').value = date;
+        setQuickAddType(type);
+        showQuickFeedback('Transaction ajoutée.', true);
+    });
+
+    // État initial : type "Dépense" et catégories synchronisées
+    setQuickAddType('expense');
+}
+
+/* -------------------------------------------------------------------------
+   Widgets du tableau de bord (deltas, rythme, flux, échéances)
+   ------------------------------------------------------------------------- */
+function renderDashboardExtras(year, month) {
+    const periodLabel = document.getElementById('dash-period-label');
+    if (periodLabel) periodLabel.textContent = 'Vue de ' + MONTH_NAMES_FR[month - 1] + ' ' + year;
+
+    const current = getMonthData(year, month);
+
+    let prevMonth = month - 1;
+    let prevYear = year;
+    if (prevMonth <= 0) { prevMonth = 12; prevYear -= 1; }
+    const previous = getMonthData(prevYear, prevMonth);
+
+    // --- Écarts avec le mois précédent ---
+    const setDelta = (id, currentValue, previousValue, lowerIsBetter) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (!previousValue) {
+            el.textContent = 'Aucune donnée le mois dernier';
+            el.style.color = '';
+            return;
+        }
+        const diff = currentValue - previousValue;
+        const pct = (diff / Math.abs(previousValue)) * 100;
+        const arrow = diff >= 0 ? '▲' : '▼';
+        el.textContent = arrow + ' ' + Math.abs(pct).toFixed(0) + '% vs mois dernier';
+        const good = lowerIsBetter ? diff <= 0 : diff >= 0;
+        el.style.color = good ? 'var(--success-color)' : 'var(--danger-color)';
+    };
+
+    setDelta('dash-income-delta', current.income, previous.income, false);
+    setDelta('dash-expense-delta', current.expense, previous.expense, true);
+    setDelta('dash-balance-delta', current.balance, previous.balance, false);
+
+    // --- Rythme de dépense ---
+    const today = new Date();
+    const isCurrentMonth = today.getFullYear() === year && (today.getMonth() + 1) === month;
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const dayOfMonth = isCurrentMonth ? today.getDate() : daysInMonth;
+    const daysLeft = Math.max(0, daysInMonth - dayOfMonth);
+
+    let goal = appData.spendingGoal;
+    const monthStr = year + '-' + String(month).padStart(2, '0');
+    if (appData.monthlyGoals && appData.monthlyGoals[monthStr] !== undefined) {
+        goal = appData.monthlyGoals[monthStr];
+    }
+
+    const dailyAvg = current.expense / Math.max(1, dayOfMonth);
+    const remaining = (goal || 0) - current.expense;
+
+    const elAvg = document.getElementById('dash-daily-avg');
+    if (elAvg) elAvg.textContent = fmtEuro(dailyAvg);
+
+    const elLeft = document.getElementById('dash-daily-left');
+    if (elLeft) {
+        if (!goal) {
+            elLeft.textContent = '—';
+            elLeft.style.color = '';
+        } else if (remaining <= 0) {
+            elLeft.textContent = '0.00 €';
+            elLeft.style.color = 'var(--danger-color)';
+        } else {
+            elLeft.textContent = fmtEuro(remaining / Math.max(1, daysLeft || 1));
+            elLeft.style.color = '';
+        }
+    }
+
+    const projection = dailyAvg * daysInMonth;
+    const elProj = document.getElementById('dash-projection');
+    if (elProj) {
+        elProj.textContent = fmtEuro(projection);
+        elProj.style.color = goal && projection > goal ? 'var(--danger-color)' : 'var(--success-color)';
+    }
+
+    const elSavings = document.getElementById('dash-savings-month');
+    if (elSavings) elSavings.textContent = fmtEuro(current.savings);
+
+    // --- Dernières transactions ---
+    const feed = document.getElementById('dash-recent-list');
+    if (feed) {
+        const list = (appData.transactions || [])
+            .slice()
+            .filter(t => t.date)
+            .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+            .slice(0, 8);
+
+        if (list.length === 0) {
+            feed.innerHTML = '<div class="feed-empty">Aucune transaction pour le moment.</div>';
+        } else {
+            feed.innerHTML = list.map(t => {
+                const isIncome = t.type === 'income' || t.type === 'salary' || t.type === 'investment_return';
+                const cls = isIncome ? 'is-in' : (t.type === 'investment_transfer' ? 'is-neutral' : 'is-out');
+                const catName = getCategoryPath(t.categoryId);
+                const label = t.note ? t.note : catName;
+                const meta = (t.note ? catName + ' · ' : '') + fmtShortDate(t.date);
+                const amount = (isIncome ? '+' : '-') + Math.abs(Number(t.amount) || 0).toFixed(2) + ' €';
+                const color = isIncome ? 'var(--success-color)' : 'var(--danger-color)';
+                const initial = (catName || '?').trim().charAt(0).toUpperCase();
+                return '<div class="feed-item" data-trans-id="' + t.id + '">' +
+                    '<span class="feed-avatar ' + cls + '">' + initial + '</span>' +
+                    '<span class="feed-body"><span class="feed-title">' + label + '</span>' +
+                    '<span class="feed-meta">' + meta + '</span></span>' +
+                    '<span class="feed-amount" style="color:' + color + '">' + amount + '</span>' +
+                    '</div>';
+            }).join('');
+
+            feed.querySelectorAll('.feed-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const id = item.getAttribute('data-trans-id');
+                    if (id && !String(id).startsWith('virtual')) editTransaction(id);
+                });
+            });
+        }
+    }
+
+    // --- Prochaines échéances & total récurrent ---
+    const upcoming = document.getElementById('dash-upcoming-list');
+    const recurringTotalEl = document.getElementById('dash-recurring-total');
+    const subs = (appData.subscriptions || []).filter(s => s.status !== 'completed');
+
+    let monthlyRecurring = 0;
+    subs.forEach(s => {
+        const amount = Number(s.amount) || 0;
+        if (s.type !== 'expense') return;
+        if (s.frequency === 'weekly') monthlyRecurring += amount * 52 / 12;
+        else if (s.frequency === 'yearly') monthlyRecurring += amount / 12;
+        else monthlyRecurring += amount;
+    });
+    if (recurringTotalEl) recurringTotalEl.textContent = fmtEuro(monthlyRecurring);
+
+    if (upcoming) {
+        const next = subs
+            .map(s => ({ sub: s, date: s.nextDate || s.startDate }))
+            .filter(x => x.date)
+            .sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : 0))
+            .slice(0, 5);
+
+        if (next.length === 0) {
+            upcoming.innerHTML = '<div class="feed-empty">Aucune récurrence active.</div>';
+        } else {
+            upcoming.innerHTML = next.map(x => {
+                const s = x.sub;
+                const isIncome = s.type === 'income';
+                const color = isIncome ? 'var(--success-color)' : 'var(--danger-color)';
+                const amount = (isIncome ? '+' : '-') + (Number(s.amount) || 0).toFixed(2) + ' €';
+                return '<div class="feed-item">' +
+                    '<span class="feed-avatar ' + (isIncome ? 'is-in' : 'is-out') + '">' + fmtShortDate(x.date).split(' ')[0] + '</span>' +
+                    '<span class="feed-body"><span class="feed-title">' + (s.name || 'Récurrence') + '</span>' +
+                    '<span class="feed-meta">' + fmtShortDate(x.date) + '</span></span>' +
+                    '<span class="feed-amount" style="color:' + color + '">' + amount + '</span>' +
+                    '</div>';
+            }).join('');
+        }
+    }
+
+    // --- Top catégories du mois ---
+    const topEl = document.getElementById('dash-top-categories');
+    if (topEl) {
+        const entries = Object.entries(current.categoryExpenses || {})
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 6);
+        const max = entries.length ? entries[0][1] : 0;
+
+        if (entries.length === 0) {
+            topEl.innerHTML = '<div class="feed-empty">Aucune dépense ce mois-ci.</div>';
+        } else {
+            topEl.innerHTML = entries.map(([name, value]) => {
+                const pct = max ? (value / max) * 100 : 0;
+                const share = current.expense ? (value / current.expense) * 100 : 0;
+                return '<div class="bar-row">' +
+                    '<div class="bar-row-head"><span>' + name + '</span><strong>' + value.toFixed(2) + ' € · ' + share.toFixed(0) + '%</strong></div>' +
+                    '<div class="bar-track"><div class="bar-value" style="width:' + pct.toFixed(1) + '%"></div></div>' +
+                    '</div>';
+            }).join('');
+        }
+    }
+
+    syncQuickAddCategories();
+}
+
+/* -------------------------------------------------------------------------
+   Initialisation de l'interface
+   ------------------------------------------------------------------------- */
+document.addEventListener('DOMContentLoaded', () => {
+
+    // Volet latéral mobile
+    const btnOpen = document.getElementById('btn-open-sidebar');
+    const btnClose = document.getElementById('btn-close-sidebar');
+    const scrim = document.getElementById('sidebar-scrim');
+    if (btnOpen) btnOpen.addEventListener('click', openSidebar);
+    if (btnClose) btnClose.addEventListener('click', closeSidebar);
+    if (scrim) scrim.addEventListener('click', closeSidebar);
+
+    // Fermeture automatique après un choix de navigation
+    document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+        link.addEventListener('click', closeSidebar);
+    });
+
+    // Bouton de thème de la barre supérieure : délègue au bouton principal
+    const themeMobile = document.getElementById('theme-toggle-mobile');
+    if (themeMobile) {
+        themeMobile.addEventListener('click', () => {
+            const main = document.getElementById('theme-toggle');
+            if (main) main.click();
+        });
+    }
+
+    // Surlignage du groupe de navigation actif
+    document.addEventListener('viewChanged', (e) => {
+        highlightNavGroup(e.detail);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    highlightNavGroup('dashboard');
+
+    initQuickAdd();
+});
