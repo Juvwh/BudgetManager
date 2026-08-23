@@ -44,9 +44,15 @@
                     </a>
                 </li>
                 <li>
-                    <a href="#" class="nav-link side-link" data-target="charts" data-group="charts savings tags">
+                    <a href="#" class="nav-link side-link" data-target="charts" data-group="charts savings">
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
                         <span class="side-label">Analyse</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="nav-link side-link" data-target="categories" data-group="categories tags">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M7 12h10"/></svg>
+                        <span class="side-label">Organisation</span>
                     </a>
                 </li>
                 <li id="nav-item-investments">
@@ -56,7 +62,7 @@
                     </a>
                 </li>
                 <li id="nav-item-meal-vouchers" style="display: none;">
-                    <a href="#" class="nav-link side-link" data-target="meal-vouchers" data-group="meal-vouchers">
+                    <a href="#" class="nav-link side-link" data-target="meal-vouchers" data-group="meal-vouchers meal-vouchers-shared">
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg>
                         <span class="side-label">Chèques repas</span>
                     </a>
@@ -68,7 +74,7 @@
         </nav>
 
         <div class="sidebar-footer">
-            <a href="#" class="nav-link side-link" data-target="settings" data-group="settings categories">
+            <a href="#" class="nav-link side-link" data-target="settings" data-group="settings">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.36.43.65.79.79H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                 <span class="side-label">Réglages</span>
             </a>
@@ -109,8 +115,8 @@
             <div class="mv-chart-toggle-container field-inline" style="display: none;">
                 <label for="dashboard-mv-toggle">Mode</label>
                 <select id="dashboard-mv-toggle">
-                    <option value="real">Argent réel</option>
-                    <option value="total">Montant total</option>
+                    <option value="real">Total</option>
+                    <option value="total">Avec chèques repas</option>
                 </select>
             </div>
             <div class="field-inline">
@@ -146,14 +152,13 @@
         <div class="dash-main">
 
             <!-- Les 3 indicateurs clés -->
-            <div class="summary-cards">
+            <div class="summary-cards summary-cards-hero">
                 <div class="card stat-card stat-income">
                     <div class="stat-head">
                         <span class="stat-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></span>
                         <h3>Revenus</h3>
                     </div>
                     <p id="dash-income">0.00 €</p>
-                    <span class="stat-delta" id="dash-income-delta"></span>
                 </div>
                 <div class="card stat-card stat-expense">
                     <div class="stat-head">
@@ -161,7 +166,6 @@
                         <h3>Dépenses</h3>
                     </div>
                     <p id="dash-expense">0.00 €</p>
-                    <span class="stat-delta" id="dash-expense-delta"></span>
                 </div>
                 <div class="card stat-card stat-balance">
                     <div class="stat-head">
@@ -169,7 +173,6 @@
                         <h3>Solde du mois</h3>
                     </div>
                     <p id="dash-balance">0.00 €</p>
-                    <span class="stat-delta" id="dash-balance-delta"></span>
                 </div>
             </div>
 
@@ -477,6 +480,11 @@
             </div>
 
             <div class="filter-bar">
+                <div class="search-field">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                    <input type="search" id="filter-search" placeholder="Rechercher un titre…" aria-label="Rechercher une transaction par titre">
+                </div>
+
                 <input type="month" id="filter-month" aria-label="Mois">
 
                 <div class="segmented segmented-sm" id="type-filters" role="tablist">
@@ -610,8 +618,8 @@
             <div class="mv-chart-toggle-container field-inline" style="display: none;">
                 <label for="charts-mv-toggle">Mode</label>
                 <select id="charts-mv-toggle">
-                    <option value="real">Argent réel</option>
-                    <option value="total">Montant total</option>
+                    <option value="real">Total</option>
+                    <option value="total">Avec chèques repas</option>
                 </select>
             </div>
         </div>
@@ -620,7 +628,6 @@
     <nav class="subnav">
         <a href="#" class="nav-link subnav-link active" data-target="charts">Graphiques</a>
         <a href="#" class="nav-link subnav-link" data-target="savings">Bilan &amp; épargne</a>
-        <a href="#" class="nav-link subnav-link" data-target="tags">Tags</a>
     </nav>
 
     <div class="charts-container">
@@ -653,6 +660,76 @@
                 <canvas id="barChartEvolution" width="520" height="330"></canvas>
             </div>
         </div>
+
+        <div class="card chart-box chart-wide">
+            <div class="card-head">
+                <h3>Solde cumulé (12 derniers mois)</h3>
+                <small class="muted">Survolez un point pour le détail du mois</small>
+            </div>
+            <div class="canvas-wrap">
+                <canvas id="chartCumulativeBalance"></canvas>
+            </div>
+        </div>
+
+        <div class="card chart-box chart-wide">
+            <div class="card-head">
+                <h3>Revenus vs dépenses (12 derniers mois)</h3>
+            </div>
+            <div class="canvas-wrap">
+                <canvas id="chartIncomeExpense12"></canvas>
+            </div>
+        </div>
+
+        <div class="card chart-box chart-wide">
+            <div class="card-head">
+                <h3>Taux d'épargne mensuel</h3>
+                <small class="muted">Part du revenu non dépensée</small>
+            </div>
+            <div class="canvas-wrap">
+                <canvas id="chartSavingsRate"></canvas>
+            </div>
+        </div>
+
+        <div class="card chart-box chart-wide">
+            <div class="card-head">
+                <h3>Zoom sur les dépenses</h3>
+                <div class="field-inline">
+                    <label for="extra-chart-period">Période</label>
+                    <select id="extra-chart-period">
+                        <option value="1">1 mois</option>
+                        <option value="3">3 mois</option>
+                        <option value="6" selected>6 mois</option>
+                        <option value="12">1 an</option>
+                    </select>
+                </div>
+            </div>
+            <div class="extra-charts-grid">
+                <div>
+                    <h4 class="chart-subtitle">Par jour de la semaine</h4>
+                    <div class="canvas-wrap">
+                        <canvas id="chartWeekday"></canvas>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="chart-subtitle">Répartition par tag</h4>
+                    <div class="canvas-wrap">
+                        <canvas id="chartTagExpenses"></canvas>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="chart-subtitle">Dépenses moyennes par jour du mois</h4>
+                    <div class="canvas-wrap">
+                        <canvas id="chartDayOfMonth"></canvas>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="chart-subtitle">Les 10 plus grosses dépenses</h4>
+                    <div class="canvas-wrap">
+                        <canvas id="chartTopExpenses"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </section>
 
@@ -668,7 +745,6 @@
     <nav class="subnav">
         <a href="#" class="nav-link subnav-link" data-target="charts">Graphiques</a>
         <a href="#" class="nav-link subnav-link active" data-target="savings">Bilan &amp; épargne</a>
-        <a href="#" class="nav-link subnav-link" data-target="tags">Tags</a>
     </nav>
 
     <div class="summary-cards">
@@ -715,18 +791,17 @@
     </div>
 </section>
 
-<!-- ============================== ANALYSE : TAGS ============================== -->
+<!-- ============================== ORGANISATION : TAGS ============================== -->
 <section id="tags" class="view-section hidden">
     <div class="page-head">
         <div class="page-head-text">
-            <h2>Analyse</h2>
+            <h2>Organisation</h2>
             <p class="page-sub">Suivi transversal par tag (voyage, projet…)</p>
         </div>
     </div>
 
     <nav class="subnav">
-        <a href="#" class="nav-link subnav-link" data-target="charts">Graphiques</a>
-        <a href="#" class="nav-link subnav-link" data-target="savings">Bilan &amp; épargne</a>
+        <a href="#" class="nav-link subnav-link" data-target="categories">Catégories</a>
         <a href="#" class="nav-link subnav-link active" data-target="tags">Tags</a>
     </nav>
 
@@ -798,6 +873,11 @@
         </div>
     </div>
 
+    <nav class="subnav">
+        <a href="#" class="nav-link subnav-link active" data-target="meal-vouchers">Solde &amp; lots</a>
+        <a href="#" class="nav-link subnav-link" data-target="meal-vouchers-shared">Dépenses partagées</a>
+    </nav>
+
     <div class="summary-cards">
         <div class="card stat-card stat-accent">
             <div class="stat-head"><h3>Solde disponible</h3></div>
@@ -848,6 +928,55 @@
         </div>
     </div>
 
+    <div class="card">
+        <div class="card-head"><h3>Historique des dépenses en chèques repas</h3></div>
+        <div class="table-container">
+            <table id="table-meal-voucher-transactions">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Note</th>
+                        <th>Catégorie</th>
+                        <th>Montant</th>
+                        <th>Part CR</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <small class="muted">Vue en lecture seule : pour modifier une transaction, utilisez l'onglet Transactions.</small>
+    </div>
+</section>
+
+<!-- ============================== CHÈQUES REPAS : DÉPENSES PARTAGÉES ============================== -->
+<section id="meal-vouchers-shared" class="view-section hidden">
+    <div class="page-head">
+        <div class="page-head-text">
+            <h2>Chèques repas</h2>
+            <p class="page-sub">Dépenses partagées, hors budget principal</p>
+        </div>
+    </div>
+
+    <nav class="subnav">
+        <a href="#" class="nav-link subnav-link" data-target="meal-vouchers">Solde &amp; lots</a>
+        <a href="#" class="nav-link subnav-link active" data-target="meal-vouchers-shared">Dépenses partagées</a>
+    </nav>
+
+    <div class="summary-cards">
+        <div class="card stat-card stat-expense">
+            <div class="stat-head"><h3>Total des dépenses partagées</h3></div>
+            <p id="mv-shared-total">0.00 €</p>
+        </div>
+        <div class="card stat-card stat-accent">
+            <div class="stat-head"><h3>Nombre de dépenses</h3></div>
+            <p id="mv-shared-count">0</p>
+        </div>
+        <div class="card stat-card">
+            <div class="stat-head"><h3>Solde disponible</h3></div>
+            <p id="mv-shared-balance">0.00 €</p>
+        </div>
+    </div>
+
     <div class="split-layout">
         <div class="form-panel card">
             <h3>Dépense partagée (hors budget)</h3>
@@ -878,25 +1007,6 @@
             </div>
         </div>
     </div>
-
-    <div class="card">
-        <div class="card-head"><h3>Historique des dépenses en chèques repas</h3></div>
-        <div class="table-container">
-            <table id="table-meal-voucher-transactions">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Note</th>
-                        <th>Catégorie</th>
-                        <th>Montant</th>
-                        <th>Part CR</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
-        <small class="muted">Vue en lecture seule : pour modifier une transaction, utilisez l'onglet Transactions.</small>
-    </div>
 </section>
 
 <!-- ============================== RÉGLAGES ============================== -->
@@ -907,11 +1017,6 @@
             <p class="page-sub">Objectifs, modules et sauvegardes</p>
         </div>
     </div>
-
-    <nav class="subnav">
-        <a href="#" class="nav-link subnav-link active" data-target="settings">Général</a>
-        <a href="#" class="nav-link subnav-link" data-target="categories">Catégories</a>
-    </nav>
 
     <div class="settings-grid">
         <div class="card">
@@ -981,18 +1086,18 @@
     </div>
 </section>
 
-<!-- ============================== CATÉGORIES ============================== -->
+<!-- ============================== ORGANISATION : CATÉGORIES ============================== -->
 <section id="categories" class="view-section hidden">
     <div class="page-head">
         <div class="page-head-text">
-            <h2>Réglages</h2>
+            <h2>Organisation</h2>
             <p class="page-sub">Arborescence des catégories et sous-catégories</p>
         </div>
     </div>
 
     <nav class="subnav">
-        <a href="#" class="nav-link subnav-link" data-target="settings">Général</a>
         <a href="#" class="nav-link subnav-link active" data-target="categories">Catégories</a>
+        <a href="#" class="nav-link subnav-link" data-target="tags">Tags</a>
     </nav>
 
     <div class="split-layout">
@@ -1153,19 +1258,23 @@
         <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 6h18"/><path d="m7 22-4-4 4-4"/><path d="M21 18H3"/></svg>
         <span>Opérations</span>
     </a>
-    <a href="#" class="nav-link" data-target="charts" data-group="charts savings tags" aria-label="Analyse">
+    <a href="#" class="nav-link" data-target="charts" data-group="charts savings" aria-label="Analyse">
         <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
         <span>Analyse</span>
+    </a>
+    <a href="#" class="nav-link" data-target="categories" data-group="categories tags" aria-label="Organisation">
+        <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M7 12h10"/></svg>
+        <span>Orga.</span>
     </a>
     <a href="#" class="nav-link" id="mobile-nav-investments" data-target="investments" data-group="investments" aria-label="Investissements">
         <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         <span>Invest.</span>
     </a>
-    <a href="#" class="nav-link" id="mobile-nav-meal-vouchers" data-target="meal-vouchers" data-group="meal-vouchers" aria-label="Chèques repas" style="display: none;">
+    <a href="#" class="nav-link" id="mobile-nav-meal-vouchers" data-target="meal-vouchers" data-group="meal-vouchers meal-vouchers-shared" aria-label="Chèques repas" style="display: none;">
         <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>
         <span>Chèques</span>
     </a>
-    <a href="#" class="nav-link" data-target="settings" data-group="settings categories" aria-label="Réglages">
+    <a href="#" class="nav-link" data-target="settings" data-group="settings" aria-label="Réglages">
         <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.36.43.65.79.79H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         <span>Réglages</span>
     </a>

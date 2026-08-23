@@ -463,6 +463,42 @@ main#app-content {
     color: var(--text-muted);
 }
 
+/* ---- Indicateurs clés du tableau de bord (version agrandie) ---- */
+.summary-cards-hero {
+    /* Exactement trois indicateurs : ils restent sur une seule ligne */
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.1rem;
+}
+
+.summary-cards-hero .stat-card {
+    padding: 1.4rem 1.3rem;
+}
+
+.summary-cards-hero .stat-head {
+    margin-bottom: 0.75rem;
+}
+
+.summary-cards-hero .stat-head h3 {
+    font-size: 0.95rem;
+    letter-spacing: 0.03em;
+}
+
+.summary-cards-hero .stat-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+}
+
+.summary-cards-hero .stat-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.summary-cards-hero .stat-card p {
+    font-size: clamp(1.45rem, 2.5vw, 2.6rem);
+    line-height: 1.1;
+}
+
 .stat-income .stat-icon { background: var(--success-soft); color: var(--success-color); }
 .stat-income p { color: var(--success-color); }
 .stat-expense .stat-icon { background: var(--danger-soft); color: var(--danger-color); }
@@ -1012,6 +1048,40 @@ main#app-content {
     font-size: 0.86rem;
 }
 
+/* ---- Recherche par titre dans l'historique ---- */
+.search-field {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1 1 220px;
+    min-width: 180px;
+    max-width: 320px;
+}
+
+.search-field svg {
+    position: absolute;
+    left: 0.6rem;
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
+.search-field input[type="search"] {
+    width: 100%;
+    padding: 0.42rem 0.7rem 0.42rem 2rem;
+    font-size: 0.86rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--r-md);
+    background-color: var(--input-bg);
+    color: var(--text-color);
+}
+
+.search-field input[type="search"]:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+.search-field input[type="search"].is-active { border-color: var(--accent-color); }
+
 .segmented-sm { margin-bottom: 0; width: auto; display: inline-flex; gap: 2px; padding: 3px; }
 .segmented-sm .seg-btn { padding: 0.32rem 0.7rem; font-size: 0.83rem; }
 
@@ -1148,7 +1218,51 @@ main#app-content {
 .charts-container .card { margin-bottom: 0; }
 .chart-wide { grid-column: 1 / -1; }
 
+/* ---- Bloc « Zoom sur les dépenses » : plusieurs mini-graphiques ---- */
+.extra-charts-grid {
+    display: grid;
+    /* Deux colonnes au maximum : les barres horizontales restent lisibles */
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+    gap: 1.6rem 2rem;
+}
+
+.extra-charts-grid > div { min-width: 0; }
+
+.chart-subtitle {
+    margin: 0 0 0.6rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
 .canvas-wrap { width: 100%; overflow: hidden; }
+.canvas-hoverable { position: relative; }
+
+/* ---- Infobulle des graphiques ---- */
+.chart-tooltip {
+    position: absolute;
+    z-index: 5;
+    pointer-events: none;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--r-sm, 8px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16);
+    padding: 0.5rem 0.65rem;
+    font-size: 0.8rem;
+    line-height: 1.35;
+    white-space: nowrap;
+    color: var(--text-color);
+}
+
+.chart-tooltip-title {
+    display: block;
+    font-weight: 700;
+    margin-bottom: 0.15rem;
+}
+
+.chart-tooltip-line { display: block; color: var(--text-muted); }
 
 .canvas-wrap canvas {
     width: 100%;
@@ -2087,6 +2201,9 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
     .dash-grid .summary-cards .card { padding: 0.7rem 0.55rem; }
     /* Le montant s'adapte a la largeur pour ne jamais etre tronque */
     .dash-grid .stat-card p { font-size: clamp(0.8rem, 3.7vw, 1.15rem); }
+    .dash-grid .summary-cards-hero .stat-card p { font-size: clamp(0.95rem, 4.6vw, 1.5rem); }
+    .dash-grid .summary-cards-hero .stat-head h3 { font-size: 0.72rem; }
+    .dash-grid .summary-cards-hero .card { padding: 0.85rem 0.6rem; }
     .stat-head { gap: 0.4rem; margin-bottom: 0.35rem; }
     .dash-grid .stat-head h3 { font-size: 0.66rem; letter-spacing: 0.02em; }
     .dash-grid .stat-icon { display: none; }
@@ -2133,6 +2250,7 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
 
     .settings-grid { grid-template-columns: 1fr; }
     .charts-container { grid-template-columns: 1fr; }
+    .extra-charts-grid { grid-template-columns: 1fr; gap: 1.2rem; }
 
     .toolbar-right { justify-content: space-between; }
 
@@ -2286,6 +2404,8 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
 
     .filter-bar { gap: 0.4rem; }
     .filter-bar input[type="month"] { flex: 1; max-width: none; font-size: 16px; }
+    .search-field { flex: 1 1 100%; max-width: none; }
+    .search-field input[type="search"] { font-size: 16px; }
     .segmented-sm { width: 100%; display: grid; grid-template-columns: repeat(4, 1fr); }
     .filter-select { flex: 1; max-width: none; font-size: 16px; }
     .filter-count-label { margin-left: 0; width: 100%; }

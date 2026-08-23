@@ -177,6 +177,7 @@ function generateId() {
 let currentTransactionFilter = 'all';
 let currentCategoryFilter = '';
 let currentTransactionTagFilters = [];
+let currentTransactionSearch = '';
 
 function toggleTransactionTagFilter(tagId) {
     if (currentTransactionTagFilters.includes(tagId)) {
@@ -301,6 +302,12 @@ function renderTransactions() {
             if (!t.tagIds) return false;
             return currentTransactionTagFilters.some(filterTagId => t.tagIds.includes(filterTagId));
         });
+    }
+
+    if (currentTransactionSearch) {
+        // Recherche sur le titre de la transaction, insensible à la casse et aux accents
+        const needle = normalizeSearchText(currentTransactionSearch);
+        filteredTrans = filteredTrans.filter(t => normalizeSearchText(t.note || '').includes(needle));
     }
 
     // Compteur + total filtré
@@ -507,12 +514,32 @@ function clearTransactionFilters() {
     currentTransactionFilter = 'all';
     currentCategoryFilter = '';
     currentTransactionTagFilters = [];
+    currentTransactionSearch = '';
     const month = document.getElementById('filter-month');
     if (month) month.value = '';
+    const search = document.getElementById('filter-search');
+    if (search) search.value = '';
+    renderTransactions();
+}
+
+function normalizeSearchText(value) {
+    return String(value || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .trim();
+}
+
+function setTransactionSearch(value) {
+    currentTransactionSearch = value || '';
     renderTransactions();
 }
 
 function updateFilterChips() {
+    // --- Recherche par titre ---
+    const searchInput = document.getElementById('filter-search');
+    if (searchInput) searchInput.classList.toggle('is-active', !!currentTransactionSearch);
+
     // --- Type (contrôle segmenté) ---
     document.querySelectorAll('#type-filters .seg-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.filter === currentTransactionFilter);
@@ -556,7 +583,7 @@ function updateFilterChips() {
     if (clearBtn) {
         const monthValue = (document.getElementById('filter-month') || {}).value;
         const dirty = currentTransactionFilter !== 'all' || !!currentCategoryFilter
-            || currentTransactionTagFilters.length > 0 || !!monthValue;
+            || currentTransactionTagFilters.length > 0 || !!monthValue || !!currentTransactionSearch;
         clearBtn.style.display = dirty ? 'inline-flex' : 'none';
     }
 }
@@ -1849,6 +1876,116 @@ function drawBarChart(canvasId, dataArr) {
     });
 }
 
+/* ---------- Barres génériques (verticales ou horizontales) ----------
+   items : [{ label, value, color?, sublabel? }]
+   options : { horizontal, height, unit, emptyMessage, formatValue }
+   -------------------------------------------------------------------- */
+function drawSimpleBarChart(canvasId, items, options) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    const opts = options || {};
+    const data = (items || []).filter(d => Number.isFinite(Number(d.value)));
+    const horizontal = !!opts.horizontal;
+    const rowH = 30;
+    const height = opts.height || (horizontal ? Math.max(140, 12 + data.length * rowH) : 240);
+
+    const { ctx, W, H } = prepareCanvas(canvas, height);
+
+    if (data.length === 0 || data.every(d => !d.value)) {
+        chartEmptyState(ctx, W, H, opts.emptyMessage || 'Aucune donnée pour cette période');
+        return;
+    }
+
+    const textColor = chartColor('--text-color', '#333');
+    const mutedColor = chartColor('--text-muted', '#888');
+    const gridColor = chartColor('--border-color', 'rgba(0,0,0,0.1)');
+    const trackColor = chartColor('--surface-2', '#eee');
+    const accent = chartColor('--accent-color', '#0a6cff');
+    const fmt = opts.formatValue || (v => v.toFixed(2) + ' ' + (opts.unit || '€'));
+
+    const maxVal = Math.max(...data.map(d => Math.abs(d.value)), 1);
+
+    if (horizontal) {
+        // Une ligne par entrée : libellé + piste + valeur
+        const labelW = Math.min(150, Math.max(80, W * 0.32));
+        const valueW = 86;
+        const trackX = labelW + 10;
+        const trackW = Math.max(20, W - trackX - valueW - 6);
+
+        data.forEach((d, i) => {
+            const top = 8 + i * rowH;
+            const cy = top + rowH / 2 - 4;
+
+            ctx.font = '12px ' + CHART_FONT;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = textColor;
+            ctx.fillText(fitText(ctx, d.label, labelW), 0, cy);
+
+            ctx.fillStyle = trackColor;
+            ctx.beginPath(); ctx.roundRect(trackX, cy - 7, trackW, 14, 7); ctx.fill();
+
+            const w = Math.max(3, (Math.abs(d.value) / maxVal) * trackW);
+            ctx.fillStyle = d.color || accent;
+            ctx.beginPath(); ctx.roundRect(trackX, cy - 7, w, 14, 7); ctx.fill();
+
+            ctx.font = '600 12px ' + CHART_FONT;
+            ctx.textAlign = 'right';
+            ctx.fillStyle = textColor;
+            ctx.fillText(fmt(d.value), W, cy);
+        });
+        return;
+    }
+
+    // Barres verticales
+    const padLeft = 46;
+    const padRight = 8;
+    const padTop = 14;
+    const padBottom = 26;
+    const chartW = W - padLeft - padRight;
+    const chartH = H - padTop - padBottom;
+
+    ctx.font = '11px ' + CHART_FONT;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'right';
+    for (let i = 0; i <= 4; i++) {
+        const y = padTop + chartH * (i / 4);
+        ctx.strokeStyle = gridColor;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(padLeft, Math.round(y) + 0.5);
+        ctx.lineTo(W - padRight, Math.round(y) + 0.5);
+        ctx.stroke();
+        ctx.fillStyle = mutedColor;
+        ctx.fillText(Math.round(maxVal * (1 - i / 4)) + (opts.unit || '€'), padLeft - 8, y);
+    }
+
+    const slotW = chartW / data.length;
+    const barW = Math.max(4, Math.min(38, slotW * 0.6));
+    const baseY = padTop + chartH;
+
+    data.forEach((d, i) => {
+        const center = padLeft + slotW * (i + 0.5);
+        const h = (Math.abs(d.value) / maxVal) * chartH;
+
+        ctx.fillStyle = d.color || accent;
+        ctx.beginPath();
+        ctx.roundRect(center - barW / 2, baseY - h, barW, Math.max(h, 1), [5, 5, 0, 0]);
+        ctx.fill();
+
+        ctx.fillStyle = mutedColor;
+        ctx.font = '11px ' + CHART_FONT;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        // Sur les séries denses (jours du mois), on n'affiche qu'un libellé sur cinq
+        if (!opts.sparseLabels || i === 0 || (i + 1) % 5 === 0) {
+            ctx.fillText(d.label, center, baseY + 8);
+        }
+        ctx.textBaseline = 'middle';
+    });
+}
+
 /* ---------- Barres horizontales par catégorie ---------- */
 function drawHorizontalBarChart(canvasId, dataObj) {
     const canvas = document.getElementById(canvasId);
@@ -1980,7 +2117,7 @@ function drawAreaLineChart(canvasId, points, options) {
         ctx.lineTo(W - padRight, Math.round(y) + 0.5);
         ctx.stroke();
         ctx.fillStyle = mutedColor;
-        ctx.fillText(Math.round(v) + '€', padLeft - 8, y);
+        ctx.fillText(Math.round(v) + (opts.unit || '€'), padLeft - 8, y);
     }
 
     // Aire sous la courbe
@@ -2008,13 +2145,20 @@ function drawAreaLineChart(canvasId, points, options) {
     ctx.lineCap = 'round';
     ctx.stroke();
 
-    // Dernier point mis en avant
-    const lastX = xAt(values.length - 1);
-    const lastY = yAt(values[values.length - 1]);
-    ctx.fillStyle = chartColor('--card-bg', '#fff');
-    ctx.beginPath(); ctx.arc(lastX, lastY, 5, 0, 2 * Math.PI); ctx.fill();
-    ctx.strokeStyle = accent; ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.arc(lastX, lastY, 5, 0, 2 * Math.PI); ctx.stroke();
+    // Points repères : soit tous les points (option markers), soit uniquement le dernier
+    const cardBg = chartColor('--card-bg', '#fff');
+    const drawDot = (x, y, radius) => {
+        ctx.fillStyle = cardBg;
+        ctx.beginPath(); ctx.arc(x, y, radius, 0, 2 * Math.PI); ctx.fill();
+        ctx.strokeStyle = accent; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(x, y, radius, 0, 2 * Math.PI); ctx.stroke();
+    };
+
+    if (opts.markers) {
+        values.forEach((v, i) => drawDot(xAt(i), yAt(v), i === values.length - 1 ? 5.5 : 4));
+    } else {
+        drawDot(xAt(values.length - 1), yAt(values[values.length - 1]), 5);
+    }
 
     // Libellés de l'axe des abscisses (premier, milieu, dernier)
     ctx.fillStyle = mutedColor;
@@ -2026,6 +2170,74 @@ function drawAreaLineChart(canvasId, points, options) {
         ctx.fillText(points[i].label, xAt(i), padTop + chartH + 8);
     });
     ctx.textBaseline = 'middle';
+
+    // Géométrie mémorisée pour l'infobulle au survol
+    canvas._chartPoints = points.map((p, i) => ({ x: xAt(i), y: yAt(p.value), point: p }));
+    canvas._chartLogicalW = W;
+    if (opts.tooltip) attachChartHoverTooltip(canvas);
+}
+
+/* ---------- Infobulle au survol des points d'une courbe ---------- */
+function attachChartHoverTooltip(canvas) {
+    if (canvas._tooltipBound) return;
+    canvas._tooltipBound = true;
+
+    const wrap = canvas.parentElement;
+    if (!wrap) return;
+    wrap.classList.add('canvas-hoverable');
+
+    const tip = document.createElement('div');
+    tip.className = 'chart-tooltip';
+    tip.style.display = 'none';
+    wrap.appendChild(tip);
+
+    const hide = () => { tip.style.display = 'none'; canvas.style.cursor = ''; };
+
+    const locate = (clientX, clientY) => {
+        const pts = canvas._chartPoints;
+        if (!pts || !pts.length) return null;
+        const rect = canvas.getBoundingClientRect();
+        if (!rect.width) return null;
+        const scale = (canvas._chartLogicalW || rect.width) / rect.width;
+        const x = (clientX - rect.left) * scale;
+        const y = (clientY - rect.top) * scale;
+
+        let best = null;
+        let bestDist = Infinity;
+        pts.forEach(p => {
+            const d = Math.abs(p.x - x);
+            if (d < bestDist) { bestDist = d; best = p; }
+        });
+        // On exige une proximité raisonnable, verticale comprise, pour éviter les faux positifs
+        if (!best || bestDist > 26 || Math.abs(best.y - y) > 60) return null;
+        return { hit: best, rect };
+    };
+
+    const show = (clientX, clientY) => {
+        const found = locate(clientX, clientY);
+        if (!found) { hide(); return; }
+
+        const lines = found.hit.point.tooltip || [found.hit.point.label, fmtEuro(found.hit.point.value)];
+        tip.innerHTML = lines.map((line, i) =>
+            '<span class="' + (i === 0 ? 'chart-tooltip-title' : 'chart-tooltip-line') + '">' + line + '</span>'
+        ).join('');
+
+        // Position en pixels CSS (le canvas est dessiné en unités logiques)
+        const ratio = found.rect.width / (canvas._chartLogicalW || found.rect.width);
+        tip.style.display = 'block';
+        const left = found.hit.x * ratio;
+        const maxLeft = found.rect.width - tip.offsetWidth - 4;
+        tip.style.left = Math.max(4, Math.min(left - tip.offsetWidth / 2, maxLeft)) + 'px';
+        tip.style.top = Math.max(4, found.hit.y * ratio - tip.offsetHeight - 12) + 'px';
+        canvas.style.cursor = 'pointer';
+    };
+
+    canvas.addEventListener('mousemove', (e) => show(e.clientX, e.clientY));
+    canvas.addEventListener('mouseleave', hide);
+    canvas.addEventListener('touchstart', (e) => {
+        if (e.touches && e.touches.length) show(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+    canvas.addEventListener('touchend', () => setTimeout(hide, 2500), { passive: true });
 }
 
 
@@ -2487,10 +2699,238 @@ function updateDashboard() {
 
     updateHorizontalBarChart(currentYear, currentMonth);
 
+    renderExtraCharts(currentYear, currentMonth);
+
     // Widgets additionnels du tableau de bord (voir bloc UI en fin de fichier)
     if (typeof renderDashboardExtras === 'function') {
         renderDashboardExtras(currentYear, currentMonth);
     }
+}
+
+/* =========================================================================
+   Graphiques complementaires de l'onglet "Analyse > Graphiques"
+   Tous se basent sur les transactions effectives et respectent le mode
+   d'affichage cheques repas ("Total" / "Avec cheques repas").
+   ========================================================================= */
+
+// Montant d'une depense selon le mode d'affichage courant
+function effectiveExpenseAmount(t) {
+    const amount = Number(t.amount) || 0;
+    const chartMode = window.currentChartMode || 'real';
+    if (chartMode === 'real' && t.mealVoucherPart > 0) return amount - t.mealVoucherPart;
+    return amount;
+}
+
+// Les N derniers mois (le dernier etant le mois affiche), du plus ancien au plus recent
+function getRecentMonths(year, month, count) {
+    const out = [];
+    for (let i = count - 1; i >= 0; i--) {
+        let m = month - i;
+        let y = year;
+        while (m <= 0) { m += 12; y -= 1; }
+        out.push({ year: y, month: m, prefix: y + '-' + String(m).padStart(2, '0') });
+    }
+    return out;
+}
+
+const MONTH_ABBR_FR = ['Jan', 'Fev', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aou', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// Depenses de la periode selectionnee dans le bloc "Zoom sur les depenses"
+function getExtraChartExpenses(year, month) {
+    const select = document.getElementById('extra-chart-period');
+    const months = select ? parseInt(select.value, 10) : 6;
+    const prefixes = new Set(getRecentMonths(year, month, months).map(m => m.prefix));
+    return getEffectiveTransactions().filter(t =>
+        t.type === 'expense' && t.date && prefixes.has(t.date.substring(0, 7))
+    );
+}
+
+/* ---- Solde cumule sur 12 mois ---- */
+function renderCumulativeBalanceChart(year, month) {
+    if (!document.getElementById('chartCumulativeBalance')) return;
+
+    const months = getRecentMonths(year, month, 12);
+    let running = 0;
+    const points = months.map(m => {
+        const data = getMonthData(m.year, m.month);
+        const net = data.income - data.expense;
+        running += net;
+        return {
+            label: MONTH_ABBR_FR[m.month - 1] + ' ' + String(m.year).slice(2),
+            value: running,
+            net: net
+        };
+    });
+
+    points.forEach(p => {
+        p.tooltip = [
+            p.label,
+            'Cumul : ' + fmtEuro(p.value),
+            'Sur le mois : ' + (p.net >= 0 ? '+' : '-') + Math.abs(p.net).toFixed(2) + ' \u20ac'
+        ];
+    });
+
+    drawAreaLineChart('chartCumulativeBalance', points, {
+        height: 240,
+        markers: true,
+        tooltip: true,
+        emptyMessage: 'Aucune donnee sur les 12 derniers mois'
+    });
+}
+
+/* ---- Revenus vs depenses sur 12 mois ---- */
+function renderIncomeExpense12Chart(year, month) {
+    if (!document.getElementById('chartIncomeExpense12')) return;
+
+    const dataArr = getRecentMonths(year, month, 12).map(m => {
+        const data = getMonthData(m.year, m.month);
+        data.label = MONTH_ABBR_FR[m.month - 1];
+        data.month = m.month;
+        data.year = m.year;
+        return data;
+    });
+
+    drawBarChart('chartIncomeExpense12', dataArr);
+}
+
+/* ---- Taux d'epargne mensuel (part du revenu non depensee) ---- */
+function renderSavingsRateChart(year, month) {
+    if (!document.getElementById('chartSavingsRate')) return;
+
+    const points = getRecentMonths(year, month, 12).map(m => {
+        const data = getMonthData(m.year, m.month);
+        const rate = data.income > 0 ? ((data.income - data.expense) / data.income) * 100 : 0;
+        const p = {
+            label: MONTH_ABBR_FR[m.month - 1] + ' ' + String(m.year).slice(2),
+            value: Math.round(rate * 10) / 10
+        };
+        p.tooltip = [
+            p.label,
+            'Taux d\u2019\u00e9pargne : ' + p.value.toFixed(1) + ' %',
+            'Revenus ' + fmtEuro(data.income) + ' \u00b7 D\u00e9penses ' + fmtEuro(data.expense)
+        ];
+        return p;
+    });
+
+    const hasData = points.some(p => p.value !== 0);
+    drawAreaLineChart('chartSavingsRate', hasData ? points : [], {
+        height: 240,
+        markers: true,
+        tooltip: true,
+        unit: '%',
+        color: chartColor('--success-color', '#12a150'),
+        emptyMessage: 'Ajoutez des revenus pour calculer un taux d\u2019\u00e9pargne'
+    });
+}
+
+/* ---- Depenses par jour de la semaine ---- */
+function renderWeekdayChart(year, month) {
+    if (!document.getElementById('chartWeekday')) return;
+
+    const labels = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+    const totals = [0, 0, 0, 0, 0, 0, 0];
+
+    getExtraChartExpenses(year, month).forEach(t => {
+        const d = new Date(t.date + 'T00:00:00');
+        if (isNaN(d.getTime())) return;
+        const idx = (d.getDay() + 6) % 7; // 0 = lundi
+        totals[idx] += effectiveExpenseAmount(t);
+    });
+
+    const color = chartColor('--danger-color', '#e5484d');
+    drawSimpleBarChart('chartWeekday', labels.map((label, i) => ({
+        label: label,
+        value: totals[i],
+        color: color
+    })), { height: 230 });
+}
+
+/* ---- Depense moyenne selon le jour du mois ---- */
+function renderDayOfMonthChart(year, month) {
+    if (!document.getElementById('chartDayOfMonth')) return;
+
+    const totals = new Array(31).fill(0);
+    const monthsSeen = new Set();
+
+    getExtraChartExpenses(year, month).forEach(t => {
+        const day = parseInt(t.date.substring(8, 10), 10);
+        if (!day || day > 31) return;
+        totals[day - 1] += effectiveExpenseAmount(t);
+        monthsSeen.add(t.date.substring(0, 7));
+    });
+
+    const divisor = Math.max(1, monthsSeen.size);
+    const color = chartColor('--accent-color', '#0a6cff');
+    drawSimpleBarChart('chartDayOfMonth', totals.map((v, i) => ({
+        label: String(i + 1),
+        value: v / divisor,
+        color: color
+    })), { height: 230, sparseLabels: true });
+}
+
+/* ---- Repartition des depenses par tag ---- */
+function renderTagExpensesChart(year, month) {
+    if (!document.getElementById('chartTagExpenses')) return;
+
+    const totals = {};
+    getExtraChartExpenses(year, month).forEach(t => {
+        if (!t.tagIds || !t.tagIds.length) return;
+        const amount = effectiveExpenseAmount(t);
+        t.tagIds.forEach(tagId => {
+            totals[tagId] = (totals[tagId] || 0) + amount;
+        });
+    });
+
+    const items = Object.entries(totals)
+        .map(([tagId, value], i) => {
+            const tag = (appData.tags || []).find(tg => tg.id === tagId);
+            return {
+                label: tag ? tag.name : 'Tag supprim\u00e9',
+                value: value,
+                color: (tag && tag.color) || CHART_PALETTE[i % CHART_PALETTE.length]
+            };
+        })
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 10);
+
+    drawSimpleBarChart('chartTagExpenses', items, {
+        horizontal: true,
+        emptyMessage: 'Aucune d\u00e9pense tagu\u00e9e sur cette p\u00e9riode'
+    });
+}
+
+/* ---- Les 10 plus grosses depenses ---- */
+function renderTopExpensesChart(year, month) {
+    if (!document.getElementById('chartTopExpenses')) return;
+
+    const color = chartColor('--danger-color', '#e5484d');
+    const items = getExtraChartExpenses(year, month)
+        .map(t => {
+            const cat = appData.categories.find(c => c.id === t.categoryId);
+            return {
+                label: t.note || (cat ? cat.name : 'Sans titre'),
+                value: effectiveExpenseAmount(t),
+                color: color
+            };
+        })
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 10);
+
+    drawSimpleBarChart('chartTopExpenses', items, {
+        horizontal: true,
+        emptyMessage: 'Aucune d\u00e9pense sur cette p\u00e9riode'
+    });
+}
+
+// Redessine l'ensemble des graphiques complementaires
+function renderExtraCharts(year, month) {
+    renderCumulativeBalanceChart(year, month);
+    renderIncomeExpense12Chart(year, month);
+    renderSavingsRateChart(year, month);
+    renderWeekdayChart(year, month);
+    renderDayOfMonthChart(year, month);
+    renderTagExpensesChart(year, month);
+    renderTopExpensesChart(year, month);
 }
 
 function updateHorizontalBarChart(year, month) {
@@ -3266,6 +3706,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let month = now.getMonth() + 1;
             drawPieChart('pieChartCategory', getMonthData(year, month).categoryExpenses);
             updateHorizontalBarChart(year, month);
+            renderExtraCharts(year, month);
         });
     }
 
@@ -3425,6 +3866,28 @@ document.addEventListener('DOMContentLoaded', () => {
         updateHorizontalBarChart(year, month);
     });
 
+    // Periode du bloc "Zoom sur les depenses"
+    const extraPeriodSelect = document.getElementById('extra-chart-period');
+    if (extraPeriodSelect) {
+        extraPeriodSelect.addEventListener('change', () => {
+            const dashMonthFilter = document.getElementById('dash-filter-month').value;
+            let year, month;
+            if (dashMonthFilter) {
+                const parts = dashMonthFilter.split('-');
+                year = parseInt(parts[0], 10);
+                month = parseInt(parts[1], 10);
+            } else {
+                const now = new Date();
+                year = now.getFullYear();
+                month = now.getMonth() + 1;
+            }
+            renderWeekdayChart(year, month);
+            renderDayOfMonthChart(year, month);
+            renderTagExpensesChart(year, month);
+            renderTopExpensesChart(year, month);
+        });
+    }
+
     // Handle FAB display based on current view
     function updateFabVisibility(targetId) {
         const fab = document.getElementById('fab-add');
@@ -3479,6 +3942,8 @@ document.addEventListener('DOMContentLoaded', () => {
             renderSavings();
         } else if(targetId === 'investments') {
             if(typeof renderInvestments === 'function') renderInvestments();
+        } else if(targetId === 'meal-vouchers' || targetId === 'meal-vouchers-shared') {
+            if(typeof window.renderMealVouchers === 'function') window.renderMealVouchers();
         }
     });
 
@@ -3980,6 +4445,16 @@ window.updateNavigationVisibility = function() {
         c.style.display = mealVouchersEnabled ? 'flex' : 'none';
     });
 
+    // Si le module est désactivé alors qu'on se trouve sur l'un de ses sous-onglets
+    if (!mealVouchersEnabled) {
+        ['meal-vouchers', 'meal-vouchers-shared'].forEach(id => {
+            const sec = document.getElementById(id);
+            if (sec && sec.classList.contains('active')) {
+                document.querySelector('.nav-link[data-target="dashboard"]').click();
+            }
+        });
+    }
+
     const investmentsEnabled = appData.investmentsEnabled !== undefined ? appData.investmentsEnabled : true;
     const desktopLinkInv = document.getElementById('nav-item-investments');
     const mobileLinkInv = document.getElementById('mobile-nav-investments');
@@ -4270,6 +4745,16 @@ window.updateNavigationVisibility = function() {
             `;
             tbodyCredits.appendChild(tr);
         });
+
+        // Indicateurs du sous-onglet "Dépenses partagées"
+        const sharedExpenses = appData.mealVoucherExpenses || [];
+        const sharedTotal = sharedExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+        const elSharedTotal = document.getElementById('mv-shared-total');
+        if (elSharedTotal) elSharedTotal.textContent = sharedTotal.toFixed(2) + ' €';
+        const elSharedCount = document.getElementById('mv-shared-count');
+        if (elSharedCount) elSharedCount.textContent = String(sharedExpenses.length);
+        const elSharedBalance = document.getElementById('mv-shared-balance');
+        if (elSharedBalance) elSharedBalance.textContent = data.availableBalance.toFixed(2) + ' €';
 
         // External Expenses Table
         const tbodyExtExpenses = document.querySelector('#table-meal-voucher-external-expenses tbody');
@@ -5472,11 +5957,12 @@ const NAV_GROUP_TITLES = {
     subscriptions: 'Transactions',
     charts: 'Analyse',
     savings: 'Analyse',
-    tags: 'Analyse',
+    categories: 'Organisation',
+    tags: 'Organisation',
     investments: 'Investissements',
     'meal-vouchers': 'Chèques repas',
+    'meal-vouchers-shared': 'Chèques repas',
     settings: 'Réglages',
-    categories: 'Réglages',
     prediction: 'Prédiction'
 };
 
@@ -5671,31 +6157,7 @@ function renderDashboardExtras(year, month) {
 
     const current = getMonthData(year, month);
 
-    let prevMonth = month - 1;
-    let prevYear = year;
-    if (prevMonth <= 0) { prevMonth = 12; prevYear -= 1; }
-    const previous = getMonthData(prevYear, prevMonth);
-
-    // --- Écarts avec le mois précédent ---
-    const setDelta = (id, currentValue, previousValue, lowerIsBetter) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        if (!previousValue) {
-            el.textContent = 'Aucune donnée le mois dernier';
-            el.style.color = '';
-            return;
-        }
-        const diff = currentValue - previousValue;
-        const pct = (diff / Math.abs(previousValue)) * 100;
-        const arrow = diff >= 0 ? '▲' : '▼';
-        el.textContent = arrow + ' ' + Math.abs(pct).toFixed(0) + '% vs mois dernier';
-        const good = lowerIsBetter ? diff <= 0 : diff >= 0;
-        el.style.color = good ? 'var(--success-color)' : 'var(--danger-color)';
-    };
-
-    setDelta('dash-income-delta', current.income, previous.income, false);
-    setDelta('dash-expense-delta', current.expense, previous.expense, true);
-    setDelta('dash-balance-delta', current.balance, previous.balance, false);
+    // Les indicateurs clés sont affichés seuls, sans comparaison avec le mois précédent.
 
     // --- Objectif du mois ---
     let goal = appData.spendingGoal;
@@ -5840,29 +6302,46 @@ function renderPatrimonyChart(year, month) {
     const transactions = (appData.transactions || []).filter(t => t.date);
     const MONTHS_BACK = 12;
 
-    // Bornes de fin de mois, du plus ancien au plus récent
+    // Un repère au 1er de chaque mois : du 1er du mois « -11 » jusqu'au 1er du mois
+    // suivant le mois affiché (ce dernier point clôture donc le mois en cours).
     const bounds = [];
-    for (let i = MONTHS_BACK - 1; i >= 0; i--) {
+    for (let i = MONTHS_BACK - 1; i >= -1; i--) {
         let m = month - i;
         let y = year;
         while (m <= 0) { m += 12; y -= 1; }
-        const lastDay = new Date(y, m, 0).getDate();
+        while (m > 12) { m -= 12; y += 1; }
+        const key = y + '-' + String(m).padStart(2, '0') + '-01';
         bounds.push({
-            key: y + '-' + String(m).padStart(2, '0') + '-' + String(lastDay).padStart(2, '0'),
-            label: MONTH_NAMES_FR[m - 1].slice(0, 4) + ' ' + String(y).slice(2)
+            key: key,
+            label: '1 ' + MONTH_NAMES_FR[m - 1].slice(0, 4) + '. ' + String(y).slice(2),
+            fullLabel: '1er ' + MONTH_NAMES_FR[m - 1] + ' ' + y
         });
     }
 
     const points = bounds.map(b => {
         let treasury = 0;
         transactions.forEach(t => {
-            if (t.date > b.key) return;
+            // Valeur « au 1er du mois » : tout ce qui précède strictement ce jour
+            if (t.date >= b.key) return;
             const amount = Number(t.amount) || 0;
             if (t.type === 'income' || t.type === 'salary' || t.type === 'investment_return') treasury += amount;
             else if (t.type === 'expense' || t.type === 'investment_transfer') treasury -= amount;
         });
         const portfolio = typeof getPortfolioValueAt === 'function' ? getPortfolioValueAt(b.key) : 0;
-        return { label: b.label, value: treasury + portfolio };
+        return { label: b.label, fullLabel: b.fullLabel, value: treasury + portfolio };
+    });
+
+    // Infobulle : total au 1er du mois + écart avec le 1er du mois précédent
+    points.forEach((p, i) => {
+        const lines = [p.fullLabel, 'Total : ' + fmtEuro(p.value)];
+        if (i > 0) {
+            const diff = p.value - points[i - 1].value;
+            const sign = diff > 0 ? '+' : (diff < 0 ? '-' : '');
+            lines.push('Mois précédent : ' + sign + Math.abs(diff).toFixed(2) + ' €');
+        } else {
+            lines.push('Mois précédent : —');
+        }
+        p.tooltip = lines;
     });
 
     const totalEl = document.getElementById('dash-patrimony-total');
@@ -5877,6 +6356,8 @@ function renderPatrimonyChart(year, month) {
     const hasData = points.some(p => p.value !== 0);
     drawAreaLineChart('dashPatrimonyChart', hasData ? points : [], {
         height: 200,
+        markers: true,
+        tooltip: true,
         emptyMessage: 'Ajoutez des transactions pour suivre votre patrimoine'
     });
 }
@@ -5946,6 +6427,9 @@ function initTransactionFilters() {
     document.querySelectorAll('#type-filters .seg-btn').forEach(btn => {
         btn.addEventListener('click', () => setTransactionFilter(btn.dataset.filter));
     });
+
+    const searchInput = document.getElementById('filter-search');
+    if (searchInput) searchInput.addEventListener('input', () => setTransactionSearch(searchInput.value));
 
     const catSelect = document.getElementById('filter-category');
     if (catSelect) catSelect.addEventListener('change', () => setCategoryFilter(catSelect.value));
