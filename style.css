@@ -2475,3 +2475,268 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
     .sidebar, #mobile-nav, .topbar, .fab-btn, .subnav, .page-head-actions { display: none !important; }
     .card { box-shadow: none; border: 1px solid #ddd; }
 }
+
+/* -------------------------------------------------------------------------
+   VACANCES — fiche de voyage, matrice récapitulative et comparatif
+   ------------------------------------------------------------------------- */
+
+/* État vide */
+.trip-empty { text-align: center; padding: 2.5rem 1.5rem; }
+.trip-empty-art {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 1rem;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent-color);
+}
+.trip-empty h3 { margin-bottom: 0.4rem; }
+.trip-empty p { max-width: 460px; margin: 0 auto 1.2rem; }
+
+/* En-tête du voyage */
+.trip-hero {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border-left: 3px solid var(--accent-color);
+}
+.trip-hero-title { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.trip-hero-title h3 { font-size: 1.3rem; letter-spacing: -0.02em; }
+.trip-hero-meta {
+    margin: 0.35rem 0 0;
+    font-size: 0.87rem;
+    color: var(--text-muted);
+}
+.trip-hero-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+/* Équilibrage */
+.trip-balances {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 0.6rem;
+    margin-bottom: 0.9rem;
+}
+.trip-balance {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.65rem 0.75rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border-color);
+    border-radius: var(--r-md);
+}
+.trip-avatar {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+.trip-balance-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.trip-balance-name { font-weight: 650; font-size: 0.94rem; }
+.trip-balance-meta { font-size: 0.75rem; color: var(--text-muted); }
+.trip-balance-value { font-weight: 700; font-size: 0.95rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.trip-settlements { display: flex; flex-direction: column; gap: 0.45rem; }
+.trip-settlement {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.8rem;
+    border-radius: var(--r-md);
+    background: var(--accent-soft);
+    color: var(--text-color);
+    font-size: 0.92rem;
+}
+.trip-settlement svg { color: var(--accent-color); flex: 0 0 auto; }
+.trip-settlement-amount {
+    margin-left: auto;
+    font-weight: 700;
+    color: var(--accent-color);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.trip-settled {
+    margin: 0;
+    padding: 0.6rem 0.8rem;
+    border-radius: var(--r-md);
+    background: var(--success-soft);
+    color: var(--success-color);
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+/* Matrice récapitulative (catégories x participants) */
+.tm-title {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin: 1.1rem 0 0.5rem;
+}
+.tm-title:first-child { margin-top: 0.2rem; }
+.tm-title-perso { color: var(--warning-color); }
+
+.tm-scroll { width: 100%; overflow-x: auto; }
+
+.trip-matrix {
+    min-width: 100%;
+    display: flex;
+    flex-direction: column;
+    font-variant-numeric: tabular-nums;
+}
+.tm-row {
+    display: grid;
+    grid-template-columns: minmax(140px, 1.6fr) repeat(var(--tm-cols), minmax(78px, 1fr)) minmax(84px, 1fr) minmax(84px, 1fr);
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.55rem;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.9rem;
+}
+.tm-row:last-child { border-bottom: none; }
+.tm-head {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+.tm-row:not(.tm-head):not(.tm-foot):hover { background: var(--surface-2); }
+.tm-cat { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; min-width: 0; }
+.tm-icon { font-size: 1rem; line-height: 1; }
+.tm-num { text-align: right; white-space: nowrap; }
+.tm-num.is-zero { color: var(--text-muted); opacity: 0.55; }
+.tm-total { font-weight: 700; }
+.tm-share { color: var(--success-color); font-weight: 600; }
+.tm-foot {
+    margin-top: 0.15rem;
+    border-top: 2px solid var(--border-strong);
+    border-bottom: none;
+    font-weight: 700;
+    background: var(--surface-2);
+    border-radius: 0 0 var(--r-sm) var(--r-sm);
+}
+
+/* Journal des dépenses */
+.trip-filter-bar { margin-bottom: 0.9rem; }
+.trip-exp-list { display: flex; flex-direction: column; gap: 1.1rem; }
+.trip-exp-group { display: flex; flex-direction: column; }
+.trip-exp-day {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0 0.2rem 0.35rem;
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+.trip-exp-day-total { font-size: 0.8rem; color: var(--text-color); }
+.trip-exp-row {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.6rem 0.45rem;
+    border-bottom: 1px solid var(--border-color);
+}
+.trip-exp-row:last-child { border-bottom: none; }
+.trip-exp-row:hover { background: var(--surface-2); border-radius: var(--r-sm); }
+.trip-exp-icon {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--surface-2);
+    font-size: 1.05rem;
+}
+.trip-exp-main { flex: 1; min-width: 0; }
+.trip-exp-title {
+    display: block;
+    font-weight: 600;
+    font-size: 0.95rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.trip-exp-sub {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+.trip-tag {
+    display: inline-block;
+    padding: 0.05rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+.trip-tag.is-shared { background: var(--accent-soft); color: var(--accent-color); }
+.trip-tag.is-perso { background: var(--warning-soft); color: var(--warning-color); }
+.trip-exp-right { text-align: right; white-space: nowrap; }
+.trip-exp-amount { font-weight: 700; font-size: 0.98rem; font-variant-numeric: tabular-nums; }
+.trip-exp-actions { display: flex; gap: 0.25rem; opacity: 0; transition: opacity 0.15s ease; }
+.trip-exp-row:hover .trip-exp-actions,
+.trip-exp-row:focus-within .trip-exp-actions { opacity: 1; }
+
+/* Les cartes graphiques s'ajustent à leur contenu (pas d'étirement inutile) */
+#trips .charts-container,
+#trips-compare .charts-container { align-items: start; }
+
+/* Éditeur de participants (modale) */
+.trip-participants-editor { display: flex; flex-direction: column; gap: 0.45rem; margin-bottom: 0.5rem; }
+.trip-participant-row { display: flex; align-items: center; gap: 0.5rem; }
+.trip-participant-input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--r-sm);
+    background: var(--input-bg);
+    color: var(--input-text);
+    font-family: inherit;
+    font-size: 0.95rem;
+}
+.trip-participant-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Choix du partage (modale dépense) */
+.trip-share-toggle { margin-bottom: 0.6rem; }
+.trip-share-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.4rem; }
+
+@media (max-width: 768px) {
+    .trip-hero { flex-direction: column; align-items: flex-start; }
+    .trip-hero-actions { width: 100%; }
+    .trip-hero-actions .btn { flex: 1; }
+
+    .trip-balances { grid-template-columns: 1fr; }
+
+    /* La matrice défile horizontalement plutôt que d'être cassée en cartes */
+    .tm-row {
+        grid-template-columns: minmax(120px, 1.4fr) repeat(var(--tm-cols), minmax(72px, 1fr)) minmax(78px, 1fr) minmax(78px, 1fr);
+        font-size: 0.85rem;
+    }
+    .trip-matrix { min-width: max-content; }
+
+    .trip-exp-actions { opacity: 1; }
+    .trip-filter-bar { flex-direction: column; align-items: stretch; }
+    .trip-filter-bar .filter-select { width: 100%; }
+}

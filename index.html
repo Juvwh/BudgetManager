@@ -61,6 +61,12 @@
                         <span class="side-label">Investissements</span>
                     </a>
                 </li>
+                <li id="nav-item-trips">
+                    <a href="#" class="nav-link side-link" data-target="trips" data-group="trips trips-compare">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M2 13h20"/></svg>
+                        <span class="side-label">Vacances</span>
+                    </a>
+                </li>
                 <li id="nav-item-meal-vouchers" style="display: none;">
                     <a href="#" class="nav-link side-link" data-target="meal-vouchers" data-group="meal-vouchers meal-vouchers-shared">
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg>
@@ -1009,6 +1015,174 @@
     </div>
 </section>
 
+<!-- ============================== VACANCES : FICHE D'UN VOYAGE ============================== -->
+<section id="trips" class="view-section hidden">
+    <div class="page-head">
+        <div class="page-head-text">
+            <h2>Vacances</h2>
+            <p class="page-sub">Suivi des dépenses de voyage — totalement séparé du budget</p>
+        </div>
+        <div class="page-head-actions">
+            <div class="field-inline">
+                <label for="trip-selector">Voyage</label>
+                <select id="trip-selector"></select>
+            </div>
+            <button type="button" id="btn-new-trip" class="btn btn-primary">Nouveau voyage</button>
+        </div>
+    </div>
+
+    <nav class="subnav">
+        <a href="#" class="nav-link subnav-link active" data-target="trips">Fiche</a>
+        <a href="#" class="nav-link subnav-link" data-target="trips-compare">Comparatif</a>
+    </nav>
+
+    <!-- État vide : aucun voyage enregistré -->
+    <div id="trip-empty" class="card trip-empty" style="display: none;">
+        <div class="trip-empty-art" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M2 13h20"/></svg>
+        </div>
+        <h3>Aucun voyage pour l'instant</h3>
+        <p class="muted">Créez un voyage (par exemple « Portugal 2026 »), ajoutez les participants puis saisissez vos dépenses : la fiche récapitulative se construit toute seule.</p>
+        <button type="button" class="btn btn-primary" onclick="openTripModal()">Créer mon premier voyage</button>
+    </div>
+
+    <div id="trip-detail">
+
+        <!-- En-tête du voyage -->
+        <div class="card trip-hero">
+            <div class="trip-hero-main">
+                <div class="trip-hero-title">
+                    <h3 id="trip-hero-name">—</h3>
+                    <span id="trip-hero-status" class="badge">—</span>
+                </div>
+                <p class="trip-hero-meta" id="trip-hero-meta"></p>
+            </div>
+            <div class="trip-hero-actions">
+                <button type="button" id="btn-add-trip-expense" class="btn btn-primary btn-small">Ajouter une dépense</button>
+                <button type="button" id="btn-edit-trip" class="btn btn-secondary btn-small">Modifier</button>
+                <button type="button" id="btn-delete-trip" class="btn btn-ghost btn-small">Supprimer</button>
+            </div>
+        </div>
+
+        <!-- Indicateurs clés -->
+        <div class="summary-cards" id="trip-summary"></div>
+
+        <!-- Budget du voyage -->
+        <div class="card" id="trip-budget-card" style="display: none;">
+            <div class="card-head"><h3>Budget du voyage</h3><span class="muted" id="trip-budget-caption"></span></div>
+            <div class="progress-track"><div class="progress-fill" id="trip-budget-fill"></div></div>
+            <div class="mini-stats" id="trip-budget-stats"></div>
+        </div>
+
+        <!-- Équilibrage entre participants -->
+        <div class="card" id="trip-settlement-card">
+            <div class="card-head"><h3>Équilibrage</h3><span class="muted">Qui doit combien à qui</span></div>
+            <div id="trip-balances" class="trip-balances"></div>
+            <div id="trip-settlements" class="trip-settlements"></div>
+        </div>
+
+        <div class="charts-container">
+            <div class="card">
+                <div class="card-head"><h3>Répartition par catégorie</h3></div>
+                <div class="canvas-wrap"><canvas id="tripCategoryChart" width="800" height="320"></canvas></div>
+            </div>
+            <div class="card">
+                <div class="card-head"><h3>Payé par participant</h3></div>
+                <div class="canvas-wrap"><canvas id="tripParticipantChart" width="800" height="240"></canvas></div>
+            </div>
+            <div class="card chart-wide">
+                <div class="card-head"><h3>Dépenses jour par jour</h3></div>
+                <div class="canvas-wrap"><canvas id="tripDailyChart" width="800" height="240"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Matrice récapitulative catégorie x participant -->
+        <div class="card">
+            <div class="card-head">
+                <h3>Récapitulatif des dépenses</h3>
+                <span class="muted">Qui a payé quoi, et la part de chacun</span>
+            </div>
+            <div id="trip-matrix-shared"></div>
+            <div id="trip-matrix-personal"></div>
+        </div>
+
+        <!-- Journal des dépenses -->
+        <div class="card">
+            <div class="card-head">
+                <h3>Dépenses du voyage</h3>
+                <div class="card-head-actions">
+                    <button type="button" id="btn-add-trip-expense-2" class="btn btn-primary btn-small">Ajouter</button>
+                </div>
+            </div>
+            <div class="filter-bar trip-filter-bar">
+                <div class="search-field">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+                    <input type="search" id="trip-expense-search" placeholder="Rechercher une dépense…">
+                </div>
+                <select id="trip-expense-filter-category" class="filter-select"></select>
+                <select id="trip-expense-filter-payer" class="filter-select"></select>
+            </div>
+            <div id="trip-expense-list" class="trip-exp-list"></div>
+        </div>
+
+    </div>
+</section>
+
+<!-- ============================== VACANCES : COMPARATIF ============================== -->
+<section id="trips-compare" class="view-section hidden">
+    <div class="page-head">
+        <div class="page-head-text">
+            <h2>Vacances</h2>
+            <p class="page-sub">Comparatif de tous vos voyages</p>
+        </div>
+        <div class="page-head-actions">
+            <button type="button" id="btn-new-trip-2" class="btn btn-primary">Nouveau voyage</button>
+        </div>
+    </div>
+
+    <nav class="subnav">
+        <a href="#" class="nav-link subnav-link" data-target="trips">Fiche</a>
+        <a href="#" class="nav-link subnav-link active" data-target="trips-compare">Comparatif</a>
+    </nav>
+
+    <div class="summary-cards" id="tripc-summary"></div>
+
+    <div class="charts-container">
+        <div class="card">
+            <div class="card-head"><h3>Coût total par voyage</h3></div>
+            <div class="canvas-wrap"><canvas id="tripCompareTotalChart" width="800" height="240"></canvas></div>
+        </div>
+        <div class="card">
+            <div class="card-head"><h3>Coût moyen par jour</h3></div>
+            <div class="canvas-wrap"><canvas id="tripCompareDayChart" width="800" height="240"></canvas></div>
+        </div>
+        <div class="card chart-wide">
+            <div class="card-head"><h3>Dépenses par catégorie, tous voyages confondus</h3></div>
+            <div class="canvas-wrap"><canvas id="tripCompareCategoryChart" width="800" height="320"></canvas></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head"><h3>Tableau comparatif</h3></div>
+        <div class="table-container">
+            <table id="table-trips-compare">
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th>Dates</th>
+                        <th>Durée</th>
+                        <th>Participants</th>
+                        <th>Montant</th>
+                        <th>Par jour</th>
+                        <th>Par personne</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
 <!-- ============================== RÉGLAGES ============================== -->
 <section id="settings" class="view-section hidden">
     <div class="page-head">
@@ -1270,6 +1444,10 @@
         <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         <span>Invest.</span>
     </a>
+    <a href="#" class="nav-link" id="mobile-nav-trips" data-target="trips" data-group="trips trips-compare" aria-label="Vacances">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M2 13h20"/></svg>
+        <span>Vacances</span>
+    </a>
     <a href="#" class="nav-link" id="mobile-nav-meal-vouchers" data-target="meal-vouchers" data-group="meal-vouchers meal-vouchers-shared" aria-label="Chèques repas" style="display: none;">
         <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>
         <span>Chèques</span>
@@ -1473,6 +1651,101 @@
                 </div>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Modale : créer / modifier un voyage -->
+<div id="trip-modal-overlay" class="login-overlay">
+    <div class="login-card card modal-md modal-tall">
+        <div class="modal-head">
+            <h2 id="trip-modal-title">Nouveau voyage</h2>
+            <button type="button" id="btn-close-trip-modal" class="btn btn-ghost btn-icon-round" aria-label="Fermer">&times;</button>
+        </div>
+        <form id="form-trip">
+            <input type="hidden" id="trip-id">
+            <div class="form-group">
+                <label for="trip-name">Nom du voyage</label>
+                <input type="text" id="trip-name" placeholder="Portugal 2026" required>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="trip-destination">Destination</label>
+                    <input type="text" id="trip-destination" placeholder="Lisbonne, Portugal">
+                </div>
+                <div class="form-group">
+                    <label for="trip-budget">Budget prévu (€, optionnel)</label>
+                    <input type="number" id="trip-budget" step="0.01" min="0" inputmode="decimal" placeholder="0.00">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="trip-start">Date de départ</label>
+                    <input type="date" id="trip-start">
+                </div>
+                <div class="form-group">
+                    <label for="trip-end">Date de retour</label>
+                    <input type="date" id="trip-end">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Participants</label>
+                <div id="trip-participants-list" class="trip-participants-editor"></div>
+                <button type="button" id="btn-add-participant" class="btn btn-secondary btn-small">+ Ajouter un participant</button>
+                <small class="form-hint">Les dépenses partagées sont divisées entre les participants sélectionnés.</small>
+            </div>
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">Enregistrer</button>
+                <button type="button" id="btn-cancel-trip-modal" class="btn btn-secondary">Annuler</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modale : ajouter / modifier une dépense de voyage -->
+<div id="trip-expense-modal-overlay" class="login-overlay">
+    <div class="login-card card modal-md modal-tall">
+        <div class="modal-head">
+            <h2 id="trip-expense-modal-title">Ajouter une dépense</h2>
+            <button type="button" id="btn-close-trip-expense-modal" class="btn btn-ghost btn-icon-round" aria-label="Fermer">&times;</button>
+        </div>
+        <form id="form-trip-expense">
+            <input type="hidden" id="trip-expense-id">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="trip-expense-amount">Montant (€)</label>
+                    <input type="number" id="trip-expense-amount" step="0.01" min="0" inputmode="decimal" required>
+                </div>
+                <div class="form-group">
+                    <label for="trip-expense-date">Date</label>
+                    <input type="date" id="trip-expense-date" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="trip-expense-category">Catégorie</label>
+                <select id="trip-expense-category"></select>
+            </div>
+            <div class="form-group">
+                <label for="trip-expense-label">Description (optionnel)</label>
+                <input type="text" id="trip-expense-label" placeholder="Dîner au Time Out Market">
+            </div>
+            <div class="form-group">
+                <label for="trip-expense-payer">Payé par</label>
+                <select id="trip-expense-payer"></select>
+            </div>
+            <div class="form-group">
+                <label>Partage</label>
+                <div class="segmented segmented-sm trip-share-toggle">
+                    <button type="button" class="seg-btn active" data-share="shared">Partagée</button>
+                    <button type="button" class="seg-btn" data-share="personal">Perso</button>
+                </div>
+                <div id="trip-expense-shared-with" class="trip-share-chips"></div>
+                <small class="form-hint" id="trip-expense-share-hint"></small>
+            </div>
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">Enregistrer</button>
+                <button type="button" id="btn-cancel-trip-expense-modal" class="btn btn-secondary">Annuler</button>
+            </div>
+        </form>
     </div>
 </div>
 

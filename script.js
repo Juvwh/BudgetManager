@@ -37,6 +37,8 @@ window.appData = window.appData || {
     mealVoucherExpectedMonthlyAmount: 0,
     investments: [],
     investmentsEnabled: true,
+    trips: [],
+    tripCategories: [],
     categories: [
         // Default categories
         { id: 'cat-inc-1', name: 'Salaire', type: 'income', parentId: null },
@@ -119,6 +121,8 @@ async function saveData() {
             mealVoucherExpenses: appData.mealVoucherExpenses || [],
             investments: appData.investments || [],
             investmentsEnabled: appData.investmentsEnabled !== undefined ? appData.investmentsEnabled : true,
+            trips: appData.trips || [],
+            tripCategories: appData.tripCategories || [],
             updatedAt: new Date().toISOString()
         };
 
@@ -159,6 +163,10 @@ async function loadData() {
 
             if(parsed.investments) appData.investments = parsed.investments;
             if(parsed.investmentsEnabled !== undefined) appData.investmentsEnabled = parsed.investmentsEnabled;
+
+            // Vacances (module independant du budget)
+            if(parsed.trips) appData.trips = parsed.trips;
+            if(parsed.tripCategories) appData.tripCategories = parsed.tripCategories;
         } else {
             console.log("Aucune donnée Firestore trouvée. Initialisation avec les valeurs par défaut.");
             await saveData(); // Sauvegarde les valeurs par défaut
@@ -3676,6 +3684,10 @@ async function initializeAppAfterAuth() {
     if (typeof window.renderMealVouchers === 'function') {
         window.renderMealVouchers();
     }
+    if (typeof window.renderTrips === 'function') {
+        window.renderTrips();
+        window.renderTripsCompare();
+    }
 
     const goalInput = document.getElementById('setting-spending-goal');
     goalInput.value = appData.spendingGoal;
@@ -5962,6 +5974,8 @@ const NAV_GROUP_TITLES = {
     investments: 'Investissements',
     'meal-vouchers': 'Chèques repas',
     'meal-vouchers-shared': 'Chèques repas',
+    trips: 'Vacances',
+    'trips-compare': 'Vacances',
     settings: 'Réglages',
     prediction: 'Prédiction'
 };
@@ -6540,3 +6554,1074 @@ function initAdvancedFields() {
         if (e.detail === 'transactions') setTimeout(sync, 0);
     });
 }
+
+/* =========================================================================
+   VACANCES — Suivi des dépenses de voyage
+   Module 100% indépendant du budget : les dépenses saisies ici ne sont
+   jamais injectées dans appData.transactions et n'entrent dans aucun
+   calcul de budget, d'épargne ou de prédiction.
+
+   Modèle de données :
+   appData.trips = [{
+       id, name, destination, startDate, endDate, budget,
+       participants: [{ id, name }],
+       expenses: [{ id, date, label, category, amount, paidBy, shared, sharedWith[] }]
+   }]
+   appData.tripCategories = [{ id, name, icon }]
+   ========================================================================= */
+
+const TRIP_DEFAULT_CATEGORIES = [
+    { id: 'tc-course', name: 'Courses', icon: '🛒' },
+    { id: 'tc-resto', name: 'Restaurant', icon: '🍽️' },
+    { id: 'tc-essence', name: 'Essence', icon: '⛽' },
+    { id: 'tc-peage', name: 'Péages', icon: '🛣️' },
+    { id: 'tc-parking', name: 'Parking', icon: '🅿️' },
+    { id: 'tc-avion', name: 'Avion', icon: '✈️' },
+    { id: 'tc-train', name: 'Train', icon: '🚆' },
+    { id: 'tc-loca', name: 'Location voiture', icon: '🚗' },
+    { id: 'tc-logement', name: 'Hébergement', icon: '🏠' },
+    { id: 'tc-visite', name: 'Visites', icon: '🏛️' },
+    { id: 'tc-activite', name: 'Activités', icon: '🎟️' },
+    { id: 'tc-shopping', name: 'Shopping', icon: '🛍️' },
+    { id: 'tc-souvenir', name: 'Souvenirs', icon: '🎁' },
+    { id: 'tc-sante', name: 'Santé', icon: '💊' },
+    { id: 'tc-divers', name: 'Divers', icon: '💠' }
+];
+
+const TRIP_STORAGE_CURRENT = 'budget_app_current_trip';
+
+// Brouillon de participants pendant l'édition d'un voyage dans la modale
+let tripParticipantsDraft = [];
+// Filtres du journal des dépenses
+let tripExpenseFilters = { search: '', category: '', payer: '' };
+
+/* ---------------------------------------------------------------------
+   Helpers
+   --------------------------------------------------------------------- */
+function tripEscape(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function getTrips() {
+    if (!Array.isArray(appData.trips)) appData.trips = [];
+    return appData.trips;
+}
+
+function getTripCategories() {
+    if (!Array.isArray(appData.tripCategories) || appData.tripCategories.length === 0) {
+        appData.tripCategories = TRIP_DEFAULT_CATEGORIES.map(c => ({ ...c }));
+    }
+    return appData.tripCategories;
+}
+
+function getTripCategory(name) {
+    return getTripCategories().find(c => c.name === name) || null;
+}
+
+function tripCategoryIcon(name) {
+    const cat = getTripCategory(name);
+    return cat ? cat.icon : '💠';
+}
+
+// Voyages triés du plus récent au plus ancien
+function getSortedTrips() {
+    return [...getTrips()].sort((a, b) => {
+        const da = a.startDate || '0000-00-00';
+        const dbb = b.startDate || '0000-00-00';
+        if (da === dbb) return (a.name || '').localeCompare(b.name || '');
+        return dbb.localeCompare(da);
+    });
+}
+
+function getCurrentTrip() {
+    const trips = getTrips();
+    if (trips.length === 0) return null;
+    let trip = trips.find(t => t.id === window.currentTripId);
+    if (!trip) {
+        trip = getSortedTrips()[0];
+        window.currentTripId = trip.id;
+    }
+    return trip;
+}
+
+function setCurrentTrip(id) {
+    window.currentTripId = id;
+    try { localStorage.setItem(TRIP_STORAGE_CURRENT, id); } catch (e) { /* stockage indisponible */ }
+    renderTrips();
+}
+window.setCurrentTrip = setCurrentTrip;
+
+function participantName(trip, id) {
+    const p = (trip.participants || []).find(x => x.id === id);
+    return p ? p.name : 'Inconnu';
+}
+
+function participantInitials(name) {
+    return (name || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+}
+
+function tripDurationDays(trip) {
+    if (trip.startDate && trip.endDate) {
+        const d1 = new Date(trip.startDate);
+        const d2 = new Date(trip.endDate);
+        if (!isNaN(d1) && !isNaN(d2)) {
+            return Math.max(1, Math.round((d2 - d1) / 86400000) + 1);
+        }
+    }
+    const dates = new Set((trip.expenses || []).map(e => e.date).filter(Boolean));
+    return Math.max(1, dates.size);
+}
+
+function tripStatus(trip) {
+    const today = new Date().toISOString().slice(0, 10);
+    if (trip.startDate && today < trip.startDate) return { label: 'À venir', cls: 'badge-warning' };
+    if (trip.endDate && today > trip.endDate) return { label: 'Terminé', cls: 'badge-closed' };
+    if (trip.startDate && trip.endDate) return { label: 'En cours', cls: '' };
+    return { label: 'Sans dates', cls: 'badge-closed' };
+}
+
+function formatTripDate(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function formatTripDayLong(dateStr) {
+    if (!dateStr) return 'Sans date';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+/* ---------------------------------------------------------------------
+   Calculs : totaux, parts et équilibrage
+   --------------------------------------------------------------------- */
+function computeTripStats(trip) {
+    const participants = trip.participants || [];
+    const ids = participants.map(p => p.id);
+
+    const stats = {
+        total: 0,
+        shared: 0,
+        personal: 0,
+        perPerson: 0,
+        count: (trip.expenses || []).length,
+        paid: {},
+        due: {},
+        balance: {},
+        categories: {},      // nom -> { total, shared, personal, byPayer }
+        daily: {},           // date -> montant
+        settlements: []
+    };
+
+    ids.forEach(id => { stats.paid[id] = 0; stats.due[id] = 0; });
+
+    (trip.expenses || []).forEach(exp => {
+        const amount = Number(exp.amount) || 0;
+        const payer = exp.paidBy;
+
+        stats.total += amount;
+        stats.paid[payer] = (stats.paid[payer] || 0) + amount;
+        if (exp.date) stats.daily[exp.date] = (stats.daily[exp.date] || 0) + amount;
+
+        const catName = exp.category || 'Divers';
+        if (!stats.categories[catName]) {
+            stats.categories[catName] = { total: 0, shared: 0, personal: 0, byPayer: {} };
+        }
+        const cat = stats.categories[catName];
+        cat.total += amount;
+        cat.byPayer[payer] = (cat.byPayer[payer] || 0) + amount;
+
+        if (exp.shared) {
+            stats.shared += amount;
+            cat.shared += amount;
+            let among = Array.isArray(exp.sharedWith) && exp.sharedWith.length
+                ? exp.sharedWith.filter(id => ids.includes(id))
+                : ids.slice();
+            if (among.length === 0) among = ids.slice();
+            const part = among.length ? amount / among.length : 0;
+            among.forEach(id => { stats.due[id] = (stats.due[id] || 0) + part; });
+        } else {
+            stats.personal += amount;
+            cat.personal += amount;
+            stats.due[payer] = (stats.due[payer] || 0) + amount;
+        }
+    });
+
+    stats.perPerson = ids.length ? stats.shared / ids.length : stats.shared;
+    ids.forEach(id => { stats.balance[id] = (stats.paid[id] || 0) - (stats.due[id] || 0); });
+    stats.settlements = computeTripSettlements(stats.balance);
+
+    return stats;
+}
+
+// Remboursements minimaux : on apparie les plus gros créanciers aux plus gros débiteurs
+function computeTripSettlements(balance) {
+    const creditors = [];
+    const debtors = [];
+
+    Object.keys(balance).forEach(id => {
+        const value = balance[id];
+        if (value > 0.005) creditors.push({ id, value });
+        else if (value < -0.005) debtors.push({ id, value: -value });
+    });
+
+    creditors.sort((a, b) => b.value - a.value);
+    debtors.sort((a, b) => b.value - a.value);
+
+    const transfers = [];
+    let i = 0;
+    let j = 0;
+    while (i < debtors.length && j < creditors.length) {
+        const amount = Math.min(debtors[i].value, creditors[j].value);
+        transfers.push({ from: debtors[i].id, to: creditors[j].id, amount });
+        debtors[i].value -= amount;
+        creditors[j].value -= amount;
+        if (debtors[i].value < 0.005) i++;
+        if (creditors[j].value < 0.005) j++;
+    }
+    return transfers;
+}
+
+/* ---------------------------------------------------------------------
+   Rendu principal
+   --------------------------------------------------------------------- */
+function renderTrips() {
+    const trips = getTrips();
+    const emptyBox = document.getElementById('trip-empty');
+    const detailBox = document.getElementById('trip-detail');
+    const selector = document.getElementById('trip-selector');
+    if (!selector) return;
+
+    const sorted = getSortedTrips();
+    const trip = getCurrentTrip();
+
+    // Sélecteur de voyage
+    selector.innerHTML = sorted.map(t =>
+        `<option value="${tripEscape(t.id)}"${trip && t.id === trip.id ? ' selected' : ''}>${tripEscape(t.name)}</option>`
+    ).join('');
+    selector.style.display = sorted.length ? '' : 'none';
+
+    if (!trip) {
+        if (emptyBox) emptyBox.style.display = 'block';
+        if (detailBox) detailBox.style.display = 'none';
+        return;
+    }
+    if (emptyBox) emptyBox.style.display = 'none';
+    if (detailBox) detailBox.style.display = 'block';
+
+    const stats = computeTripStats(trip);
+
+    renderTripHero(trip, stats);
+    renderTripSummary(trip, stats);
+    renderTripBudget(trip, stats);
+    renderTripSettlement(trip, stats);
+    renderTripMatrix(trip, stats);
+    renderTripExpenseFilters(trip);
+    renderTripExpenseList(trip);
+    renderTripCharts(trip, stats);
+}
+window.renderTrips = renderTrips;
+
+function renderTripHero(trip, stats) {
+    const status = tripStatus(trip);
+    document.getElementById('trip-hero-name').textContent = trip.name;
+
+    const badge = document.getElementById('trip-hero-status');
+    badge.textContent = status.label;
+    badge.className = 'badge ' + status.cls;
+
+    const days = tripDurationDays(trip);
+    const bits = [];
+    if (trip.destination) bits.push(tripEscape(trip.destination));
+    if (trip.startDate || trip.endDate) {
+        bits.push(`${formatTripDate(trip.startDate) || '?'} → ${formatTripDate(trip.endDate) || '?'}`);
+    }
+    bits.push(days + (days > 1 ? ' jours' : ' jour'));
+    bits.push((trip.participants || []).map(p => tripEscape(p.name)).join(' · ') || 'Aucun participant');
+    bits.push(stats.count + (stats.count > 1 ? ' dépenses' : ' dépense'));
+
+    document.getElementById('trip-hero-meta').innerHTML = bits.join(' <span class="cat-sep">•</span> ');
+}
+
+function renderTripSummary(trip, stats) {
+    const container = document.getElementById('trip-summary');
+    const days = tripDurationDays(trip);
+    const nbParticipants = (trip.participants || []).length || 1;
+
+    const cards = [
+        { cls: 'stat-expense', label: 'Total du voyage', value: fmtEuro(stats.total), sub: fmtEuro(stats.total / days) + ' / jour' },
+        { cls: 'stat-accent', label: 'Total partagé', value: fmtEuro(stats.shared), sub: 'réparti entre ' + nbParticipants + (nbParticipants > 1 ? ' personnes' : ' personne') },
+        { cls: '', label: 'Part / personne', value: fmtEuro(stats.perPerson), sub: 'sur les dépenses partagées' },
+        { cls: '', label: 'Dépenses perso', value: fmtEuro(stats.personal), sub: 'non partagées' }
+    ];
+
+    container.innerHTML = cards.map(c => `
+        <div class="card stat-card ${c.cls}">
+            <div class="stat-head"><h3>${c.label}</h3></div>
+            <p>${c.value}</p>
+            <span class="stat-delta">${c.sub}</span>
+        </div>
+    `).join('');
+}
+
+function renderTripBudget(trip, stats) {
+    const card = document.getElementById('trip-budget-card');
+    const budget = Number(trip.budget) || 0;
+
+    if (!budget) {
+        card.style.display = 'none';
+        return;
+    }
+    card.style.display = 'block';
+
+    const pct = Math.min(100, (stats.total / budget) * 100);
+    const rest = budget - stats.total;
+    const fill = document.getElementById('trip-budget-fill');
+    fill.style.width = pct.toFixed(1) + '%';
+    fill.style.background = rest < 0 ? 'var(--danger-color)' : (pct > 85 ? 'var(--warning-color)' : 'var(--success-color)');
+
+    document.getElementById('trip-budget-caption').textContent = Math.round(pct) + ' % consommé';
+    document.getElementById('trip-budget-stats').innerHTML = `
+        <div class="mini-stat"><span class="mini-label">Budget prévu</span><span class="mini-value">${fmtEuro(budget)}</span></div>
+        <div class="mini-stat"><span class="mini-label">Dépensé</span><span class="mini-value">${fmtEuro(stats.total)}</span></div>
+        <div class="mini-stat"><span class="mini-label">${rest < 0 ? 'Dépassement' : 'Restant'}</span><span class="mini-value ${rest < 0 ? 'text-red' : 'text-green'}">${fmtEuro(Math.abs(rest))}</span></div>
+    `;
+}
+
+function renderTripSettlement(trip, stats) {
+    const participants = trip.participants || [];
+    const balancesBox = document.getElementById('trip-balances');
+    const settlementBox = document.getElementById('trip-settlements');
+
+    balancesBox.innerHTML = participants.map((p, i) => {
+        const paid = stats.paid[p.id] || 0;
+        const due = stats.due[p.id] || 0;
+        const bal = stats.balance[p.id] || 0;
+        const color = CHART_PALETTE[i % CHART_PALETTE.length];
+        return `
+            <div class="trip-balance">
+                <span class="trip-avatar" style="background:${color}1f;color:${color};">${tripEscape(participantInitials(p.name))}</span>
+                <div class="trip-balance-main">
+                    <span class="trip-balance-name">${tripEscape(p.name)}</span>
+                    <span class="trip-balance-meta">A payé ${fmtEuro(paid)} · doit ${fmtEuro(due)}</span>
+                </div>
+                <span class="trip-balance-value ${bal >= 0 ? 'text-green' : 'text-red'}">${(bal >= 0 ? '+' : '−') + fmtEuro(Math.abs(bal))}</span>
+            </div>
+        `;
+    }).join('') || '<p class="muted">Ajoutez des participants pour calculer les parts.</p>';
+
+    if (stats.settlements.length === 0) {
+        settlementBox.innerHTML = participants.length
+            ? '<p class="trip-settled">Tout est équilibré, personne ne doit rien.</p>'
+            : '';
+        return;
+    }
+
+    settlementBox.innerHTML = stats.settlements.map(s => `
+        <div class="trip-settlement">
+            <strong>${tripEscape(participantName(trip, s.from))}</strong>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+            <strong>${tripEscape(participantName(trip, s.to))}</strong>
+            <span class="trip-settlement-amount">${fmtEuro(s.amount)}</span>
+        </div>
+    `).join('');
+}
+
+/* Matrice catégorie x participant (l'équivalent du tableau Excel) */
+function renderTripMatrix(trip, stats) {
+    const participants = trip.participants || [];
+    const sharedBox = document.getElementById('trip-matrix-shared');
+    const personalBox = document.getElementById('trip-matrix-personal');
+
+    const buildTable = (title, rows, isShared) => {
+        if (rows.length === 0) return '';
+
+        const head = `
+            <div class="tm-row tm-head">
+                <span>Catégorie</span>
+                ${participants.map(p => `<span class="tm-num">${tripEscape(p.name)}</span>`).join('')}
+                <span class="tm-num">Total</span>
+                <span class="tm-num">${isShared ? 'Part / pers.' : ''}</span>
+            </div>`;
+
+        const totalRow = { total: 0, byPayer: {} };
+        rows.forEach(r => {
+            totalRow.total += r.amount;
+            participants.forEach(p => {
+                totalRow.byPayer[p.id] = (totalRow.byPayer[p.id] || 0) + (r.byPayer[p.id] || 0);
+            });
+        });
+
+        const body = rows.map(r => `
+            <div class="tm-row">
+                <span class="tm-cat"><span class="tm-icon">${r.icon}</span>${tripEscape(r.name)}</span>
+                ${participants.map(p => {
+                    const v = r.byPayer[p.id] || 0;
+                    return `<span class="tm-num${v ? '' : ' is-zero'}">${fmtEuro(v)}</span>`;
+                }).join('')}
+                <span class="tm-num tm-total">${fmtEuro(r.amount)}</span>
+                <span class="tm-num tm-share">${isShared ? fmtEuro(participants.length ? r.amount / participants.length : r.amount) : '<em class="muted">non partagé</em>'}</span>
+            </div>
+        `).join('');
+
+        const foot = `
+            <div class="tm-row tm-foot">
+                <span>Total</span>
+                ${participants.map(p => `<span class="tm-num">${fmtEuro(totalRow.byPayer[p.id] || 0)}</span>`).join('')}
+                <span class="tm-num">${fmtEuro(totalRow.total)}</span>
+                <span class="tm-num">${isShared ? fmtEuro(participants.length ? totalRow.total / participants.length : totalRow.total) : ''}</span>
+            </div>`;
+
+        return `
+            <h4 class="tm-title${isShared ? '' : ' tm-title-perso'}">${title}</h4>
+            <div class="tm-scroll">
+                <div class="trip-matrix" style="--tm-cols:${participants.length}">
+                    ${head}${body}${foot}
+                </div>
+            </div>`;
+    };
+
+    const sharedRows = [];
+    const personalRows = [];
+
+    Object.keys(stats.categories).sort((a, b) => stats.categories[b].total - stats.categories[a].total).forEach(name => {
+        const cat = stats.categories[name];
+        const icon = tripCategoryIcon(name);
+
+        if (cat.shared > 0) {
+            const byPayer = {};
+            (trip.expenses || []).filter(e => e.shared && (e.category || 'Divers') === name)
+                .forEach(e => { byPayer[e.paidBy] = (byPayer[e.paidBy] || 0) + (Number(e.amount) || 0); });
+            sharedRows.push({ name, icon, amount: cat.shared, byPayer });
+        }
+        if (cat.personal > 0) {
+            const byPayer = {};
+            (trip.expenses || []).filter(e => !e.shared && (e.category || 'Divers') === name)
+                .forEach(e => { byPayer[e.paidBy] = (byPayer[e.paidBy] || 0) + (Number(e.amount) || 0); });
+            personalRows.push({ name, icon, amount: cat.personal, byPayer });
+        }
+    });
+
+    sharedBox.innerHTML = sharedRows.length
+        ? buildTable('Dépenses partagées', sharedRows, true)
+        : '<p class="muted">Aucune dépense partagée pour l\'instant.</p>';
+    personalBox.innerHTML = buildTable('Dépenses personnelles — non partagées', personalRows, false);
+}
+
+/* ---------------------------------------------------------------------
+   Journal des dépenses
+   --------------------------------------------------------------------- */
+function renderTripExpenseFilters(trip) {
+    const catSelect = document.getElementById('trip-expense-filter-category');
+    const paySelect = document.getElementById('trip-expense-filter-payer');
+    if (!catSelect || !paySelect) return;
+
+    const used = [...new Set((trip.expenses || []).map(e => e.category || 'Divers'))].sort();
+    catSelect.innerHTML = '<option value="">Toutes les catégories</option>' +
+        used.map(c => `<option value="${tripEscape(c)}"${tripExpenseFilters.category === c ? ' selected' : ''}>${tripCategoryIcon(c)} ${tripEscape(c)}</option>`).join('');
+    catSelect.classList.toggle('is-active', !!tripExpenseFilters.category);
+
+    paySelect.innerHTML = '<option value="">Tous les participants</option>' +
+        (trip.participants || []).map(p => `<option value="${tripEscape(p.id)}"${tripExpenseFilters.payer === p.id ? ' selected' : ''}>Payé par ${tripEscape(p.name)}</option>`).join('');
+    paySelect.classList.toggle('is-active', !!tripExpenseFilters.payer);
+}
+
+function renderTripExpenseList(trip) {
+    const container = document.getElementById('trip-expense-list');
+    if (!container) return;
+
+    const search = (tripExpenseFilters.search || '').toLowerCase().trim();
+    let expenses = (trip.expenses || []).filter(e => {
+        if (tripExpenseFilters.category && (e.category || 'Divers') !== tripExpenseFilters.category) return false;
+        if (tripExpenseFilters.payer && e.paidBy !== tripExpenseFilters.payer) return false;
+        if (search) {
+            const hay = ((e.label || '') + ' ' + (e.category || '')).toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+        return true;
+    });
+
+    if (expenses.length === 0) {
+        container.innerHTML = '<p class="feed-empty">Aucune dépense à afficher.</p>';
+        return;
+    }
+
+    expenses = expenses.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+    // Regroupement par jour
+    const groups = [];
+    expenses.forEach(e => {
+        const last = groups[groups.length - 1];
+        if (last && last.date === e.date) last.items.push(e);
+        else groups.push({ date: e.date, items: [e] });
+    });
+
+    container.innerHTML = groups.map(g => {
+        const dayTotal = g.items.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+        return `
+        <div class="trip-exp-group">
+            <div class="trip-exp-day">
+                <span>${tripEscape(formatTripDayLong(g.date))}</span>
+                <span class="trip-exp-day-total">${fmtEuro(dayTotal)}</span>
+            </div>
+            ${g.items.map(e => `
+                <div class="trip-exp-row">
+                    <span class="trip-exp-icon">${tripCategoryIcon(e.category)}</span>
+                    <div class="trip-exp-main">
+                        <span class="trip-exp-title">${tripEscape(e.label || e.category || 'Dépense')}</span>
+                        <span class="trip-exp-sub">
+                            ${tripEscape(e.category || 'Divers')}
+                            <span class="cat-sep">•</span> ${tripEscape(participantName(trip, e.paidBy))}
+                            ${e.shared
+                                ? `<span class="trip-tag is-shared">Partagé${(Array.isArray(e.sharedWith) && e.sharedWith.length && e.sharedWith.length < (trip.participants || []).length) ? ' (' + e.sharedWith.map(id => tripEscape(participantName(trip, id))).join(', ') + ')' : ''}</span>`
+                                : '<span class="trip-tag is-perso">Perso</span>'}
+                        </span>
+                    </div>
+                    <div class="trip-exp-right">
+                        <span class="trip-exp-amount">${fmtEuro(Number(e.amount) || 0)}</span>
+                    </div>
+                    <div class="trip-exp-actions">
+                        <button type="button" class="icon-action" title="Modifier" onclick="editTripExpense('${e.id}')">
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+                        </button>
+                        <button type="button" class="icon-action is-delete" title="Supprimer" onclick="deleteTripExpense('${e.id}')">
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('')}
+        </div>`;
+    }).join('');
+}
+
+/* ---------------------------------------------------------------------
+   Graphiques
+   --------------------------------------------------------------------- */
+function renderTripCharts(trip, stats) {
+    // Camembert par catégorie (clics désactivés : rien à voir avec le budget)
+    const catTotals = {};
+    Object.keys(stats.categories).forEach(name => { catTotals[name] = stats.categories[name].total; });
+    drawPieChart('tripCategoryChart', catTotals);
+    chartInteractions['tripCategoryChart'] = [];
+
+    // Payé par participant
+    const payerData = (trip.participants || []).map((p, i) => ({
+        label: p.name,
+        value: stats.paid[p.id] || 0,
+        color: CHART_PALETTE[i % CHART_PALETTE.length]
+    }));
+    drawSimpleBarChart('tripParticipantChart', payerData, {
+        horizontal: true,
+        emptyMessage: 'Aucune dépense enregistrée'
+    });
+
+    // Dépenses jour par jour
+    const days = Object.keys(stats.daily).sort();
+    const dailyData = days.map(d => ({
+        label: new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }),
+        value: stats.daily[d]
+    }));
+    drawSimpleBarChart('tripDailyChart', dailyData, {
+        height: 240,
+        sparseLabels: dailyData.length > 12,
+        emptyMessage: 'Aucune dépense enregistrée'
+    });
+}
+
+/* ---------------------------------------------------------------------
+   Comparatif entre voyages
+   --------------------------------------------------------------------- */
+function renderTripsCompare() {
+    const trips = getSortedTrips();
+    const summary = document.getElementById('tripc-summary');
+    const tbody = document.querySelector('#table-trips-compare tbody');
+    if (!summary || !tbody) return;
+
+    const rows = trips.map(t => {
+        const stats = computeTripStats(t);
+        const days = tripDurationDays(t);
+        const nb = (t.participants || []).length || 1;
+        return { trip: t, stats, days, nb, perDay: stats.total / days, perPerson: stats.total / nb };
+    });
+
+    const grandTotal = rows.reduce((sum, r) => sum + r.stats.total, 0);
+    const avgPerDay = rows.length ? rows.reduce((sum, r) => sum + r.perDay, 0) / rows.length : 0;
+    const priciest = rows.reduce((best, r) => (!best || r.stats.total > best.stats.total ? r : best), null);
+
+    summary.innerHTML = `
+        <div class="card stat-card stat-accent">
+            <div class="stat-head"><h3>Voyages enregistrés</h3></div>
+            <p>${rows.length}</p>
+            <span class="stat-delta">${rows.reduce((s, r) => s + r.days, 0)} jours cumulés</span>
+        </div>
+        <div class="card stat-card stat-expense">
+            <div class="stat-head"><h3>Total dépensé</h3></div>
+            <p>${fmtEuro(grandTotal)}</p>
+            <span class="stat-delta">toutes vacances confondues</span>
+        </div>
+        <div class="card stat-card">
+            <div class="stat-head"><h3>Coût moyen / jour</h3></div>
+            <p>${fmtEuro(avgPerDay)}</p>
+            <span class="stat-delta">moyenne des voyages</span>
+        </div>
+        <div class="card stat-card">
+            <div class="stat-head"><h3>Voyage le plus cher</h3></div>
+            <p>${priciest ? fmtEuro(priciest.stats.total) : fmtEuro(0)}</p>
+            <span class="stat-delta">${priciest ? tripEscape(priciest.trip.name) : '—'}</span>
+        </div>
+    `;
+
+    // Tableau comparatif
+    if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Aucun voyage enregistré.</td></tr>';
+    } else {
+        tbody.innerHTML = rows.map(r => `
+            <tr class="clickable-row" onclick="openTripFromCompare('${r.trip.id}')">
+                <td data-label="Nom"><strong>${tripEscape(r.trip.name)}</strong>${r.trip.destination ? '<br><small class="muted">' + tripEscape(r.trip.destination) + '</small>' : ''}</td>
+                <td data-label="Dates">${formatTripDate(r.trip.startDate) || '—'} → ${formatTripDate(r.trip.endDate) || '—'}</td>
+                <td data-label="Durée">${r.days} j</td>
+                <td data-label="Participants">${r.nb}</td>
+                <td data-label="Montant"><strong>${fmtEuro(r.stats.total)}</strong></td>
+                <td data-label="Par jour">${fmtEuro(r.perDay)}</td>
+                <td data-label="Par personne">${fmtEuro(r.perPerson)}</td>
+            </tr>
+        `).join('');
+    }
+
+    // Graphiques comparatifs
+    const chronological = [...rows].reverse();
+    drawSimpleBarChart('tripCompareTotalChart', chronological.map((r, i) => ({
+        label: r.trip.name,
+        value: r.stats.total,
+        color: CHART_PALETTE[i % CHART_PALETTE.length]
+    })), { horizontal: true, emptyMessage: 'Aucun voyage à comparer' });
+
+    drawSimpleBarChart('tripCompareDayChart', chronological.map((r, i) => ({
+        label: r.trip.name,
+        value: r.perDay,
+        color: CHART_PALETTE[i % CHART_PALETTE.length]
+    })), { horizontal: true, emptyMessage: 'Aucun voyage à comparer' });
+
+    const allCategories = {};
+    rows.forEach(r => {
+        Object.keys(r.stats.categories).forEach(name => {
+            allCategories[name] = (allCategories[name] || 0) + r.stats.categories[name].total;
+        });
+    });
+    drawPieChart('tripCompareCategoryChart', allCategories);
+    chartInteractions['tripCompareCategoryChart'] = [];
+}
+window.renderTripsCompare = renderTripsCompare;
+
+window.openTripFromCompare = function(tripId) {
+    setCurrentTrip(tripId);
+    document.querySelector('.nav-link[data-target="trips"]').click();
+};
+
+/* ---------------------------------------------------------------------
+   Modale : création / édition d'un voyage
+   --------------------------------------------------------------------- */
+function renderTripParticipantsEditor() {
+    const box = document.getElementById('trip-participants-list');
+    if (!box) return;
+
+    box.innerHTML = tripParticipantsDraft.map((p, i) => `
+        <div class="trip-participant-row">
+            <span class="trip-avatar" style="background:${CHART_PALETTE[i % CHART_PALETTE.length]}1f;color:${CHART_PALETTE[i % CHART_PALETTE.length]};">${tripEscape(participantInitials(p.name || '?'))}</span>
+            <input type="text" class="trip-participant-input" data-index="${i}" value="${tripEscape(p.name)}" placeholder="Prénom">
+            <button type="button" class="icon-action is-delete" title="Retirer" data-remove-participant="${i}">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+    `).join('');
+
+    box.querySelectorAll('.trip-participant-input').forEach(input => {
+        input.addEventListener('input', (e) => {
+            tripParticipantsDraft[Number(e.target.dataset.index)].name = e.target.value;
+        });
+    });
+
+    box.querySelectorAll('[data-remove-participant]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            tripParticipantsDraft.splice(Number(btn.dataset.removeParticipant), 1);
+            renderTripParticipantsEditor();
+        });
+    });
+}
+
+window.openTripModal = function(tripId) {
+    const trip = tripId ? getTrips().find(t => t.id === tripId) : null;
+
+    document.getElementById('trip-modal-title').textContent = trip ? 'Modifier le voyage' : 'Nouveau voyage';
+    document.getElementById('trip-id').value = trip ? trip.id : '';
+    document.getElementById('trip-name').value = trip ? trip.name : '';
+    document.getElementById('trip-destination').value = trip ? (trip.destination || '') : '';
+    document.getElementById('trip-budget').value = trip && trip.budget ? trip.budget : '';
+    document.getElementById('trip-start').value = trip ? (trip.startDate || '') : '';
+    document.getElementById('trip-end').value = trip ? (trip.endDate || '') : '';
+
+    tripParticipantsDraft = trip
+        ? (trip.participants || []).map(p => ({ ...p }))
+        : [{ id: 'tp-' + generateId(), name: '' }];
+    renderTripParticipantsEditor();
+
+    document.getElementById('trip-modal-overlay').classList.add('active');
+    setTimeout(() => document.getElementById('trip-name').focus(), 50);
+};
+
+function closeTripModal() {
+    document.getElementById('trip-modal-overlay').classList.remove('active');
+}
+
+/* ---------------------------------------------------------------------
+   Modale : création / édition d'une dépense
+   --------------------------------------------------------------------- */
+function renderTripExpenseCategoryOptions(selected) {
+    const select = document.getElementById('trip-expense-category');
+    const cats = getTripCategories();
+    select.innerHTML = cats.map(c =>
+        `<option value="${tripEscape(c.name)}"${c.name === selected ? ' selected' : ''}>${c.icon} ${tripEscape(c.name)}</option>`
+    ).join('') + '<option value="__new__">➕ Nouvelle catégorie…</option>';
+}
+
+function renderTripShareChips(trip, selectedIds, isShared) {
+    const box = document.getElementById('trip-expense-shared-with');
+    const hint = document.getElementById('trip-expense-share-hint');
+    const participants = trip.participants || [];
+
+    if (!isShared) {
+        box.innerHTML = '';
+        box.style.display = 'none';
+        hint.textContent = 'Dépense personnelle : elle reste à la charge de celui qui a payé.';
+        return;
+    }
+
+    box.style.display = 'flex';
+    box.innerHTML = participants.map(p => `
+        <button type="button" class="filter-chip trip-share-chip${selectedIds.includes(p.id) ? ' active' : ''}" data-participant="${tripEscape(p.id)}">${tripEscape(p.name)}</button>
+    `).join('');
+
+    box.querySelectorAll('.trip-share-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            chip.classList.toggle('active');
+            updateTripShareHint(trip);
+        });
+    });
+    updateTripShareHint(trip);
+}
+
+function getSelectedShareIds() {
+    return [...document.querySelectorAll('#trip-expense-shared-with .trip-share-chip.active')]
+        .map(c => c.dataset.participant);
+}
+
+function updateTripShareHint(trip) {
+    const hint = document.getElementById('trip-expense-share-hint');
+    const ids = getSelectedShareIds();
+    const amount = parseFloat(document.getElementById('trip-expense-amount').value) || 0;
+
+    if (ids.length === 0) {
+        hint.textContent = 'Sélectionnez au moins une personne concernée par le partage.';
+        return;
+    }
+    hint.textContent = amount
+        ? `${fmtEuro(amount / ids.length)} par personne (${ids.length} participant${ids.length > 1 ? 's' : ''}).`
+        : `Partagé entre ${ids.length} participant${ids.length > 1 ? 's' : ''}.`;
+}
+
+function setTripShareMode(isShared, trip, selectedIds) {
+    document.querySelectorAll('.trip-share-toggle .seg-btn').forEach(btn => {
+        btn.classList.toggle('active', (btn.dataset.share === 'shared') === isShared);
+    });
+    renderTripShareChips(trip, selectedIds, isShared);
+}
+
+window.openTripExpenseModal = function(expenseId) {
+    const trip = getCurrentTrip();
+    if (!trip) return;
+
+    if ((trip.participants || []).length === 0) {
+        alert('Ajoutez d\'abord au moins un participant au voyage (bouton « Modifier »).');
+        return;
+    }
+
+    const expense = expenseId ? (trip.expenses || []).find(e => e.id === expenseId) : null;
+    const ids = trip.participants.map(p => p.id);
+
+    document.getElementById('trip-expense-modal-title').textContent = expense ? 'Modifier la dépense' : 'Ajouter une dépense';
+    document.getElementById('trip-expense-id').value = expense ? expense.id : '';
+    document.getElementById('trip-expense-amount').value = expense ? expense.amount : '';
+    document.getElementById('trip-expense-label').value = expense ? (expense.label || '') : '';
+
+    // Par défaut : aujourd'hui si l'on est pendant le voyage, sinon le premier jour du séjour
+    const today = new Date().toISOString().slice(0, 10);
+    let defaultDate = today;
+    if (trip.startDate && today < trip.startDate) defaultDate = trip.startDate;
+    else if (trip.endDate && today > trip.endDate) defaultDate = trip.endDate;
+    document.getElementById('trip-expense-date').value = expense ? expense.date : defaultDate;
+
+    renderTripExpenseCategoryOptions(expense ? expense.category : getTripCategories()[0].name);
+
+    const payerSelect = document.getElementById('trip-expense-payer');
+    payerSelect.innerHTML = trip.participants.map(p =>
+        `<option value="${tripEscape(p.id)}"${expense && expense.paidBy === p.id ? ' selected' : ''}>${tripEscape(p.name)}</option>`
+    ).join('');
+
+    const isShared = expense ? !!expense.shared : true;
+    const selected = expense && Array.isArray(expense.sharedWith) && expense.sharedWith.length
+        ? expense.sharedWith.filter(id => ids.includes(id))
+        : ids;
+    setTripShareMode(isShared, trip, selected);
+
+    document.getElementById('trip-expense-modal-overlay').classList.add('active');
+    setTimeout(() => document.getElementById('trip-expense-amount').focus(), 50);
+};
+
+function closeTripExpenseModal() {
+    document.getElementById('trip-expense-modal-overlay').classList.remove('active');
+}
+
+window.editTripExpense = function(id) {
+    window.openTripExpenseModal(id);
+};
+
+window.deleteTripExpense = async function(id) {
+    const trip = getCurrentTrip();
+    if (!trip) return;
+    if (!confirm('Supprimer cette dépense de vacances ?')) return;
+
+    trip.expenses = (trip.expenses || []).filter(e => e.id !== id);
+    await saveData();
+    renderTrips();
+};
+
+/* ---------------------------------------------------------------------
+   Initialisation : écouteurs
+   --------------------------------------------------------------------- */
+function initTripsModule() {
+    if (!document.getElementById('trips')) return;
+
+    try {
+        const stored = localStorage.getItem(TRIP_STORAGE_CURRENT);
+        if (stored) window.currentTripId = stored;
+    } catch (e) { /* stockage indisponible */ }
+
+    // Sélection du voyage courant
+    document.getElementById('trip-selector').addEventListener('change', (e) => setCurrentTrip(e.target.value));
+
+    // Création / édition / suppression d'un voyage
+    document.getElementById('btn-new-trip').addEventListener('click', () => window.openTripModal());
+    const btnNew2 = document.getElementById('btn-new-trip-2');
+    if (btnNew2) btnNew2.addEventListener('click', () => window.openTripModal());
+
+    document.getElementById('btn-edit-trip').addEventListener('click', () => {
+        const trip = getCurrentTrip();
+        if (trip) window.openTripModal(trip.id);
+    });
+
+    document.getElementById('btn-delete-trip').addEventListener('click', async () => {
+        const trip = getCurrentTrip();
+        if (!trip) return;
+        if (!confirm(`Supprimer le voyage « ${trip.name} » et toutes ses dépenses ?`)) return;
+
+        appData.trips = getTrips().filter(t => t.id !== trip.id);
+        window.currentTripId = null;
+        await saveData();
+        renderTrips();
+        renderTripsCompare();
+    });
+
+    document.getElementById('btn-close-trip-modal').addEventListener('click', closeTripModal);
+    document.getElementById('btn-cancel-trip-modal').addEventListener('click', closeTripModal);
+    document.getElementById('btn-add-participant').addEventListener('click', () => {
+        tripParticipantsDraft.push({ id: 'tp-' + generateId(), name: '' });
+        renderTripParticipantsEditor();
+        const inputs = document.querySelectorAll('.trip-participant-input');
+        if (inputs.length) inputs[inputs.length - 1].focus();
+    });
+
+    document.getElementById('form-trip').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const participants = tripParticipantsDraft
+            .map(p => ({ id: p.id, name: (p.name || '').trim() }))
+            .filter(p => p.name);
+
+        if (participants.length === 0) {
+            alert('Ajoutez au moins un participant.');
+            return;
+        }
+
+        const start = document.getElementById('trip-start').value;
+        const end = document.getElementById('trip-end').value;
+        if (start && end && end < start) {
+            alert('La date de retour doit être postérieure à la date de départ.');
+            return;
+        }
+
+        const id = document.getElementById('trip-id').value;
+        const payload = {
+            name: document.getElementById('trip-name').value.trim(),
+            destination: document.getElementById('trip-destination').value.trim(),
+            budget: parseFloat(document.getElementById('trip-budget').value) || 0,
+            startDate: start,
+            endDate: end,
+            participants
+        };
+
+        if (id) {
+            const trip = getTrips().find(t => t.id === id);
+            if (trip) Object.assign(trip, payload);
+        } else {
+            const trip = { id: 'trip-' + generateId(), ...payload, expenses: [] };
+            getTrips().push(trip);
+            window.currentTripId = trip.id;
+            try { localStorage.setItem(TRIP_STORAGE_CURRENT, trip.id); } catch (err) { /* ignore */ }
+        }
+
+        await saveData();
+        closeTripModal();
+        renderTrips();
+        renderTripsCompare();
+    });
+
+    // Dépenses
+    ['btn-add-trip-expense', 'btn-add-trip-expense-2'].forEach(btnId => {
+        const btn = document.getElementById(btnId);
+        if (btn) btn.addEventListener('click', () => window.openTripExpenseModal());
+    });
+
+    document.getElementById('btn-close-trip-expense-modal').addEventListener('click', closeTripExpenseModal);
+    document.getElementById('btn-cancel-trip-expense-modal').addEventListener('click', closeTripExpenseModal);
+
+    document.querySelectorAll('.trip-share-toggle .seg-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const trip = getCurrentTrip();
+            if (!trip) return;
+            const isShared = btn.dataset.share === 'shared';
+            const current = getSelectedShareIds();
+            setTripShareMode(isShared, trip, current.length ? current : trip.participants.map(p => p.id));
+        });
+    });
+
+    document.getElementById('trip-expense-amount').addEventListener('input', () => {
+        const trip = getCurrentTrip();
+        if (trip) updateTripShareHint(trip);
+    });
+
+    // Nouvelle catégorie à la volée
+    document.getElementById('trip-expense-category').addEventListener('change', async (e) => {
+        if (e.target.value !== '__new__') return;
+
+        const name = (prompt('Nom de la nouvelle catégorie :') || '').trim();
+        if (!name) {
+            renderTripExpenseCategoryOptions(getTripCategories()[0].name);
+            return;
+        }
+        if (!getTripCategory(name)) {
+            const icon = (prompt('Emoji pour cette catégorie (optionnel) :', '💠') || '💠').trim() || '💠';
+            getTripCategories().push({ id: 'tc-' + generateId(), name, icon });
+            await saveData();
+        }
+        renderTripExpenseCategoryOptions(name);
+    });
+
+    document.getElementById('form-trip-expense').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const trip = getCurrentTrip();
+        if (!trip) return;
+
+        const isShared = document.querySelector('.trip-share-toggle .seg-btn.active').dataset.share === 'shared';
+        const sharedWith = isShared ? getSelectedShareIds() : [];
+
+        if (isShared && sharedWith.length === 0) {
+            alert('Sélectionnez au moins une personne concernée par cette dépense partagée.');
+            return;
+        }
+
+        const category = document.getElementById('trip-expense-category').value;
+        if (category === '__new__') {
+            alert('Choisissez une catégorie.');
+            return;
+        }
+
+        const payload = {
+            date: document.getElementById('trip-expense-date').value,
+            label: document.getElementById('trip-expense-label').value.trim(),
+            category,
+            amount: parseFloat(document.getElementById('trip-expense-amount').value) || 0,
+            paidBy: document.getElementById('trip-expense-payer').value,
+            shared: isShared,
+            sharedWith
+        };
+
+        const id = document.getElementById('trip-expense-id').value;
+        if (!Array.isArray(trip.expenses)) trip.expenses = [];
+
+        if (id) {
+            const exp = trip.expenses.find(x => x.id === id);
+            if (exp) Object.assign(exp, payload);
+        } else {
+            trip.expenses.push({ id: 'te-' + generateId(), ...payload });
+        }
+
+        await saveData();
+        closeTripExpenseModal();
+        renderTrips();
+    });
+
+    // Filtres du journal
+    const search = document.getElementById('trip-expense-search');
+    if (search) {
+        search.addEventListener('input', (e) => {
+            tripExpenseFilters.search = e.target.value;
+            const trip = getCurrentTrip();
+            if (trip) renderTripExpenseList(trip);
+        });
+    }
+    document.getElementById('trip-expense-filter-category').addEventListener('change', (e) => {
+        tripExpenseFilters.category = e.target.value;
+        const trip = getCurrentTrip();
+        if (trip) { renderTripExpenseFilters(trip); renderTripExpenseList(trip); }
+    });
+    document.getElementById('trip-expense-filter-payer').addEventListener('change', (e) => {
+        tripExpenseFilters.payer = e.target.value;
+        const trip = getCurrentTrip();
+        if (trip) { renderTripExpenseFilters(trip); renderTripExpenseList(trip); }
+    });
+
+    // Fermeture des modales au clic sur le fond
+    ['trip-modal-overlay', 'trip-expense-modal-overlay'].forEach(id => {
+        const overlay = document.getElementById(id);
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) overlay.classList.remove('active');
+        });
+    });
+
+    // Redessine les graphiques à l'affichage de l'onglet (canvas masqué = largeur nulle)
+    document.addEventListener('viewChanged', (e) => {
+        if (e.detail === 'trips') renderTrips();
+        else if (e.detail === 'trips-compare') renderTripsCompare();
+    });
+
+    window.addEventListener('resize', () => {
+        const tripsSection = document.getElementById('trips');
+        const compareSection = document.getElementById('trips-compare');
+        clearTimeout(window._tripResizeTimer);
+        window._tripResizeTimer = setTimeout(() => {
+            if (tripsSection && tripsSection.classList.contains('active')) {
+                const trip = getCurrentTrip();
+                if (trip) renderTripCharts(trip, computeTripStats(trip));
+            } else if (compareSection && compareSection.classList.contains('active')) {
+                renderTripsCompare();
+            }
+        }, 200);
+    });
+}
+
+initTripsModule();
