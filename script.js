@@ -39,6 +39,7 @@ window.appData = window.appData || {
     investmentsEnabled: true,
     trips: [],
     tripCategories: [],
+    tripsSeeded: false,
     categories: [
         // Default categories
         { id: 'cat-inc-1', name: 'Salaire', type: 'income', parentId: null },
@@ -123,6 +124,7 @@ async function saveData() {
             investmentsEnabled: appData.investmentsEnabled !== undefined ? appData.investmentsEnabled : true,
             trips: appData.trips || [],
             tripCategories: appData.tripCategories || [],
+            tripsSeeded: appData.tripsSeeded || false,
             updatedAt: new Date().toISOString()
         };
 
@@ -167,6 +169,7 @@ async function loadData() {
             // Vacances (module independant du budget)
             if(parsed.trips) appData.trips = parsed.trips;
             if(parsed.tripCategories) appData.tripCategories = parsed.tripCategories;
+            if(parsed.tripsSeeded !== undefined) appData.tripsSeeded = parsed.tripsSeeded;
         } else {
             console.log("Aucune donnée Firestore trouvée. Initialisation avec les valeurs par défaut.");
             await saveData(); // Sauvegarde les valeurs par défaut
@@ -3684,6 +3687,9 @@ async function initializeAppAfterAuth() {
     if (typeof window.renderMealVouchers === 'function') {
         window.renderMealVouchers();
     }
+    if (typeof window.seedDefaultTrips === 'function') {
+        await window.seedDefaultTrips();
+    }
     if (typeof window.renderTrips === 'function') {
         window.renderTrips();
         window.renderTripsCompare();
@@ -6589,6 +6595,88 @@ const TRIP_DEFAULT_CATEGORIES = [
 ];
 
 const TRIP_STORAGE_CURRENT = 'budget_app_current_trip';
+
+/* Voyage fourni par défaut au premier lancement : reprise du tableur « Portugal 2026 ».
+   Les montants sont ceux de l'Excel ; les dates du séjour sont indicatives et se
+   modifient depuis le bouton « Modifier » de la fiche.
+   Chaque ligne : [catégorie, payé par Justin, payé par Gaëlle, partagée ?] */
+const TRIP_SEED_PORTUGAL = {
+    name: 'Portugal 2026',
+    destination: 'Portugal',
+    startDate: '2026-06-06',
+    endDate: '2026-06-13',
+    budget: 0,
+    participants: [
+        { id: 'tp-seed-justin', name: 'Justin' },
+        { id: 'tp-seed-gaelle', name: 'Gaëlle' }
+    ],
+    rows: [
+        ['Courses', 80.34, 81.20, true],
+        ['Essence', 131.14, 0, true],
+        ['Restaurant', 72.50, 46.75, true],
+        ['Parking', 16.00, 35.00, true],
+        ['Visites', 66.95, 24.00, true],
+        ['Péages', 98.56, 0, true],
+        ['Avion', 320.72, 0, true],
+        ['Hébergement', 75.92, 0, true],
+        ['Location voiture', 121.12, 0, true],
+        ['Perso', 20.00, 0, false]
+    ]
+};
+
+// Crée le voyage de démarrage une seule fois : s'il est supprimé, il ne revient pas.
+window.seedDefaultTrips = async function() {
+    if (appData.tripsSeeded) return;
+    appData.tripsSeeded = true;
+
+    if (Array.isArray(appData.trips) && appData.trips.length > 0) {
+        await saveData();
+        return;
+    }
+
+    const seed = TRIP_SEED_PORTUGAL;
+    const participantIds = seed.participants.map(p => p.id);
+
+    // La catégorie « Perso » n'existe pas dans la liste par défaut : on l'ajoute.
+    if (!getTripCategory('Perso')) {
+        getTripCategories().push({ id: 'tc-perso', name: 'Perso', icon: '🎒' });
+    }
+
+    const expenses = [];
+    seed.rows.forEach(([category, amountJustin, amountGaelle, shared], index) => {
+        seed.participants.forEach((participant, pIndex) => {
+            const amount = pIndex === 0 ? amountJustin : amountGaelle;
+            if (!amount) return;
+            expenses.push({
+                id: 'te-seed-' + index + '-' + pIndex,
+                date: seed.startDate,
+                label: category,
+                category: category,
+                amount: amount,
+                paidBy: participant.id,
+                shared: shared,
+                sharedWith: shared ? participantIds.slice() : []
+            });
+        });
+    });
+
+    const trip = {
+        id: 'trip-seed-portugal-2026',
+        name: seed.name,
+        destination: seed.destination,
+        startDate: seed.startDate,
+        endDate: seed.endDate,
+        budget: seed.budget,
+        participants: seed.participants.map(p => ({ ...p })),
+        expenses: expenses
+    };
+
+    getTrips().push(trip);
+    window.currentTripId = trip.id;
+    try { localStorage.setItem(TRIP_STORAGE_CURRENT, trip.id); } catch (e) { /* stockage indisponible */ }
+
+    await saveData();
+};
 
 // Brouillon de participants pendant l'édition d'un voyage dans la modale
 let tripParticipantsDraft = [];
