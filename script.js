@@ -6595,6 +6595,7 @@ const TRIP_DEFAULT_CATEGORIES = [
 ];
 
 const TRIP_STORAGE_CURRENT = 'budget_app_current_trip';
+const TRIP_STORAGE_MATRIX = 'budget_app_trip_matrix_detail';
 
 /* Voyage fourni par défaut au premier lancement : reprise du tableur « Portugal 2026 ».
    Les montants sont ceux de l'Excel ; les dates du séjour sont indicatives et se
@@ -6682,6 +6683,8 @@ window.seedDefaultTrips = async function() {
 let tripParticipantsDraft = [];
 // Filtres du journal des dépenses
 let tripExpenseFilters = { search: '', category: '', payer: '' };
+// Récapitulatif : totaux seuls par défaut, détail du partage à la demande
+let tripMatrixDetailed = false;
 
 /* ---------------------------------------------------------------------
    Helpers
@@ -7025,15 +7028,18 @@ function renderTripMatrix(trip, stats) {
     const sharedBox = document.getElementById('trip-matrix-shared');
     const personalBox = document.getElementById('trip-matrix-personal');
 
+    // Vue repliée : catégorie + total. Vue détaillée : colonnes par participant + part de chacun.
+    const detailed = tripMatrixDetailed;
+
     const buildTable = (title, rows, isShared) => {
         if (rows.length === 0) return '';
 
         const head = `
             <div class="tm-row tm-head">
                 <span>Catégorie</span>
-                ${participants.map(p => `<span class="tm-num">${tripEscape(p.name)}</span>`).join('')}
+                ${detailed ? participants.map(p => `<span class="tm-num">${tripEscape(p.name)}</span>`).join('') : ''}
                 <span class="tm-num">Total</span>
-                <span class="tm-num">${isShared ? 'Part / pers.' : ''}</span>
+                ${detailed ? `<span class="tm-num">${isShared ? 'Part / pers.' : ''}</span>` : ''}
             </div>`;
 
         const totalRow = { total: 0, byPayer: {} };
@@ -7047,27 +7053,27 @@ function renderTripMatrix(trip, stats) {
         const body = rows.map(r => `
             <div class="tm-row">
                 <span class="tm-cat"><span class="tm-icon">${r.icon}</span>${tripEscape(r.name)}</span>
-                ${participants.map(p => {
+                ${detailed ? participants.map(p => {
                     const v = r.byPayer[p.id] || 0;
                     return `<span class="tm-num${v ? '' : ' is-zero'}">${fmtEuro(v)}</span>`;
-                }).join('')}
+                }).join('') : ''}
                 <span class="tm-num tm-total">${fmtEuro(r.amount)}</span>
-                <span class="tm-num tm-share">${isShared ? fmtEuro(participants.length ? r.amount / participants.length : r.amount) : '<em class="muted">non partagé</em>'}</span>
+                ${detailed ? `<span class="tm-num tm-share">${isShared ? fmtEuro(participants.length ? r.amount / participants.length : r.amount) : '<em class="muted">non partagé</em>'}</span>` : ''}
             </div>
         `).join('');
 
         const foot = `
             <div class="tm-row tm-foot">
                 <span>Total</span>
-                ${participants.map(p => `<span class="tm-num">${fmtEuro(totalRow.byPayer[p.id] || 0)}</span>`).join('')}
+                ${detailed ? participants.map(p => `<span class="tm-num">${fmtEuro(totalRow.byPayer[p.id] || 0)}</span>`).join('') : ''}
                 <span class="tm-num">${fmtEuro(totalRow.total)}</span>
-                <span class="tm-num">${isShared ? fmtEuro(participants.length ? totalRow.total / participants.length : totalRow.total) : ''}</span>
+                ${detailed ? `<span class="tm-num">${isShared ? fmtEuro(participants.length ? totalRow.total / participants.length : totalRow.total) : ''}</span>` : ''}
             </div>`;
 
         return `
             <h4 class="tm-title${isShared ? '' : ' tm-title-perso'}">${title}</h4>
             <div class="tm-scroll">
-                <div class="trip-matrix" style="--tm-cols:${participants.length}">
+                <div class="trip-matrix${detailed ? '' : ' is-simple'}" style="--tm-cols:${participants.length}">
                     ${head}${body}${foot}
                 </div>
             </div>`;
@@ -7487,6 +7493,13 @@ window.deleteTripExpense = async function(id) {
     renderTrips();
 };
 
+function syncTripMatrixToggle() {
+    const btn = document.getElementById('btn-toggle-trip-matrix');
+    if (!btn) return;
+    btn.textContent = tripMatrixDetailed ? 'Masquer le détail' : 'Afficher le détail';
+    btn.setAttribute('aria-expanded', tripMatrixDetailed ? 'true' : 'false');
+}
+
 /* ---------------------------------------------------------------------
    Initialisation : écouteurs
    --------------------------------------------------------------------- */
@@ -7662,6 +7675,23 @@ function initTripsModule() {
         closeTripExpenseModal();
         renderTrips();
     });
+
+    // Récapitulatif : bascule totaux seuls / détail du partage
+    try {
+        tripMatrixDetailed = localStorage.getItem(TRIP_STORAGE_MATRIX) === '1';
+    } catch (e) { /* stockage indisponible */ }
+
+    const btnMatrix = document.getElementById('btn-toggle-trip-matrix');
+    if (btnMatrix) {
+        syncTripMatrixToggle();
+        btnMatrix.addEventListener('click', () => {
+            tripMatrixDetailed = !tripMatrixDetailed;
+            try { localStorage.setItem(TRIP_STORAGE_MATRIX, tripMatrixDetailed ? '1' : '0'); } catch (e) { /* ignore */ }
+            syncTripMatrixToggle();
+            const trip = getCurrentTrip();
+            if (trip) renderTripMatrix(trip, computeTripStats(trip));
+        });
+    }
 
     // Filtres du journal
     const search = document.getElementById('trip-expense-search');
