@@ -3068,6 +3068,7 @@ function updateCategorySelects() {
 
     populateTransSelect();
     populateSubSelect();
+    syncQuickAddCategories();
 
     // Event listeners to update on type change
     document.getElementById('trans-type').addEventListener('change', (e) => {
@@ -6032,15 +6033,70 @@ function openSidebar() {
    Saisie rapide (tableau de bord)
    ------------------------------------------------------------------------- */
 function syncQuickAddCategories() {
-    const source = document.getElementById('trans-category');
     const target = document.getElementById('qa-category');
-    if (!source || !target) return;
+    if (!target) return;
+    if (typeof appData === 'undefined' || !appData || !Array.isArray(appData.categories)) return;
+
+    // La saisie rapide construit sa propre liste : elle ne dépend plus de
+    // l'état du formulaire complet (vide au démarrage, ou positionné sur une
+    // transaction en cours d'édition).
+    const qaType = (document.getElementById('qa-type') || {}).value || 'expense';
+    const catType = qaType === 'salary' ? 'income' : qaType;
 
     const previous = target.value;
-    target.innerHTML = source.innerHTML;
+    const options = appData.categories
+        .filter(c => c.type === catType)
+        .map(c => ({ id: c.id, path: getCategoryPath(c.id) }))
+        .sort((a, b) => a.path.localeCompare(b.path));
+
+    target.innerHTML = '';
+    options.forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o.id;
+        opt.textContent = o.path;
+        target.appendChild(opt);
+    });
+
     if (previous && target.querySelector('option[value="' + previous + '"]')) {
         target.value = previous;
     }
+    updateQuickMvFields();
+}
+
+/* Affiche le champ « chèques repas » directement dans la saisie rapide
+   dès qu'une catégorie éligible est sélectionnée. */
+function updateQuickMvFields() {
+    const group = document.getElementById('qa-mv-group');
+    if (!group) return;
+
+    const input = document.getElementById('qa-mv-part');
+    const hint = document.getElementById('qa-mv-hint');
+    const type = (document.getElementById('qa-type') || {}).value || 'expense';
+    const catId = (document.getElementById('qa-category') || {}).value || '';
+
+    const eligible = typeof appData !== 'undefined' && appData
+        && appData.mealVouchersEnabled
+        && type === 'expense'
+        && Array.isArray(appData.mealVoucherEligibleCategories)
+        && appData.mealVoucherEligibleCategories.includes(catId);
+
+    if (!eligible) {
+        group.style.display = 'none';
+        if (input) input.value = '';
+        return;
+    }
+
+    group.style.display = 'block';
+
+    let balance = 0;
+    if (typeof window.calculateMealVoucherData === 'function') {
+        balance = window.calculateMealVoucherData().availableBalance || 0;
+    }
+    if (hint) hint.textContent = 'Solde disponible : ' + balance.toFixed(2) + ' €';
+
+    const amountEl = document.getElementById('qa-amount');
+    const amount = amountEl ? parseFloat(amountEl.value) : NaN;
+    if (input) input.max = (isNaN(amount) || amount <= 0) ? '' : amount;
 }
 
 function setQuickAddType(type) {
@@ -6055,13 +6111,7 @@ function setQuickAddType(type) {
     const savingsGroup = document.getElementById('qa-savings-group');
     if (savingsGroup) savingsGroup.style.display = type === 'salary' ? 'block' : 'none';
 
-    // On aligne le formulaire complet pour récupérer les bonnes catégories
-    const transType = document.getElementById('trans-type');
-    if (transType && !document.getElementById('trans-id').value) {
-        transType.value = type;
-        transType.dispatchEvent(new Event('change'));
-        syncQuickAddCategories();
-    }
+    syncQuickAddCategories();
 }
 
 function showQuickFeedback(message, isSuccess) {
@@ -6085,6 +6135,28 @@ function initQuickAdd() {
     const dateInput = document.getElementById('qa-date');
     if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().split('T')[0];
 
+    const qaCategory = document.getElementById('qa-category');
+    if (qaCategory) qaCategory.addEventListener('change', updateQuickMvFields);
+
+    const qaAmount = document.getElementById('qa-amount');
+    if (qaAmount) qaAmount.addEventListener('input', updateQuickMvFields);
+
+    const mvAllBtn = document.getElementById('btn-qa-mv-all');
+    if (mvAllBtn) {
+        mvAllBtn.addEventListener('click', () => {
+            const amount = parseFloat(document.getElementById('qa-amount').value);
+            if (isNaN(amount) || amount <= 0) {
+                showQuickFeedback('Indiquez d’abord un montant.');
+                return;
+            }
+            let balance = amount;
+            if (typeof window.calculateMealVoucherData === 'function') {
+                balance = window.calculateMealVoucherData().availableBalance || 0;
+            }
+            document.getElementById('qa-mv-part').value = Math.min(amount, balance).toFixed(2);
+        });
+    }
+
     // Ouvre le formulaire complet, pré-rempli avec la saisie en cours
     const advancedBtn = document.getElementById('btn-qa-advanced');
     if (advancedBtn) {
@@ -6101,6 +6173,8 @@ function initQuickAdd() {
             if (cat) document.getElementById('trans-category').value = cat;
             document.getElementById('trans-note').value = document.getElementById('qa-note').value || '';
             document.getElementById('trans-category').dispatchEvent(new Event('change'));
+            const qaMv = document.getElementById('qa-mv-part');
+            if (qaMv && qaMv.value) document.getElementById('trans-mv-part').value = qaMv.value;
 
             if (window.innerWidth <= 768) {
                 const mobileModal = document.getElementById('mobile-form-modal');
@@ -6142,7 +6216,10 @@ function initQuickAdd() {
         document.getElementById('trans-date').value = date;
         document.getElementById('trans-category').value = category;
         document.getElementById('trans-category').dispatchEvent(new Event('change'));
-        document.getElementById('trans-mv-part').value = '';
+        const mvGroup = document.getElementById('qa-mv-group');
+        const mvPart = document.getElementById('qa-mv-part');
+        document.getElementById('trans-mv-part').value =
+            (mvGroup && mvGroup.style.display !== 'none' && mvPart) ? mvPart.value : '';
         document.getElementById('trans-note').value = note;
         if (type === 'salary') {
             document.getElementById('trans-savings-amount').value = document.getElementById('qa-savings-amount').value || 0;
@@ -6158,6 +6235,7 @@ function initQuickAdd() {
         // Remise à zéro de la saisie rapide
         document.getElementById('qa-amount').value = '';
         document.getElementById('qa-note').value = '';
+        if (mvPart) mvPart.value = '';
         document.getElementById('qa-savings-amount').value = 0;
         document.getElementById('qa-date').value = date;
         setQuickAddType(type);
@@ -6911,6 +6989,7 @@ function renderTrips() {
     renderTripBudget(trip, stats);
     renderTripSettlement(trip, stats);
     renderTripMatrix(trip, stats);
+    syncTripDetailCards();
     renderTripExpenseFilters(trip);
     renderTripExpenseList(trip);
     renderTripCharts(trip, stats);
@@ -7495,9 +7574,20 @@ window.deleteTripExpense = async function(id) {
 
 function syncTripMatrixToggle() {
     const btn = document.getElementById('btn-toggle-trip-matrix');
-    if (!btn) return;
-    btn.textContent = tripMatrixDetailed ? 'Masquer le détail' : 'Afficher le détail';
-    btn.setAttribute('aria-expanded', tripMatrixDetailed ? 'true' : 'false');
+    if (btn) {
+        btn.textContent = tripMatrixDetailed ? 'Masquer le détail' : 'Afficher le détail';
+        btn.setAttribute('aria-expanded', tripMatrixDetailed ? 'true' : 'false');
+    }
+    syncTripDetailCards();
+}
+
+/* Le partage entre participants (équilibrage, payé par participant) n'apparaît
+   qu'en vue détaillée : par défaut on ne montre que les dépenses et catégories. */
+function syncTripDetailCards() {
+    ['trip-settlement-card', 'trip-participant-card'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = tripMatrixDetailed ? '' : 'none';
+    });
 }
 
 /* ---------------------------------------------------------------------
@@ -7689,7 +7779,13 @@ function initTripsModule() {
             try { localStorage.setItem(TRIP_STORAGE_MATRIX, tripMatrixDetailed ? '1' : '0'); } catch (e) { /* ignore */ }
             syncTripMatrixToggle();
             const trip = getCurrentTrip();
-            if (trip) renderTripMatrix(trip, computeTripStats(trip));
+            if (trip) {
+                const stats = computeTripStats(trip);
+                renderTripMatrix(trip, stats);
+                renderTripSettlement(trip, stats);
+                // Les canvas masqués ne se dessinent pas : on redessine à l'affichage.
+                if (tripMatrixDetailed) renderTripCharts(trip, stats);
+            }
         });
     }
 

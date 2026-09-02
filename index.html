@@ -298,6 +298,15 @@
                         <select id="qa-category" required></select>
                     </div>
 
+                    <div class="form-group form-group-accent" id="qa-mv-group" style="display: none;">
+                        <label for="qa-mv-part">Part payée en chèques repas (€)</label>
+                        <input type="number" id="qa-mv-part" step="0.01" min="0" inputmode="decimal" placeholder="0.00">
+                        <div class="qa-mv-actions">
+                            <button type="button" class="btn btn-ghost btn-small" id="btn-qa-mv-all">Tout en chèques repas</button>
+                            <span id="qa-mv-hint" class="form-hint"></span>
+                        </div>
+                    </div>
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="qa-date">Date</label>
@@ -1074,8 +1083,8 @@
             <div class="mini-stats" id="trip-budget-stats"></div>
         </div>
 
-        <!-- Équilibrage entre participants -->
-        <div class="card" id="trip-settlement-card">
+        <!-- Équilibrage entre participants (visible uniquement en vue détaillée) -->
+        <div class="card" id="trip-settlement-card" style="display: none;">
             <div class="card-head"><h3>Équilibrage</h3><span class="muted">Qui doit combien à qui</span></div>
             <div id="trip-balances" class="trip-balances"></div>
             <div id="trip-settlements" class="trip-settlements"></div>
@@ -1086,7 +1095,7 @@
                 <div class="card-head"><h3>Répartition par catégorie</h3></div>
                 <div class="canvas-wrap"><canvas id="tripCategoryChart" width="800" height="320"></canvas></div>
             </div>
-            <div class="card">
+            <div class="card" id="trip-participant-card" style="display: none;">
                 <div class="card-head"><h3>Payé par participant</h3></div>
                 <div class="canvas-wrap"><canvas id="tripParticipantChart" width="800" height="240"></canvas></div>
             </div>

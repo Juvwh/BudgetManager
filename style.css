@@ -2749,3 +2749,14 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
     .trip-filter-bar { flex-direction: column; align-items: stretch; }
     .trip-filter-bar .filter-select { width: 100%; }
 }
+
+/* Saisie rapide — bloc chèques repas */
+.qa-mv-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.4rem;
+}
+
+.qa-mv-actions .form-hint { margin: 0; }
