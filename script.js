@@ -155,7 +155,7 @@ async function loadData() {
             if(parsed.tags) appData.tags = parsed.tags;
             if(parsed.simulations) appData.simulations = parsed.simulations;
             if(parsed.simulationBalance !== undefined) appData.simulationBalance = parsed.simulationBalance;
-            if(parsed.categories) appData.categories = parsed.categories;
+            if(parsed.categories && parsed.categories.length > 0) appData.categories = parsed.categories;
 
             if(parsed.mealVouchersEnabled !== undefined) appData.mealVouchersEnabled = parsed.mealVouchersEnabled;
             if(parsed.mealVoucherEligibleCategories) appData.mealVoucherEligibleCategories = parsed.mealVoucherEligibleCategories;
@@ -172,11 +172,22 @@ async function loadData() {
             if(parsed.tripsSeeded !== undefined) appData.tripsSeeded = parsed.tripsSeeded;
         } else {
             console.log("Aucune donnée Firestore trouvée. Initialisation avec les valeurs par défaut.");
-            await saveData(); // Sauvegarde les valeurs par défaut
+            // On s'assure de ne pas écraser s'il y a un souci réseau passager déguisé en not-found.
+            // On sauvegarde les données locales par défaut (qui contiennent déjà les catégories de base).
+            await saveData();
         }
     } catch (error) {
         console.error("Erreur lors du chargement depuis Firestore :", error);
-        alert("Impossible de charger vos données. Veuillez réessayer plus tard.");
+
+        // Sur iOS Safari (PWA), un échec réseau ou une erreur interne peut survenir.
+        // On affiche un avertissement visuel sur l'écran pour informer l'utilisateur.
+        const warningBanner = document.getElementById('dashboard-warning-banner');
+        if (warningBanner) {
+            warningBanner.innerHTML = "⚠️ <strong>Erreur de synchronisation</strong>: Impossible de charger vos données depuis le serveur. Vérifiez votre connexion. <button onclick='location.reload()' class='btn btn-small' style='margin-left: 10px;'>Réessayer</button>";
+            warningBanner.style.display = 'block';
+        } else {
+            alert("Impossible de charger vos données. Vérifiez votre connexion internet ou réessayez plus tard.");
+        }
     }
 }
 
@@ -2517,12 +2528,18 @@ function updateDashboard() {
 
     const warningBanner = document.getElementById('dashboard-warning-banner');
     if (warningBanner) {
-        const hasCorruptedTrans = appData.transactions.some(t => isNaN(t.amount) || t.amount === null || t.amount === undefined || !t.date);
-        const hasCorruptedSub = appData.subscriptions.some(s => isNaN(s.amount) || s.amount === null || s.amount === undefined || !s.startDate);
-        if (hasCorruptedTrans || hasCorruptedSub) {
-            warningBanner.style.display = 'block';
-        } else {
-            warningBanner.style.display = 'none';
+        // Only hide the banner if it doesn't currently contain a sync error
+        const isSyncError = warningBanner.innerHTML.includes('Erreur de synchronisation');
+        if (!isSyncError) {
+            const hasCorruptedTrans = appData.transactions.some(t => isNaN(t.amount) || t.amount === null || t.amount === undefined || !t.date);
+            const hasCorruptedSub = appData.subscriptions.some(s => isNaN(s.amount) || s.amount === null || s.amount === undefined || !s.startDate);
+
+            if (hasCorruptedTrans || hasCorruptedSub) {
+                warningBanner.innerHTML = '⚠️ Certaines données (transactions ou abonnements) sont corrompues (NaN). Veuillez vérifier l\'historique.';
+                warningBanner.style.display = 'block';
+            } else {
+                warningBanner.style.display = 'none';
+            }
         }
     }
 
@@ -3762,7 +3779,10 @@ document.addEventListener('DOMContentLoaded', () => {
                  } catch (createError) {
                      console.error("Erreur de création de compte", createError);
                      errP.style.display = 'block';
-                     if (createError.code === 'auth/weak-password') {
+                     if (createError.code === 'auth/email-already-in-use') {
+                         // L'utilisateur existe déjà, donc l'erreur invalid-credential signifiait "Mauvais mot de passe"
+                         errP.textContent = "Mot de passe incorrect.";
+                     } else if (createError.code === 'auth/weak-password') {
                          errP.textContent = "Le mot de passe doit faire au moins 6 caractères.";
                      } else if(createError.code === 'auth/operation-not-allowed') {
                          errP.textContent = "L'authentification Email/Mot de passe n'est pas activée sur Firebase.";

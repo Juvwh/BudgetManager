@@ -20,6 +20,6 @@
   "homepage": "https://github.com/Juvwh/BudgetManager#readme",
   "dependencies": {
     "@playwright/test": "^1.61.1",
-    "playwright": "^1.61.1"
+    "playwright": "^1.63.0"
   }
 }
