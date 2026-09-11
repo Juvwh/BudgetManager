@@ -2188,8 +2188,35 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
     h2 { font-size: 1.3rem; }
 
     .page-head { align-items: flex-start; margin-bottom: 0.9rem; }
-    .page-head-actions { width: 100%; }
-    .field-inline { flex: 1; justify-content: space-between; }
+    .page-head-text { min-width: 0; max-width: 100%; }
+    .page-head-actions { width: 100%; max-width: 100%; }
+
+    /* Les pilules de filtre occupent toute la largeur et ne debordent plus :
+       min-width:0 sur le champ evite qu'un <input type="month"> impose sa
+       largeur intrinseque (plus large que l'ecran). */
+    .field-inline {
+        flex: 1 1 100%;
+        min-width: 0;
+        max-width: 100%;
+        justify-content: space-between;
+    }
+
+    /* On garde l'apparence "pilule" : le champ reste transparent et compact,
+       sans le fond/bordure/padding des champs de formulaire classiques. */
+    .field-inline select,
+    .field-inline input,
+    .field-inline input[type="month"],
+    .field-inline input[type="date"] {
+        flex: 1 1 auto;
+        min-width: 0;
+        width: auto;
+        text-align: right;
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        padding: 0.15rem 0.2rem;
+        font-size: 16px;
+    }
 
     .subnav { width: 100%; justify-content: flex-start; }
     .subnav-link { flex: 1; text-align: center; }
@@ -2202,14 +2229,70 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
     /* Le montant s'adapte a la largeur pour ne jamais etre tronque */
     .dash-grid .stat-card p { font-size: clamp(0.8rem, 3.7vw, 1.15rem); }
     .dash-grid .summary-cards-hero .stat-card p { font-size: clamp(0.95rem, 4.6vw, 1.5rem); }
-    .dash-grid .summary-cards-hero .stat-head h3 { font-size: 0.72rem; }
+    .dash-grid .summary-cards-hero .stat-head h3 { font-size: clamp(0.62rem, 2.95vw, 0.72rem); }
     .dash-grid .summary-cards-hero .card { padding: 0.85rem 0.6rem; }
+    /* Les 3 cartes ont la meme hauteur : on colle les montants en bas pour
+       qu'ils restent alignes meme si un titre passe sur deux lignes. */
+    .dash-grid .summary-cards-hero .card { display: flex; flex-direction: column; }
+    .dash-grid .summary-cards-hero .stat-card p { margin-top: auto; }
     .stat-head { gap: 0.4rem; margin-bottom: 0.35rem; }
     .dash-grid .stat-head h3 { font-size: 0.66rem; letter-spacing: 0.02em; }
     .dash-grid .stat-icon { display: none; }
     .stat-delta { font-size: 0.74rem; }
 
     .dash-side { grid-template-columns: 1fr; }
+
+    /* --- Objectif de depense : sur mobile, les etiquettes flottantes
+       (positionnees en absolu par le JS) debordaient de la carte.
+       On repasse tout en flux : barre pleine largeur, puis la depense a
+       gauche et la limite a droite. --- */
+    .goal-wrap {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 0.5rem 0.6rem;
+        height: auto;
+        margin: 0.6rem 0 0;
+    }
+
+    .goal-wrap .progress-track {
+        position: relative !important;
+        flex: 1 1 100%;
+        width: 100% !important;
+    }
+
+    #goal-progress-bar {
+        position: absolute !important;
+        top: 0;
+        left: 0;
+    }
+
+    #progress-current-marker,
+    #progress-limit-marker,
+    #progress-remaining-text { display: none !important; }
+
+    #progress-current-text,
+    #progress-limit-text {
+        position: static !important;
+        left: auto !important;
+        top: auto !important;
+        transform: none !important;
+        padding: 0 !important;
+        background: transparent !important;
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
+
+    #progress-current-text {
+        display: flex;
+        align-items: baseline;
+        gap: 0.4rem;
+        text-align: left !important;
+    }
+
+    #progress-current-text br { display: none; }
+
+    #progress-limit-text { margin-left: auto; }
 
     /* Ordre de lecture sur mobile : indicateurs d'abord, puis saisie */
     .dash-grid { display: flex; flex-direction: column; gap: 1.1rem; }
