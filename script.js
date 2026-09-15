@@ -1168,13 +1168,97 @@ function getSpecificMonthsCategoryData(monthPrefixes) {
     return categoryTotals;
 }
 
+/* =========================================================================
+   NAVIGATION PAR MOIS & PERIODES
+   ========================================================================= */
+
+/** Decale un champ <input type="month"> de `step` mois (negatif = precedent). */
+function shiftMonthInput(input, step) {
+    if (!input) return;
+    let year, month;
+    const parts = String(input.value || '').split('-');
+    if (parts.length === 2 && parts[0] && parts[1]) {
+        year = parseInt(parts[0], 10);
+        month = parseInt(parts[1], 10);
+    }
+    if (!Number.isFinite(year) || !Number.isFinite(month)) {
+        const now = new Date();
+        year = now.getFullYear();
+        month = now.getMonth() + 1;
+    }
+    // Index 0-based : Date gere seul les passages d'annee.
+    const shifted = new Date(year, month - 1 + step, 1);
+    input.value = shifted.getFullYear() + '-' + String(shifted.getMonth() + 1).padStart(2, '0');
+    // On previent les listeners existants (tableau de bord, filtres...).
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/**
+ * Active les fleches precedent/suivant placees autour des selecteurs de mois.
+ * Le champ <input type="month"> reste utilisable normalement (calendrier).
+ */
+function initMonthNavigation() {
+    document.querySelectorAll('[data-month-nav]').forEach(btn => {
+        if (btn.dataset.monthNavBound === '1') return;
+        btn.dataset.monthNavBound = '1';
+        btn.addEventListener('click', () => {
+            const input = document.getElementById(btn.dataset.monthNav);
+            const step = parseInt(btn.dataset.monthStep, 10) || 0;
+            shiftMonthInput(input, step);
+        });
+    });
+}
+
+/**
+ * Etendue "All Time" : du mois de la premiere transaction au mois le plus
+ * recent (derniere transaction, ou mois selectionne s'il est posterieur).
+ * Retourne l'ancre de fin et le nombre de mois a remonter depuis celle-ci.
+ */
+function getAllTimeMonthSpan(fallbackYear, fallbackMonth) {
+    const selected = fallbackYear + '-' + String(fallbackMonth).padStart(2, '0');
+    let min = null;
+    let max = selected;
+    (appData.transactions || []).forEach(t => {
+        if (!t.date || typeof t.date !== 'string' || t.date.length < 7) return;
+        const prefix = t.date.substring(0, 7);
+        if (min === null || prefix < min) min = prefix;
+        if (prefix > max) max = prefix;
+    });
+    if (min === null) return { year: fallbackYear, month: fallbackMonth, months: 1 };
+
+    const minParts = min.split('-').map(Number);
+    const maxParts = max.split('-').map(Number);
+    const months = (maxParts[0] - minParts[0]) * 12 + (maxParts[1] - minParts[1]) + 1;
+    return { year: maxParts[0], month: maxParts[1], months: Math.max(1, months) };
+}
+
+/**
+ * Traduit la valeur d'un <select> de periode en fenetre de mois exploitable.
+ * "all" couvre tout l'historique ; sinon c'est un nombre de mois remontes
+ * depuis le mois affiche.
+ */
+function resolvePeriodSelection(value, year, month, fallbackMonths) {
+    if (value === 'all') {
+        const span = getAllTimeMonthSpan(year, month);
+        return { year: span.year, month: span.month, months: span.months, isAllTime: true };
+    }
+    const parsed = parseInt(value, 10);
+    return {
+        year: year,
+        month: month,
+        months: (Number.isFinite(parsed) && parsed > 0) ? parsed : fallbackMonths,
+        isAllTime: false
+    };
+}
+
 function getMultiMonthCategoryData(startYear, startMonth, numberOfMonths) {
     // Generate valid YYYY-MM prefixes for the requested period
     const validPrefixes = [];
     for (let i = 0; i < numberOfMonths; i++) {
         let m = startMonth - i;
         let y = startYear;
-        if (m <= 0) {
+        // `while` (et non `if`) : une periode peut remonter plusieurs annees.
+        while (m <= 0) {
             m += 12;
             y -= 1;
         }
@@ -1312,7 +1396,6 @@ function showCategoryDetails(categoryName, totalAmount, options = {}) {
     if (isChartsView) {
         // Chart view logic: use dash-filter-month and chart-period-select (months backwards)
         const periodSelect = document.getElementById('chart-period-select');
-        let months = periodSelect ? parseInt(periodSelect.value, 10) : 1;
         const dashMonthFilter = document.getElementById('dash-filter-month').value;
         let year, month;
         if (dashMonthFilter) {
@@ -1324,10 +1407,15 @@ function showCategoryDetails(categoryName, totalAmount, options = {}) {
             year = now.getFullYear();
             month = now.getMonth() + 1;
         }
+        const period = resolvePeriodSelection(periodSelect ? periodSelect.value : '1', year, month, 1);
+        const months = period.months;
+        year = period.year;
+        month = period.month;
         for (let i = 0; i < months; i++) {
             let m = month - i;
             let y = year;
-            if (m <= 0) {
+            // `while` (et non `if`) : une periode peut remonter plusieurs annees.
+            while (m <= 0) {
                 m += 12;
                 y -= 1;
             }
@@ -2766,8 +2854,8 @@ const MONTH_ABBR_FR = ['Jan', 'Fev', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aou',
 // Depenses de la periode selectionnee dans le bloc "Zoom sur les depenses"
 function getExtraChartExpenses(year, month) {
     const select = document.getElementById('extra-chart-period');
-    const months = select ? parseInt(select.value, 10) : 6;
-    const prefixes = new Set(getRecentMonths(year, month, months).map(m => m.prefix));
+    const period = resolvePeriodSelection(select ? select.value : '6', year, month, 6);
+    const prefixes = new Set(getRecentMonths(period.year, period.month, period.months).map(m => m.prefix));
     return getEffectiveTransactions().filter(t =>
         t.type === 'expense' && t.date && prefixes.has(t.date.substring(0, 7))
     );
@@ -2965,13 +3053,15 @@ function updateHorizontalBarChart(year, month) {
     const periodSelect = document.getElementById('chart-period-select');
     if (!periodSelect) return;
 
-    const months = parseInt(periodSelect.value, 10);
-    const multiMonthData = getMultiMonthCategoryData(year, month, months);
+    const period = resolvePeriodSelection(periodSelect.value, year, month, 1);
+    const months = period.months;
+    const multiMonthData = getMultiMonthCategoryData(period.year, period.month, months);
     drawHorizontalBarChart('horizontalBarChartCategory', multiMonthData);
 
     const title = document.getElementById('horizontalBarChartTitle');
     if (title) {
-        if (months === 1) title.textContent = "Dépenses par catégorie (Ce mois)";
+        if (period.isAllTime) title.textContent = "Dépenses par catégorie (Tout l'historique)";
+        else if (months === 1) title.textContent = "Dépenses par catégorie (Ce mois)";
         else if (months === 12) title.textContent = "Dépenses par catégorie (Cette année)";
         else title.textContent = `Dépenses par catégorie (${months} derniers mois)`;
     }
@@ -3888,6 +3978,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.getElementById('dash-filter-month').addEventListener('change', updateDashboard);
+
+    // Fleches < > autour des selecteurs de mois (le calendrier reste utilisable)
+    initMonthNavigation();
 
     // Period select listener for horizontal chart
     document.getElementById('chart-period-select').addEventListener('change', () => {

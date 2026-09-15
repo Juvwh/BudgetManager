@@ -309,6 +309,71 @@ main#app-content {
     outline: none;
 }
 
+/* ---- Navigation mois par mois (fleches + selecteur calendrier) ----
+   Les fleches encadrent un <input type="month"> qui reste pleinement
+   utilisable : un clic dessus ouvre toujours le calendrier mois/annee. */
+.month-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.month-nav-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.month-nav-btn svg {
+    width: 15px;
+    height: 15px;
+}
+
+.month-nav-btn:hover {
+    background: var(--accent-soft);
+    color: var(--accent-color);
+}
+
+.month-nav-btn:active {
+    transform: scale(0.92);
+}
+
+.month-nav-btn:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 1px;
+}
+
+/* Variante pour la barre de filtres, ou le champ est encadre. */
+.month-nav-boxed {
+    gap: 0.3rem;
+}
+
+.month-nav-boxed .month-nav-btn {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--r-sm);
+    background: var(--input-bg);
+    color: var(--text-muted);
+}
+
+.month-nav-boxed .month-nav-btn:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
 /* ---- Sous-navigation par onglet ---- */
 .subnav {
     display: flex;
@@ -2203,6 +2268,20 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
 
     /* On garde l'apparence "pilule" : le champ reste transparent et compact,
        sans le fond/bordure/padding des champs de formulaire classiques. */
+    /* La pilule occupe toute la largeur : les fleches restent aux extremites
+       et le champ mois s'etire entre les deux. */
+    .field-inline .month-nav {
+        flex: 1 1 auto;
+        min-width: 0;
+        justify-content: flex-end;
+    }
+
+    /* Le champ ne s'etire pas : les fleches restent collees au mois affiche. */
+    .field-inline .month-nav input[type="month"] {
+        flex: 0 1 auto;
+        text-align: center;
+    }
+
     .field-inline select,
     .field-inline input,
     .field-inline input[type="month"],
@@ -2486,6 +2565,7 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
     #transactions .split-layout { max-width: none; }
 
     .filter-bar { gap: 0.4rem; }
+    .filter-bar .month-nav { flex: 1 1 100%; min-width: 0; }
     .filter-bar input[type="month"] { flex: 1; max-width: none; font-size: 16px; }
     .search-field { flex: 1 1 100%; max-width: none; }
     .search-field input[type="search"] { font-size: 16px; }
