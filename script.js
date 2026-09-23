@@ -1169,6 +1169,173 @@ function getSpecificMonthsCategoryData(monthPrefixes) {
 }
 
 /* =========================================================================
+   ANALYSE IA : EXPORT DE DONNEES STRUCTUREES + PROMPT
+   ========================================================================= */
+
+/** Construit un objet JSON structuré et pertinent pour une analyse par une IA externe. */
+function buildAiAnalysisExport() {
+    const effectiveTrans = getEffectiveTransactions();
+
+    // 1. Determine the range of months covered by real data
+    const monthKeys = new Set();
+    effectiveTrans.forEach(t => {
+        if (t.date && t.date.length >= 7) monthKeys.add(t.date.slice(0, 7));
+    });
+    const sortedMonthKeys = Array.from(monthKeys).sort();
+
+    // 2. Monthly breakdown (income, expenses, savings, balance, per-category)
+    const monthlyBreakdown = sortedMonthKeys.map(key => {
+        const [year, month] = key.split('-').map(Number);
+        const data = getMonthData(year, month);
+        return {
+            month: key,
+            revenus: parseFloat(data.income.toFixed(2)),
+            depenses: parseFloat(data.expense.toFixed(2)),
+            epargneDeclaree: parseFloat(data.savings.toFixed(2)),
+            solde: parseFloat(data.balance.toFixed(2)),
+            versementsInvestissement: parseFloat(data.investmentTransfers.toFixed(2)),
+            depensesParCategorie: Object.fromEntries(
+                Object.entries(data.categoryExpenses).map(([k, v]) => [k, parseFloat(v.toFixed(2))])
+            )
+        };
+    });
+
+    // 3. Aggregated totals per category (full hierarchical path), all-time
+    const categoryTotalsDetailed = {};
+    effectiveTrans.forEach(t => {
+        if (t.type !== 'expense') return;
+        let amount = t.amount;
+        if (t.mealVoucherPart > 0) amount -= t.mealVoucherPart;
+        const path = getCategoryPath(t.categoryId);
+        categoryTotalsDetailed[path] = (categoryTotalsDetailed[path] || 0) + amount;
+    });
+    const categoryBreakdownDetailed = Object.entries(categoryTotalsDetailed)
+        .map(([categorie, total]) => ({ categorie, total: parseFloat(total.toFixed(2)) }))
+        .sort((a, b) => b.total - a.total);
+
+    // 4. Recurring commitments (subscriptions)
+    const recurringCommitments = (appData.subscriptions || []).map(sub => {
+        let monthlyEquivalent = sub.amount;
+        if (sub.frequency === 'weekly') monthlyEquivalent = sub.amount * 52 / 12;
+        else if (sub.frequency === 'yearly') monthlyEquivalent = sub.amount / 12;
+        return {
+            nom: sub.name,
+            type: sub.type,
+            categorie: getCategoryPath(sub.categoryId),
+            montant: parseFloat(sub.amount.toFixed(2)),
+            frequence: sub.frequency,
+            equivalentMensuel: parseFloat(monthlyEquivalent.toFixed(2)),
+            statut: sub.status || 'active',
+            dateDebut: sub.startDate || null,
+            dateFin: sub.endDate || null
+        };
+    });
+
+    // 5. Overall stats / averages
+    const nbMonths = monthlyBreakdown.length;
+    const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+    const totalRevenus = sum(monthlyBreakdown.map(m => m.revenus));
+    const totalDepenses = sum(monthlyBreakdown.map(m => m.depenses));
+    const totalEpargne = sum(monthlyBreakdown.map(m => m.epargneDeclaree));
+    const avgRevenus = nbMonths ? totalRevenus / nbMonths : 0;
+    const avgDepenses = nbMonths ? totalDepenses / nbMonths : 0;
+    const avgSolde = nbMonths ? (totalRevenus - totalDepenses) / nbMonths : 0;
+    const avgEpargne = nbMonths ? totalEpargne / nbMonths : 0;
+
+    let bestMonth = null, worstMonth = null;
+    monthlyBreakdown.forEach(m => {
+        if (!bestMonth || m.solde > bestMonth.solde) bestMonth = m;
+        if (!worstMonth || m.solde < worstMonth.solde) worstMonth = m;
+    });
+
+    // 6. Savings / investments
+    let investments = null;
+    if (appData.investmentsEnabled && appData.investments && appData.investments.length > 0) {
+        investments = appData.investments.map(inv => {
+            const invested = getInvestedAmount(inv.id);
+            let currentValue = invested;
+            if (inv.status === 'closed') {
+                currentValue = 0;
+            } else if (inv.valueHistory && inv.valueHistory.length > 0) {
+                const sortedHistory = [...inv.valueHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
+                currentValue = sortedHistory[0].value;
+            }
+            return {
+                nom: inv.name,
+                type: inv.type,
+                statut: inv.status,
+                montantInvesti: parseFloat(invested.toFixed(2)),
+                valeurActuelle: parseFloat(currentValue.toFixed(2)),
+                performance: parseFloat((currentValue - invested).toFixed(2))
+            };
+        });
+    }
+
+    // 7. Meal vouchers (titres-restaurant)
+    let mealVouchers = null;
+    if (appData.mealVouchersEnabled) {
+        const totalCredits = sum((appData.mealVoucherCredits || []).map(c => c.amount || 0));
+        const totalSpent = sum(effectiveTrans.filter(t => t.mealVoucherPart > 0).map(t => t.mealVoucherPart));
+        mealVouchers = {
+            montantMensuelHabituel: appData.mealVoucherExpectedMonthlyAmount || 0,
+            totalCreditsRecus: parseFloat(totalCredits.toFixed(2)),
+            totalDepenseParChequesRepas: parseFloat(totalSpent.toFixed(2))
+        };
+    }
+
+    return {
+        genere_le: new Date().toISOString(),
+        devise: 'EUR',
+        periodeCouverte: {
+            premierMois: sortedMonthKeys[0] || null,
+            dernierMois: sortedMonthKeys[sortedMonthKeys.length - 1] || null,
+            nombreDeMois: nbMonths
+        },
+        objectifsBudget: {
+            objectifDepenseParDefaut: appData.spendingGoal,
+            objectifsParMois: appData.monthlyGoals || {}
+        },
+        resume: {
+            totalRevenus: parseFloat(totalRevenus.toFixed(2)),
+            totalDepenses: parseFloat(totalDepenses.toFixed(2)),
+            totalEpargneDeclaree: parseFloat(totalEpargne.toFixed(2)),
+            moyenneMensuelleRevenus: parseFloat(avgRevenus.toFixed(2)),
+            moyenneMensuelleDepenses: parseFloat(avgDepenses.toFixed(2)),
+            moyenneMensuelleSolde: parseFloat(avgSolde.toFixed(2)),
+            moyenneMensuelleEpargne: parseFloat(avgEpargne.toFixed(2)),
+            meilleurMois: bestMonth ? { mois: bestMonth.month, solde: bestMonth.solde } : null,
+            piresMois: worstMonth ? { mois: worstMonth.month, solde: worstMonth.solde } : null
+        },
+        evolutionMensuelle: monthlyBreakdown,
+        repartitionParCategorie: categoryBreakdownDetailed,
+        chargesRecurrentes: recurringCommitments,
+        investissements: investments,
+        chequesRepas: mealVouchers
+    };
+}
+
+/** Construit le prompt à copier-coller, à utiliser avec le fichier JSON exporté. */
+function buildAiAnalysisPrompt(fileName) {
+    return `Tu es un conseiller budgétaire personnel expérimenté et pédagogue. Je te transmets en pièce jointe un export structuré (JSON, fichier "${fileName}") de mes finances personnelles, généré par mon application de gestion de budget. Il contient : mon historique mensuel (revenus, dépenses, épargne, solde), la répartition de mes dépenses par catégorie et sous-catégorie, mes charges récurrentes (abonnements), mes objectifs de dépense actuels, ainsi que (si présents) mes données d'investissements et de titres-repas.
+
+Analyse ces données en détail et réponds de façon chiffrée et argumentée aux questions suivantes, en te basant uniquement sur les chiffres fournis :
+
+1. Tendance générale : suis-je globalement en positif ou en négatif sur la période couverte ? L'évolution mois par mois s'améliore-t-elle, se dégrade-t-elle, ou stagne-t-elle ?
+2. Points de vigilance : quelles dépenses ou catégories doivent particulièrement attirer mon attention (postes en hausse, dépenses disproportionnées par rapport à mes revenus, charges récurrentes trop lourdes, etc.) ?
+3. Limites de dépenses mensuelles recommandées : quelle limite haute et quelle limite basse de dépenses totales par mois me recommandes-tu, compte tenu de mes revenus réels et de la variabilité observée ?
+4. Salaire minimal viable : avec mon mode de vie actuel (ou un mode de vie ajusté raisonnablement), quel serait le salaire mensuel net minimal avec lequel je pourrais m'en sortir sans stress financier ?
+5. Objectif d'épargne mensuel : combien devrais-je essayer d'épargner chaque mois, en euros et en pourcentage de mes revenus ?
+6. Budget idéal par catégorie : propose-moi une répartition budgétaire idéale (en euros et en %) pour chacune de mes catégories et sous-catégories principales, en t'appuyant sur des repères reconnus (ex: règle 50/30/20) tout en respectant mes habitudes réelles.
+7. Loyer / logement maximal recommandé : en fonction de mes revenus et de mes autres charges fixes, quel devrait être le montant maximal raisonnable pour mon loyer ou mes charges de logement ?
+8. Charges récurrentes : mes abonnements et charges récurrentes actuels sont-ils raisonnables par rapport à mes revenus ? Y a-t-il des doublons, ou des abonnements à envisager de résilier ?
+9. Plan d'action concret : donne-moi 3 à 5 actions concrètes et priorisées à mettre en place dès ce mois-ci pour améliorer ma situation financière.
+
+Présente ta réponse de façon structurée avec des sections claires et des chiffres précis tirés des données fournies. Évite les généralités qui ne s'appliquent pas à mon cas. Si certaines données te semblent manquantes ou insuffisantes pour répondre précisément à une question, signale-le plutôt que de supposer.
+
+Réponds impérativement en français.`;
+}
+
+/* =========================================================================
    NAVIGATION PAR MOIS & PERIODES
    ========================================================================= */
 
@@ -5185,6 +5352,63 @@ window.updateNavigationVisibility = function() {
             location.reload();
         }
     });
+
+    // 9. Settings - Analyse IA
+    const btnAiAnalysis = document.getElementById('btn-ai-analysis');
+    if (btnAiAnalysis) {
+        btnAiAnalysis.addEventListener('click', () => {
+            const dateStr = new Date().toISOString().split('T')[0];
+            const fileName = `budget_analyse_IA_${dateStr}.json`;
+            const promptTextarea = document.getElementById('ai-analysis-prompt');
+            if (promptTextarea) promptTextarea.value = buildAiAnalysisPrompt(fileName);
+            document.getElementById('ai-analysis-modal-overlay').classList.add('active');
+        });
+    }
+
+    const btnCloseAiAnalysis = document.getElementById('btn-close-ai-analysis-modal');
+    if (btnCloseAiAnalysis) {
+        btnCloseAiAnalysis.addEventListener('click', () => {
+            document.getElementById('ai-analysis-modal-overlay').classList.remove('active');
+        });
+    }
+
+    const btnAiDownloadData = document.getElementById('btn-ai-download-data');
+    if (btnAiDownloadData) {
+        btnAiDownloadData.addEventListener('click', () => {
+            const exportData = buildAiAnalysisExport();
+            const dateStr = new Date().toISOString().split('T')[0];
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", `budget_analyse_IA_${dateStr}.json`);
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        });
+    }
+
+    const btnAiCopyPrompt = document.getElementById('btn-ai-copy-prompt');
+    if (btnAiCopyPrompt) {
+        btnAiCopyPrompt.addEventListener('click', async () => {
+            const promptTextarea = document.getElementById('ai-analysis-prompt');
+            if (!promptTextarea) return;
+            const text = promptTextarea.value;
+            const originalLabel = btnAiCopyPrompt.textContent;
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(text);
+                } else {
+                    promptTextarea.select();
+                    document.execCommand('copy');
+                }
+                btnAiCopyPrompt.textContent = 'Copié !';
+            } catch (error) {
+                promptTextarea.select();
+                btnAiCopyPrompt.textContent = 'Sélectionnez et copiez (Ctrl+C)';
+            }
+            setTimeout(() => { btnAiCopyPrompt.textContent = originalLabel; }, 2000);
+        });
+    }
 });
 
 // --- MODAL GENERIQUE ---

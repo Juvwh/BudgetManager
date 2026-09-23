@@ -1278,6 +1278,14 @@
                 <button id="btn-reset" class="btn btn-danger">Effacer toutes les données</button>
             </div>
         </div>
+
+        <div class="card">
+            <div class="card-head"><h3>Analyse IA de mon budget</h3></div>
+            <p class="muted">Générez un fichier de données structuré et un prompt prêt à coller dans votre IA préférée (Claude, ChatGPT, ...) pour obtenir une vraie analyse personnalisée de vos finances.</p>
+            <div class="settings-actions">
+                <button id="btn-ai-analysis" class="btn btn-primary">Préparer l'analyse IA</button>
+            </div>
+        </div>
     </div>
 </section>
 
@@ -1584,6 +1592,30 @@
         </div>
         <div class="modal-foot">
             <button id="btn-save-mv-reconciliation" class="btn btn-primary">Enregistrer les parts ajoutées</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modale Analyse IA -->
+<div id="ai-analysis-modal-overlay" class="login-overlay">
+    <div class="login-card card modal-lg modal-tall">
+        <div class="modal-head">
+            <h2>Analyse IA de mon budget</h2>
+            <button id="btn-close-ai-analysis-modal" class="btn btn-ghost btn-icon-round" aria-label="Fermer">&times;</button>
+        </div>
+        <p class="muted">Deux étapes : téléchargez le fichier de données, puis copiez le prompt et collez les deux (texte + fichier joint) dans votre IA préférée.</p>
+
+        <div class="ai-analysis-step">
+            <h3>1. Fichier de données</h3>
+            <p class="muted">Export structuré (JSON) de vos revenus, dépenses, catégories, abonnements et objectifs.</p>
+            <button id="btn-ai-download-data" class="btn btn-secondary">Télécharger le fichier de données</button>
+        </div>
+
+        <div class="ai-analysis-step">
+            <h3>2. Prompt d'analyse</h3>
+            <p class="muted">À coller dans votre IA, avec le fichier ci-dessus en pièce jointe.</p>
+            <textarea id="ai-analysis-prompt" class="ai-prompt-textarea" rows="14" readonly></textarea>
+            <button id="btn-ai-copy-prompt" class="btn btn-primary">Copier le prompt</button>
         </div>
     </div>
 </div>
