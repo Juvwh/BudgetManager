@@ -1184,14 +1184,21 @@ function buildAiAnalysisExport() {
     const sortedMonthKeys = Array.from(monthKeys).sort();
 
     // 2. Monthly breakdown (income, expenses, savings, balance, per-category)
+    // IMPORTANT : une partie du salaire peut être mise de côté automatiquement sur un
+    // compte épargne dès sa réception (avant même d'être "disponible" pour le budget).
+    // On distingue donc explicitement : le revenu total encaissé, la part mise de côté
+    // automatiquement, et le revenu réellement disponible pour vivre / faire le budget.
     const monthlyBreakdown = sortedMonthKeys.map(key => {
         const [year, month] = key.split('-').map(Number);
         const data = getMonthData(year, month);
+        const revenuDisponible = parseFloat(data.income.toFixed(2));
+        const epargneAutomatiqueALaReception = parseFloat(data.savings.toFixed(2));
         return {
             month: key,
-            revenus: parseFloat(data.income.toFixed(2)),
+            revenuTotalEncaisse: parseFloat((revenuDisponible + epargneAutomatiqueALaReception).toFixed(2)),
+            epargneAutomatiqueALaReception,
+            revenuDisponiblePourBudget: revenuDisponible,
             depenses: parseFloat(data.expense.toFixed(2)),
-            epargneDeclaree: parseFloat(data.savings.toFixed(2)),
             solde: parseFloat(data.balance.toFixed(2)),
             versementsInvestissement: parseFloat(data.investmentTransfers.toFixed(2)),
             depensesParCategorie: Object.fromEntries(
@@ -1234,13 +1241,15 @@ function buildAiAnalysisExport() {
     // 5. Overall stats / averages
     const nbMonths = monthlyBreakdown.length;
     const sum = (arr) => arr.reduce((a, b) => a + b, 0);
-    const totalRevenus = sum(monthlyBreakdown.map(m => m.revenus));
+    const totalRevenuEncaisse = sum(monthlyBreakdown.map(m => m.revenuTotalEncaisse));
+    const totalRevenuDisponible = sum(monthlyBreakdown.map(m => m.revenuDisponiblePourBudget));
     const totalDepenses = sum(monthlyBreakdown.map(m => m.depenses));
-    const totalEpargne = sum(monthlyBreakdown.map(m => m.epargneDeclaree));
-    const avgRevenus = nbMonths ? totalRevenus / nbMonths : 0;
+    const totalEpargneAutomatique = sum(monthlyBreakdown.map(m => m.epargneAutomatiqueALaReception));
+    const avgRevenuEncaisse = nbMonths ? totalRevenuEncaisse / nbMonths : 0;
+    const avgRevenuDisponible = nbMonths ? totalRevenuDisponible / nbMonths : 0;
     const avgDepenses = nbMonths ? totalDepenses / nbMonths : 0;
-    const avgSolde = nbMonths ? (totalRevenus - totalDepenses) / nbMonths : 0;
-    const avgEpargne = nbMonths ? totalEpargne / nbMonths : 0;
+    const avgSolde = nbMonths ? (totalRevenuDisponible - totalDepenses) / nbMonths : 0;
+    const avgEpargneAutomatique = nbMonths ? totalEpargneAutomatique / nbMonths : 0;
 
     let bestMonth = null, worstMonth = null;
     monthlyBreakdown.forEach(m => {
@@ -1295,14 +1304,22 @@ function buildAiAnalysisExport() {
             objectifDepenseParDefaut: appData.spendingGoal,
             objectifsParMois: appData.monthlyGoals || {}
         },
+        notesMethodologiques: [
+            "Une partie du salaire peut être mise de côté AUTOMATIQUEMENT sur un compte épargne dès sa réception, avant toute dépense. Ce n'est PAS une décision d'épargne mensuelle discrétionnaire : c'est déjà retiré du budget courant.",
+            "Pour chaque mois dans 'evolutionMensuelle' : revenuTotalEncaisse = tout l'argent réellement perçu (salaires + autres revenus). epargneAutomatiqueALaReception = la part de ce revenu transférée automatiquement vers l'épargne dès réception. revenuDisponiblePourBudget = revenuTotalEncaisse - epargneAutomatiqueALaReception, c'est-à-dire ce qui reste réellement pour vivre et couvrir les dépenses courantes.",
+            "'depenses' et 'solde' sont calculés par rapport à revenuDisponiblePourBudget (donc après mise de côté automatique), pas par rapport à revenuTotalEncaisse.",
+            "Quand tu recommandes un montant d'épargne mensuel, précise s'il s'ajoute à l'épargne automatique déjà existante (epargneAutomatiqueALaReception) ou s'il la remplace/l'ajuste."
+        ],
         resume: {
-            totalRevenus: parseFloat(totalRevenus.toFixed(2)),
+            totalRevenuEncaisse: parseFloat(totalRevenuEncaisse.toFixed(2)),
+            totalRevenuDisponiblePourBudget: parseFloat(totalRevenuDisponible.toFixed(2)),
             totalDepenses: parseFloat(totalDepenses.toFixed(2)),
-            totalEpargneDeclaree: parseFloat(totalEpargne.toFixed(2)),
-            moyenneMensuelleRevenus: parseFloat(avgRevenus.toFixed(2)),
+            totalEpargneAutomatique: parseFloat(totalEpargneAutomatique.toFixed(2)),
+            moyenneMensuelleRevenuEncaisse: parseFloat(avgRevenuEncaisse.toFixed(2)),
+            moyenneMensuelleRevenuDisponible: parseFloat(avgRevenuDisponible.toFixed(2)),
             moyenneMensuelleDepenses: parseFloat(avgDepenses.toFixed(2)),
             moyenneMensuelleSolde: parseFloat(avgSolde.toFixed(2)),
-            moyenneMensuelleEpargne: parseFloat(avgEpargne.toFixed(2)),
+            moyenneMensuelleEpargneAutomatique: parseFloat(avgEpargneAutomatique.toFixed(2)),
             meilleurMois: bestMonth ? { mois: bestMonth.month, solde: bestMonth.solde } : null,
             piresMois: worstMonth ? { mois: worstMonth.month, solde: worstMonth.solde } : null
         },
@@ -1316,18 +1333,20 @@ function buildAiAnalysisExport() {
 
 /** Construit le prompt à copier-coller, à utiliser avec le fichier JSON exporté. */
 function buildAiAnalysisPrompt(fileName) {
-    return `Tu es un conseiller budgétaire personnel expérimenté et pédagogue. Je te transmets en pièce jointe un export structuré (JSON, fichier "${fileName}") de mes finances personnelles, généré par mon application de gestion de budget. Il contient : mon historique mensuel (revenus, dépenses, épargne, solde), la répartition de mes dépenses par catégorie et sous-catégorie, mes charges récurrentes (abonnements), mes objectifs de dépense actuels, ainsi que (si présents) mes données d'investissements et de titres-repas.
+    return `Tu es un conseiller budgétaire personnel expérimenté et pédagogue. Je te transmets en pièce jointe un export structuré (JSON, fichier "${fileName}") de mes finances personnelles, généré par mon application de gestion de budget. Il contient : mon historique mensuel (revenus, dépenses, épargne automatique, solde), la répartition de mes dépenses par catégorie et sous-catégorie, mes charges récurrentes (abonnements), mes objectifs de dépense actuels, ainsi que (si présents) mes données d'investissements et de titres-repas.
+
+POINT IMPORTANT À BIEN COMPRENDRE AVANT D'ANALYSER : une partie de mon salaire est mise de côté AUTOMATIQUEMENT sur un compte épargne dès sa réception, avant même que je ne fasse quoi que ce soit avec le reste. Ce n'est pas un choix mensuel que je fais après coup, c'est déjà retiré à la source. Dans le fichier JSON, pour chaque mois : "revenuTotalEncaisse" est l'argent total réellement perçu, "epargneAutomatiqueALaReception" est la part transférée automatiquement vers l'épargne dès réception, et "revenuDisponiblePourBudget" (= revenuTotalEncaisse - epargneAutomatiqueALaReception) est ce qui me reste réellement pour vivre et couvrir mes dépenses courantes. Les dépenses et le solde sont calculés par rapport à ce revenu disponible, PAS par rapport au revenu total encaissé. Le champ "notesMethodologiques" du fichier redonne cette explication. Merci de bien intégrer cette distinction dans toute ton analyse (ne confonds jamais revenu total encaissé et revenu disponible), et de préciser, quand tu recommandes un montant d'épargne, s'il s'ajoute à l'épargne automatique déjà existante ou s'il la remplace.
 
 Analyse ces données en détail et réponds de façon chiffrée et argumentée aux questions suivantes, en te basant uniquement sur les chiffres fournis :
 
-1. Tendance générale : suis-je globalement en positif ou en négatif sur la période couverte ? L'évolution mois par mois s'améliore-t-elle, se dégrade-t-elle, ou stagne-t-elle ?
-2. Points de vigilance : quelles dépenses ou catégories doivent particulièrement attirer mon attention (postes en hausse, dépenses disproportionnées par rapport à mes revenus, charges récurrentes trop lourdes, etc.) ?
-3. Limites de dépenses mensuelles recommandées : quelle limite haute et quelle limite basse de dépenses totales par mois me recommandes-tu, compte tenu de mes revenus réels et de la variabilité observée ?
-4. Salaire minimal viable : avec mon mode de vie actuel (ou un mode de vie ajusté raisonnablement), quel serait le salaire mensuel net minimal avec lequel je pourrais m'en sortir sans stress financier ?
-5. Objectif d'épargne mensuel : combien devrais-je essayer d'épargner chaque mois, en euros et en pourcentage de mes revenus ?
-6. Budget idéal par catégorie : propose-moi une répartition budgétaire idéale (en euros et en %) pour chacune de mes catégories et sous-catégories principales, en t'appuyant sur des repères reconnus (ex: règle 50/30/20) tout en respectant mes habitudes réelles.
-7. Loyer / logement maximal recommandé : en fonction de mes revenus et de mes autres charges fixes, quel devrait être le montant maximal raisonnable pour mon loyer ou mes charges de logement ?
-8. Charges récurrentes : mes abonnements et charges récurrentes actuels sont-ils raisonnables par rapport à mes revenus ? Y a-t-il des doublons, ou des abonnements à envisager de résilier ?
+1. Tendance générale : suis-je globalement en positif ou en négatif sur la période couverte (en te basant sur le revenu disponible, épargne automatique déjà déduite) ? L'évolution mois par mois s'améliore-t-elle, se dégrade-t-elle, ou stagne-t-elle ?
+2. Points de vigilance : quelles dépenses ou catégories doivent particulièrement attirer mon attention (postes en hausse, dépenses disproportionnées par rapport à mon revenu disponible, charges récurrentes trop lourdes, etc.) ?
+3. Limites de dépenses mensuelles recommandées : quelle limite haute et quelle limite basse de dépenses totales par mois me recommandes-tu, compte tenu de mon revenu disponible réel et de la variabilité observée ?
+4. Salaire minimal viable : avec mon mode de vie actuel (ou un mode de vie ajusté raisonnablement), quel serait le salaire mensuel net total minimal (avant mise de côté automatique) avec lequel je pourrais m'en sortir sans stress financier ?
+5. Objectif d'épargne mensuel : en tenant compte de l'épargne déjà mise de côté automatiquement, devrais-je épargner davantage chaque mois ? Si oui, combien de plus, en euros et en pourcentage de mon revenu total ?
+6. Budget idéal par catégorie : propose-moi une répartition budgétaire idéale (en euros et en %) pour chacune de mes catégories et sous-catégories principales, en t'appuyant sur des repères reconnus (ex: règle 50/30/20, à adapter puisqu'une partie de l'épargne est déjà prélevée automatiquement) tout en respectant mes habitudes réelles.
+7. Loyer / logement maximal recommandé : en fonction de mon revenu disponible et de mes autres charges fixes, quel devrait être le montant maximal raisonnable pour mon loyer ou mes charges de logement ?
+8. Charges récurrentes : mes abonnements et charges récurrentes actuels sont-ils raisonnables par rapport à mon revenu disponible ? Y a-t-il des doublons, ou des abonnements à envisager de résilier ?
 9. Plan d'action concret : donne-moi 3 à 5 actions concrètes et priorisées à mettre en place dès ce mois-ci pour améliorer ma situation financière.
 
 Présente ta réponse de façon structurée avec des sections claires et des chiffres précis tirés des données fournies. Évite les généralités qui ne s'appliquent pas à mon cas. Si certaines données te semblent manquantes ou insuffisantes pour répondre précisément à une question, signale-le plutôt que de supposer.
