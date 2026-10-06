@@ -40,6 +40,7 @@ window.appData = window.appData || {
     trips: [],
     tripCategories: [],
     tripsSeeded: false,
+    plannedCharges: [],
     categories: [
         // Default categories
         { id: 'cat-inc-1', name: 'Salaire', type: 'income', parentId: null },
@@ -125,6 +126,7 @@ async function saveData() {
             trips: appData.trips || [],
             tripCategories: appData.tripCategories || [],
             tripsSeeded: appData.tripsSeeded || false,
+            plannedCharges: appData.plannedCharges || [],
             updatedAt: new Date().toISOString()
         };
 
@@ -170,6 +172,9 @@ async function loadData() {
             if(parsed.trips) appData.trips = parsed.trips;
             if(parsed.tripCategories) appData.tripCategories = parsed.tripCategories;
             if(parsed.tripsSeeded !== undefined) appData.tripsSeeded = parsed.tripsSeeded;
+
+            // Charges prévues (grosses dépenses connues à l'avance)
+            if(parsed.plannedCharges) appData.plannedCharges = parsed.plannedCharges;
         } else {
             console.log("Aucune donnée Firestore trouvée. Initialisation avec les valeurs par défaut.");
             // On s'assure de ne pas écraser s'il y a un souci réseau passager déguisé en not-found.
@@ -1326,6 +1331,13 @@ function buildAiAnalysisExport() {
         evolutionMensuelle: monthlyBreakdown,
         repartitionParCategorie: categoryBreakdownDetailed,
         chargesRecurrentes: recurringCommitments,
+        chargesPrevues: (appData.plannedCharges || []).map(c => ({
+            nom: c.name,
+            montantEstime: Number(c.amount) || 0,
+            categorie: getCategoryPath(c.categoryId),
+            mois: (c.months || []).map(m => MONTH_NAMES_FR[m - 1]),
+            repetition: c.year ? 'une seule fois (' + c.year + ')' : 'chaque année'
+        })),
         investissements: investments,
         chequesRepas: mealVouchers
     };
@@ -2505,7 +2517,9 @@ function attachChartHoverTooltip(canvas) {
             if (d < bestDist) { bestDist = d; best = p; }
         });
         // On exige une proximité raisonnable, verticale comprise, pour éviter les faux positifs
-        if (!best || bestDist > 26 || Math.abs(best.y - y) > 60) return null;
+        // (un histogramme peut déclarer une colonne entière active : _chartFullHeightHit)
+        if (!best || bestDist > (canvas._chartHitRadius || 26)) return null;
+        if (!canvas._chartFullHeightHit && Math.abs(best.y - y) > 60) return null;
         return { hit: best, rect };
     };
 
@@ -2582,7 +2596,8 @@ function renderSavings() {
             goal = appData.monthlyGoals[monthStr];
         }
 
-        const savingsForMonth = goal - data.expense;
+        const plannedActual = getPlannedChargesStatus(year, month, effectiveTrans).actualTotal;
+        const savingsForMonth = goal - Math.max(0, data.expense - plannedActual);
         totalSavings += savingsForMonth;
         totalRealSaved += data.savings;
 
@@ -2616,7 +2631,7 @@ function renderSavings() {
             <td data-label="Mois">${formattedMonth}</td>
             <td data-label="Revenus réels" class="${incomeColor}">${incomeSign}${data.income.toFixed(2)} €</td>
             <td data-label="Objectif">${goal.toFixed(2)} €</td>
-            <td data-label="Dépenses réelles" class="text-red">-${data.expense.toFixed(2)} €</td>
+            <td data-label="Dépenses réelles" class="text-red">-${data.expense.toFixed(2)} €${plannedActual > 0 ? `<br><small class="muted">dont ${plannedActual.toFixed(2)} € de charges prévues</small>` : ''}</td>
             <td data-label="Économie (Bilan)" class="${savingsClass}">${savingsSign}${savingsForMonth.toFixed(2)} €</td>
             <td data-label="Épargne du mois" class="text-primary">${data.savings > 0 ? '+' : ''}${data.savings.toFixed(2)} €</td>
             <td data-label="Bénéfice Réel" class="${realProfitClass}" style="font-weight: bold;">${realProfitSign}${realProfit.toFixed(2)} €</td>
@@ -2881,7 +2896,8 @@ function updateDashboard() {
         goal = appData.monthlyGoals[monthStr];
     }
 
-    const spent = currentData.expense;
+    // L'objectif ne couvre que le budget courant : les charges prévues sont suivies à part
+    const spent = getCurrentBudgetSpend(currentYear, currentMonth, currentData);
 
     if (goal <= 0) {
         // Handle edge case where goal is 0 or negative
@@ -5365,6 +5381,7 @@ window.updateNavigationVisibility = function() {
                 mealVouchersEnabled: false,
                 mealVoucherEligibleCategories: [],
                 mealVoucherExpectedMonthlyAmount: 0,
+                plannedCharges: [],
                 categories: []
             };
             await saveData();
@@ -5588,10 +5605,11 @@ function calculateAverageMonthlyTrends() {
         } else if (sub.frequency === 'weekly') {
             if (sub.type === 'income') subIncome += (sub.amount * 52) / 12;
             else subExpense += (sub.amount * 52) / 12;
-        } else if (sub.frequency === 'yearly') {
-            if (sub.type === 'income') subIncome += sub.amount / 12;
-            else subExpense += sub.amount / 12;
+        } else if (sub.frequency === 'yearly' && sub.type === 'income') {
+            subIncome += sub.amount / 12;
         }
+        // Les dépenses annuelles ne sont pas lissées : elles sont appliquées
+        // dans leur mois réel via getChargesDueInMonth() (charges prévues).
     });
 
     // Optionnel : on pourrait calculer les vraies dépenses variables des X derniers mois.
@@ -5636,6 +5654,12 @@ function updatePredictionChart() {
 
         baselineBalance += trends.monthlyIncome;
         baselineBalance -= trends.monthlyExpense;
+
+        // 1 bis. Charges prévues du mois (assurance, entretien, vacances, abonnements annuels…)
+        const plannedThisMonth = getChargesDueInMonth(currentYear, currentMonth)
+            .reduce((sum, c) => sum + c.estimate, 0);
+        currentBalance -= plannedThisMonth;
+        baselineBalance -= plannedThisMonth;
 
         // 2. Ajouter les simulations pour ce mois
         appData.simulations.forEach(sim => {
@@ -6340,7 +6364,8 @@ const NAV_GROUP_TITLES = {
     trips: 'Vacances',
     'trips-compare': 'Vacances',
     settings: 'Réglages',
-    prediction: 'Prédiction'
+    prediction: 'Prédiction',
+    planned: 'Transactions'
 };
 
 const MONTH_NAMES_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
@@ -6620,13 +6645,15 @@ function renderDashboardExtras(year, month) {
         goal = appData.monthlyGoals[monthStr];
     }
 
-    const remaining = (goal || 0) - current.expense;
+    const plannedStatus = getPlannedChargesStatus(year, month);
+    const currentSpend = Math.max(0, current.expense - plannedStatus.actualTotal);
+    const remaining = (goal || 0) - currentSpend;
 
     // Légende de l'objectif
     const elTarget = document.getElementById('goal-value-target');
     if (elTarget) elTarget.textContent = goal ? fmtEuro(goal) : 'Non défini';
     const elSpent = document.getElementById('goal-value-spent');
-    if (elSpent) elSpent.textContent = fmtEuro(current.expense);
+    if (elSpent) elSpent.textContent = fmtEuro(currentSpend);
     const elGoalLeft = document.getElementById('goal-value-left');
     if (elGoalLeft) {
         if (!goal) {
@@ -6637,6 +6664,9 @@ function renderDashboardExtras(year, month) {
             elGoalLeft.style.color = remaining < 0 ? 'var(--danger-color)' : 'var(--success-color)';
         }
     }
+
+    // Charges prévues du mois (carte dédiée + note sous l'objectif)
+    renderDashboardPlanned(year, month, plannedStatus);
 
     // Courbe du patrimoine
     renderPatrimonyChart(year, month);
@@ -8195,3 +8225,811 @@ function initTripsModule() {
 }
 
 initTripsModule();
+
+/* =========================================================================
+   CHARGES PRÉVUES
+   Grosses dépenses connues à l'avance (assurance, entretien de la voiture,
+   vacances…) qui font varier fortement les dépenses d'un mois à l'autre.
+   - Elles sont suivies À PART de l'objectif mensuel : l'objectif ne couvre
+     que le « budget courant » (dépenses totales − charges prévues payées).
+   - Une dépense est rattachée à une charge si elle tombe le mois prévu, dans
+     sa catégorie (ou une sous-catégorie) et, si précisé, porte son tag.
+   - Les abonnements annuels (Récurrences) sont repris automatiquement.
+   Modèle : { id, name, amount, categoryId, months: [1..12], year: null|AAAA,
+              tagId, tripId }  — year = null signifie « chaque année ».
+   ========================================================================= */
+
+const PLANNED_MONTH_ABBR = ['Jan', 'Fév', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sept', 'Oct', 'Nov', 'Déc'];
+
+const PLANNED_STATE_LABELS = {
+    paid: 'Payée',
+    over: 'Dépassée',
+    due: 'À venir',
+    upcoming: 'Prévue',
+    missed: 'Non survenue'
+};
+
+function getPlannedCharges() {
+    if (!Array.isArray(appData.plannedCharges)) appData.plannedCharges = [];
+    return appData.plannedCharges;
+}
+
+function plannedMonthKey(year, month) {
+    return year + '-' + String(month).padStart(2, '0');
+}
+
+function plannedTodayKey() {
+    const now = new Date();
+    return plannedMonthKey(now.getFullYear(), now.getMonth() + 1);
+}
+
+// Décale (année, mois) de `offset` mois
+function plannedShiftMonth(year, month, offset) {
+    const d = new Date(year, month - 1 + offset, 1);
+    return { year: d.getFullYear(), month: d.getMonth() + 1 };
+}
+
+function plannedMonthLabel(year, month) {
+    return MONTH_NAMES_FR[month - 1] + ' ' + year;
+}
+
+// Liste lisible de mois : « mars et septembre », « janvier, avril et juillet »
+function plannedMonthsText(months) {
+    const names = (months || []).slice().sort((a, b) => a - b).map(m => MONTH_NAMES_FR[m - 1]);
+    if (names.length <= 1) return names.join('');
+    return names.slice(0, -1).join(', ') + ' et ' + names[names.length - 1];
+}
+
+// Identifiants d'une catégorie et de toutes ses sous-catégories
+function getCategoryWithDescendants(catId) {
+    const ids = new Set([catId]);
+    let added = true;
+    while (added) {
+        added = false;
+        appData.categories.forEach(c => {
+            if (c.parentId && ids.has(c.parentId) && !ids.has(c.id)) {
+                ids.add(c.id);
+                added = true;
+            }
+        });
+    }
+    return ids;
+}
+
+function getGoalForMonth(year, month) {
+    const key = plannedMonthKey(year, month);
+    if (appData.monthlyGoals && appData.monthlyGoals[key] !== undefined) return Number(appData.monthlyGoals[key]) || 0;
+    return Number(appData.spendingGoal) || 0;
+}
+
+function plannedChargeAppliesTo(charge, year, month) {
+    if (!(charge.months || []).includes(month)) return false;
+    return !charge.year || Number(charge.year) === year;
+}
+
+// Toutes les charges attendues un mois donné : charges saisies + abonnements annuels
+function getChargesDueInMonth(year, month) {
+    const key = plannedMonthKey(year, month);
+    const out = [];
+
+    getPlannedCharges().forEach(c => {
+        if (!plannedChargeAppliesTo(c, year, month)) return;
+        out.push({
+            id: c.id,
+            name: c.name,
+            estimate: Number(c.amount) || 0,
+            categoryId: c.categoryId,
+            tagId: c.tagId || '',
+            source: 'manual'
+        });
+    });
+
+    (appData.subscriptions || []).forEach(sub => {
+        if (sub.frequency !== 'yearly' || sub.type === 'income' || !sub.startDate) return;
+        if (Number(sub.startDate.slice(5, 7)) !== month) return;
+        if (key < sub.startDate.slice(0, 7)) return;
+        if (sub.endDate && key > sub.endDate.slice(0, 7)) return;
+        out.push({
+            id: 'sub:' + sub.id,
+            name: sub.name || 'Abonnement annuel',
+            estimate: Number(sub.amount) || 0,
+            categoryId: sub.categoryId,
+            subscriptionId: sub.id,
+            source: 'subscription'
+        });
+    });
+
+    return out;
+}
+
+/**
+ * Rapproche les charges attendues d'un mois avec les dépenses réellement saisies.
+ * Une dépense n'est rattachée qu'à une seule charge : les règles les plus précises
+ * passent en premier (abonnement, puis tag, puis catégorie la plus profonde).
+ */
+function getPlannedChargesStatus(year, month, effectiveTrans) {
+    const key = plannedMonthKey(year, month);
+    const todayKey = plannedTodayKey();
+    const charges = getChargesDueInMonth(year, month);
+
+    if (charges.length === 0) {
+        return { key, charges, estimateTotal: 0, actualTotal: 0, projectedTotal: 0 };
+    }
+
+    const monthExpenses = (effectiveTrans || getEffectiveTransactions())
+        .filter(t => t.type === 'expense' && t.date && t.date.startsWith(key));
+
+    const depth = (catId) => getCategoryPath(catId).split(' > ').length;
+    const rank = (c) => c.subscriptionId ? 0 : (c.tagId ? 1 : 2);
+    const ordered = charges.slice().sort((a, b) => (rank(a) - rank(b)) || (depth(b.categoryId) - depth(a.categoryId)));
+
+    const used = new Set();
+    ordered.forEach(ch => {
+        const cats = ch.subscriptionId ? null : getCategoryWithDescendants(ch.categoryId);
+        ch.transactions = monthExpenses.filter(t => {
+            if (used.has(t.id)) return false;
+            if (ch.subscriptionId) return t.subscriptionId === ch.subscriptionId;
+            // Les prélèvements des autres récurrences font partie du budget courant
+            if (t.subscriptionId) return false;
+            if (!cats.has(t.categoryId)) return false;
+            if (ch.tagId && !(t.tagIds || []).includes(ch.tagId)) return false;
+            return true;
+        });
+        ch.transactions.forEach(t => used.add(t.id));
+        ch.actual = ch.transactions.reduce((sum, t) => sum + effectiveExpenseAmount(t), 0);
+
+        if (ch.actual > 0) {
+            ch.state = (ch.estimate > 0 && ch.actual > ch.estimate * 1.1) ? 'over' : 'paid';
+        } else if (key > todayKey) {
+            ch.state = 'upcoming';
+        } else if (key === todayKey) {
+            ch.state = 'due';
+        } else {
+            ch.state = 'missed';
+        }
+        // Montant retenu pour les projections : le réel s'il existe, sinon l'estimation
+        ch.projected = ch.actual > 0 ? ch.actual : (ch.state === 'missed' ? 0 : ch.estimate);
+    });
+
+    charges.sort((a, b) => b.estimate - a.estimate);
+
+    return {
+        key,
+        charges,
+        estimateTotal: charges.reduce((s, c) => s + c.estimate, 0),
+        actualTotal: charges.reduce((s, c) => s + c.actual, 0),
+        projectedTotal: charges.reduce((s, c) => s + c.projected, 0)
+    };
+}
+
+// Dépenses du mois comparées à l'objectif : tout sauf les charges prévues
+function getCurrentBudgetSpend(year, month, monthData) {
+    const data = monthData || getMonthData(year, month);
+    const planned = getPlannedChargesStatus(year, month);
+    return Math.max(0, data.expense - planned.actualTotal);
+}
+
+// Projection des N prochains mois à partir de (year, month) inclus
+function getPlannedOutlook(year, month, count) {
+    const effectiveTrans = getEffectiveTransactions();
+    const out = [];
+    for (let i = 0; i < count; i++) {
+        const ym = plannedShiftMonth(year, month, i);
+        const status = getPlannedChargesStatus(ym.year, ym.month, effectiveTrans);
+        out.push({
+            year: ym.year,
+            month: ym.month,
+            goal: getGoalForMonth(ym.year, ym.month),
+            planned: status.projectedTotal,
+            status
+        });
+    }
+    return out;
+}
+
+/* ---------- Tableau de bord : carte « Charges prévues du mois » ---------- */
+function renderDashboardPlanned(year, month, status) {
+    const list = document.getElementById('dash-planned-list');
+    const note = document.getElementById('goal-planned-note');
+    const footValue = document.getElementById('dash-planned-foot-value');
+    if (!list) return;
+
+    status = status || getPlannedChargesStatus(year, month);
+
+    if (status.charges.length === 0) {
+        const hasAny = getPlannedCharges().length > 0
+            || (appData.subscriptions || []).some(s => s.frequency === 'yearly' && s.type !== 'income');
+        list.innerHTML = '<div class="feed-empty">' + (hasAny
+            ? 'Aucune grosse charge prévue ce mois-ci.'
+            : 'Ajoutez vos grosses dépenses annuelles (assurance, entretien, vacances…) pour qu\'elles ne faussent plus l\'objectif.') + '</div>';
+    } else {
+        list.innerHTML = status.charges.map(ch => {
+            const isPaid = ch.state === 'paid' || ch.state === 'over';
+            const meta = 'Estimé ' + fmtEuro(ch.estimate) + (isPaid ? ' · payé ' + fmtEuro(ch.actual) : '');
+            const amountColor = isPaid ? 'var(--danger-color)' : 'var(--text-muted)';
+            return '<div class="feed-item">' +
+                '<span class="feed-avatar ' + (isPaid ? 'is-out' : 'is-neutral') + '">' + tripEscape((ch.name || '?').trim().charAt(0).toUpperCase()) + '</span>' +
+                '<span class="feed-body"><span class="feed-title">' + tripEscape(ch.name) +
+                    '<span class="planned-status is-' + ch.state + '">' + PLANNED_STATE_LABELS[ch.state] + '</span></span>' +
+                '<span class="feed-meta">' + meta + '</span></span>' +
+                '<span class="feed-amount" style="color:' + amountColor + '">-' + (isPaid ? ch.actual : ch.estimate).toFixed(2) + ' €</span>' +
+                '</div>';
+        }).join('');
+    }
+
+    // Note sous l'objectif : rappelle que les charges prévues sont exclues
+    if (note) {
+        if (status.charges.length > 0) {
+            note.innerHTML = 'Objectif calculé hors charges prévues : <strong>' + fmtEuro(status.actualTotal) +
+                '</strong> payés sur <strong>' + fmtEuro(status.estimateTotal) + '</strong> estimés ce mois-ci.';
+            note.style.display = 'block';
+        } else {
+            note.style.display = 'none';
+        }
+    }
+
+    // Prochain mois chargé après le mois affiché (sur un an)
+    if (footValue) {
+        const next = getPlannedOutlook(year, month, 13).slice(1).find(m => m.planned > 0);
+        footValue.textContent = next ? plannedMonthLabel(next.year, next.month) + ' · ' + fmtEuro(next.planned) : '—';
+    }
+}
+
+/* ---------- Graphique : budget courant + charges prévues sur 12 mois ---------- */
+function drawPlannedYearChart(canvasId, outlook) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    const { ctx, W, H } = prepareCanvas(canvas, 260);
+    const totals = outlook.map(m => m.goal + m.planned);
+
+    if (outlook.length === 0 || totals.every(v => !v)) {
+        chartEmptyState(ctx, W, H, 'Définissez un objectif ou ajoutez une charge prévue');
+        canvas._chartPoints = [];
+        return;
+    }
+
+    const textColor = chartColor('--text-color', '#333');
+    const mutedColor = chartColor('--text-muted', '#888');
+    const gridColor = chartColor('--border-color', 'rgba(0,0,0,0.1)');
+    const accent = chartColor('--accent-color', '#0a6cff');
+    const warn = chartColor('--warning-color', '#f5a524');
+
+    // Échelle arrondie (1, 2, 2.5, 5 × 10^n par graduation)
+    const rawStep = Math.max(...totals, 1) / 4;
+    const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+    const step = [1, 2, 2.5, 5, 10].map(f => f * mag).find(s => s >= rawStep) || rawStep;
+    const maxVal = step * 4;
+
+    const padLeft = 52;
+    const padRight = 8;
+    const padTop = 22;
+    const padBottom = 26;
+    const chartW = W - padLeft - padRight;
+    const chartH = H - padTop - padBottom;
+    const baseY = padTop + chartH;
+    const yAt = (v) => baseY - (v / maxVal) * chartH;
+
+    // Grille + axe des ordonnées
+    ctx.font = '11px ' + CHART_FONT;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'right';
+    for (let i = 0; i <= 4; i++) {
+        const y = Math.round(yAt(step * i)) + 0.5;
+        ctx.strokeStyle = gridColor;
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(padLeft, y); ctx.lineTo(W - padRight, y); ctx.stroke();
+        ctx.fillStyle = mutedColor;
+        ctx.fillText(Math.round(step * i) + '€', padLeft - 8, y);
+    }
+
+    const slotW = chartW / outlook.length;
+    const barW = Math.max(6, Math.min(36, slotW * 0.62));
+
+    outlook.forEach((m, i) => {
+        const center = padLeft + slotW * (i + 0.5);
+        const x = center - barW / 2;
+        const goalTop = yAt(m.goal);
+        const totalTop = yAt(m.goal + m.planned);
+
+        // Socle : objectif courant
+        if (m.goal > 0) {
+            ctx.save();
+            ctx.globalAlpha = 0.35;
+            ctx.fillStyle = accent;
+            ctx.beginPath();
+            ctx.roundRect(x, goalTop, barW, baseY - goalTop, m.planned > 0 ? 0 : [5, 5, 0, 0]);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Charges prévues empilées au-dessus
+        if (m.planned > 0) {
+            ctx.fillStyle = warn;
+            ctx.beginPath();
+            ctx.roundRect(x, totalTop, barW, Math.max(goalTop - totalTop, 2), [5, 5, 0, 0]);
+            ctx.fill();
+
+            if (slotW >= 44) {
+                ctx.fillStyle = textColor;
+                ctx.font = '600 10px ' + CHART_FONT;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText('+' + Math.round(m.planned), center, totalTop - 3);
+            }
+        }
+
+        // Libellé du mois (année ajoutée en janvier)
+        ctx.fillStyle = mutedColor;
+        ctx.font = '11px ' + CHART_FONT;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        const label = PLANNED_MONTH_ABBR[m.month - 1] + (m.month === 1 && slotW >= 40 ? ' ' + String(m.year).slice(2) : '');
+        ctx.fillText(slotW < 30 ? label.charAt(0) : label, center, baseY + 8);
+    });
+
+    // Moyenne mensuelle (pointillés)
+    const avg = totals.reduce((a, b) => a + b, 0) / totals.length;
+    const avgY = Math.round(yAt(avg)) + 0.5;
+    ctx.save();
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = textColor;
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(padLeft, avgY); ctx.lineTo(W - padRight, avgY); ctx.stroke();
+    ctx.restore();
+    // Étiquette à gauche, sur fond de carte, pour ne pas chevaucher les montants des barres
+    const avgLabel = 'moyenne ' + Math.round(avg) + ' €';
+    ctx.font = '600 10px ' + CHART_FONT;
+    const avgLabelW = ctx.measureText(avgLabel).width + 8;
+    ctx.fillStyle = chartColor('--card-bg', '#fff');
+    ctx.fillRect(padLeft + 2, avgY - 15, avgLabelW, 13);
+    ctx.fillStyle = mutedColor;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(avgLabel, padLeft + 6, avgY - 3);
+
+    // Infobulle : détail du mois survolé (toute la hauteur de la colonne est active)
+    canvas._chartPoints = outlook.map((m, i) => {
+        const lines = [plannedMonthLabel(m.year, m.month), 'Objectif courant : ' + fmtEuro(m.goal)];
+        m.status.charges.forEach(ch => {
+            if (ch.projected > 0) lines.push(ch.name + ' : ' + fmtEuro(ch.projected));
+        });
+        lines.push('Total : ' + fmtEuro(m.goal + m.planned));
+        return { x: padLeft + slotW * (i + 0.5), y: padTop + chartH / 2, point: { tooltip: lines.map(tripEscape) } };
+    });
+    canvas._chartLogicalW = W;
+    canvas._chartHitRadius = slotW / 2;
+    canvas._chartFullHeightHit = true;
+    attachChartHoverTooltip(canvas);
+}
+
+/* ---------- Page « Charges prévues » ---------- */
+
+// Prochaine occurrence d'une charge à partir du mois courant (null si passée)
+function getNextPlannedOccurrence(charge) {
+    const now = new Date();
+    for (let i = 0; i < 24; i++) {
+        const ym = plannedShiftMonth(now.getFullYear(), now.getMonth() + 1, i);
+        if (plannedChargeAppliesTo(charge, ym.year, ym.month)) return ym;
+    }
+    return null;
+}
+
+function renderPlannedPage() {
+    if (!document.getElementById('planned')) return;
+
+    populatePlannedFormSelects();
+
+    const now = new Date();
+    const outlook = getPlannedOutlook(now.getFullYear(), now.getMonth() + 1, 12);
+
+    // Indicateurs
+    const total = outlook.reduce((s, m) => s + m.planned, 0);
+    const chargeCount = outlook.reduce((s, m) => s + m.status.charges.filter(c => c.projected > 0).length, 0);
+    document.getElementById('planned-stat-total').textContent = fmtEuro(total);
+    document.getElementById('planned-stat-count').textContent = chargeCount
+        ? chargeCount + ' échéance' + (chargeCount > 1 ? 's' : '') + ' · soit ' + fmtEuro(total / 12) + ' par mois en moyenne'
+        : 'Aucune charge prévue';
+
+    const peak = outlook.reduce((best, m) => (m.planned > (best ? best.planned : 0) ? m : best), null);
+    document.getElementById('planned-stat-peak').textContent = peak ? plannedMonthLabel(peak.year, peak.month) : '—';
+    document.getElementById('planned-stat-peak-detail').textContent = peak
+        ? fmtEuro(peak.planned) + ' de charges en plus de l\'objectif courant'
+        : '';
+
+    let next = null;
+    outlook.some(m => {
+        const ch = m.status.charges.find(c => c.state === 'due' || c.state === 'upcoming');
+        if (ch) next = { m, ch };
+        return !!ch;
+    });
+    document.getElementById('planned-stat-next').textContent = next ? next.ch.name : '—';
+    document.getElementById('planned-stat-next-detail').textContent = next
+        ? fmtEuro(next.ch.estimate) + ' en ' + plannedMonthLabel(next.m.year, next.m.month)
+        : '';
+
+    drawPlannedYearChart('plannedYearChart', outlook);
+    renderPlannedList();
+    renderPlannedSuggestions();
+}
+
+function renderPlannedList() {
+    const list = document.getElementById('planned-list');
+    if (!list) return;
+
+    const ICONS = {
+        edit: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+        del: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+        open: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>'
+    };
+
+    // Charges saisies + abonnements annuels, triés par prochaine échéance
+    const items = getPlannedCharges().map(c => ({ charge: c, next: getNextPlannedOccurrence(c), auto: false }));
+    (appData.subscriptions || []).forEach(sub => {
+        if (sub.frequency !== 'yearly' || sub.type === 'income' || sub.status === 'completed' || !sub.startDate) return;
+        const pseudo = {
+            id: 'sub:' + sub.id,
+            name: sub.name,
+            amount: sub.amount,
+            categoryId: sub.categoryId,
+            months: [Number(sub.startDate.slice(5, 7))],
+            year: null
+        };
+        items.push({ charge: pseudo, next: getNextPlannedOccurrence(pseudo), auto: true });
+    });
+
+    const nextKey = (it) => it.next ? plannedMonthKey(it.next.year, it.next.month) : '9999';
+    items.sort((a, b) => nextKey(a).localeCompare(nextKey(b)));
+
+    const yearlyTotal = items.reduce((s, it) => {
+        if (it.charge.year) return s;
+        return s + (Number(it.charge.amount) || 0) * (it.charge.months || []).length;
+    }, 0);
+    const summary = document.getElementById('planned-list-summary');
+    if (summary) summary.textContent = items.length ? fmtEuro(yearlyTotal) + ' / an (charges annuelles)' : '';
+
+    if (items.length === 0) {
+        list.innerHTML = '<div class="feed-empty">Aucune charge prévue. Ajoutez par exemple l\'assurance auto ou l\'entretien de la voiture, ou partez des suggestions ci-dessous.</div>';
+        return;
+    }
+
+    list.innerHTML = items.map(it => {
+        const c = it.charge;
+        const amount = Number(c.amount) || 0;
+        const isPast = !it.next;
+        const occurrences = (c.months || []).length;
+
+        const meta = [];
+        meta.push(c.year ? 'Une fois, ' + plannedMonthsText(c.months) + ' ' + c.year : 'Chaque année en ' + plannedMonthsText(c.months));
+        meta.push(getCategoryPath(c.categoryId));
+        if (c.tagId) {
+            const tag = (appData.tags || []).find(t => t.id === c.tagId);
+            if (tag) meta.push('#' + tag.name);
+        }
+        if (it.next) meta.push('prochaine en ' + plannedMonthLabel(it.next.year, it.next.month));
+
+        const badge = it.auto
+            ? ' <span class="badge">Récurrence annuelle</span>'
+            : (isPast ? ' <span class="badge badge-closed">Passée</span>' : '');
+        const icon = it.next ? PLANNED_MONTH_ABBR[it.next.month - 1] : '—';
+        const perYear = !c.year && occurrences > 1 ? '<div class="sub-permonth">' + fmtEuro(amount * occurrences) + ' / an</div>' : '';
+
+        const actions = it.auto
+            ? '<button class="icon-action" title="Gérer dans Récurrences" data-action="open-sub">' + ICONS.open + '</button>'
+            : '<button class="icon-action" title="Modifier" data-action="edit">' + ICONS.edit + '</button>' +
+              '<button class="icon-action is-delete" title="Supprimer" data-action="delete">' + ICONS.del + '</button>';
+
+        return '<div class="sub-card' + (isPast ? ' is-done' : '') + '" data-id="' + tripEscape(c.id) + '">' +
+            '<div class="sub-icon ' + (it.auto ? 'is-auto' : 'is-planned') + '">' + icon + '</div>' +
+            '<div class="sub-main">' +
+                '<div class="sub-name">' + tripEscape(c.name || 'Sans nom') + badge + '</div>' +
+                '<div class="sub-meta">' + tripEscape(meta.join(' · ')) + '</div>' +
+            '</div>' +
+            '<div class="sub-right"><div class="sub-amount text-red">-' + amount.toFixed(2) + ' €</div>' + perYear + '</div>' +
+            '<div class="sub-actions">' + actions + '</div>' +
+        '</div>';
+    }).join('');
+
+    list.querySelectorAll('.sub-card').forEach(card => {
+        const id = card.getAttribute('data-id');
+        card.querySelectorAll('[data-action]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const action = btn.getAttribute('data-action');
+                if (action === 'edit') editPlannedCharge(id);
+                else if (action === 'delete') deletePlannedCharge(id);
+                else if (action === 'open-sub') {
+                    const link = document.querySelector('#planned .subnav-link[data-target="subscriptions"]');
+                    if (link) link.click();
+                }
+            });
+        });
+        if (!id.startsWith('sub:')) card.addEventListener('dblclick', () => editPlannedCharge(id));
+    });
+}
+
+/* ---------- Suggestions : grosses dépenses ponctuelles passées + voyages à venir ---------- */
+function computePlannedSuggestions() {
+    const suggestions = [];
+    const now = new Date();
+    const todayKey = plannedTodayKey();
+    const start = plannedShiftMonth(now.getFullYear(), now.getMonth() + 1, -24);
+    const startKey = plannedMonthKey(start.year, start.month);
+
+    // Seuil d'une « grosse » dépense : 20 % de l'objectif, 100 € minimum
+    const threshold = Math.max(100, (Number(appData.spendingGoal) || 0) * 0.2);
+    const covered = getPlannedCharges().map(c => getCategoryWithDescendants(c.categoryId));
+    const yearlySubCats = new Set((appData.subscriptions || []).filter(s => s.frequency === 'yearly').map(s => s.categoryId));
+
+    // Dépenses hors récurrences des 24 derniers mois, par catégorie puis par mois
+    const byCat = {};
+    getEffectiveTransactions().forEach(t => {
+        if (t.type !== 'expense' || !t.date || t.subscriptionId) return;
+        const key = t.date.slice(0, 7);
+        if (key < startKey || key >= todayKey) return;
+        if (!byCat[t.categoryId]) byCat[t.categoryId] = {};
+        byCat[t.categoryId][key] = (byCat[t.categoryId][key] || 0) + effectiveExpenseAmount(t);
+    });
+
+    Object.entries(byCat).forEach(([catId, months]) => {
+        const cat = appData.categories.find(c => c.id === catId);
+        if (!cat) return;
+        if (covered.some(set => set.has(catId)) || yearlySubCats.has(catId)) return;
+
+        const entries = Object.entries(months);
+        // Une catégorie présente plus d'un mois sur trois relève du budget courant
+        if (entries.length > 8) return;
+
+        const big = entries.filter(([, v]) => v >= threshold).sort((a, b) => a[0].localeCompare(b[0]));
+        if (big.length === 0) return;
+
+        const monthNums = Array.from(new Set(big.map(([k]) => Number(k.slice(5, 7))))).sort((a, b) => a - b);
+        const maxAmount = Math.max(...big.map(([, v]) => v));
+
+        suggestions.push({
+            kind: 'history',
+            name: cat.name,
+            amount: Math.ceil(maxAmount / 10) * 10,
+            categoryId: catId,
+            months: monthNums,
+            year: null,
+            detail: getCategoryPath(catId) + ' — ' + big.slice(-4).map(([k, v]) =>
+                MONTH_NAMES_FR[Number(k.slice(5, 7)) - 1] + ' ' + k.slice(0, 4) + ' : ' + Math.round(v) + ' €').join(', ')
+        });
+    });
+
+    suggestions.sort((a, b) => b.amount - a.amount);
+
+    // Voyages à venir avec un budget (module Vacances)
+    const todayIso = new Date().toISOString().slice(0, 10);
+    (appData.trips || []).forEach(trip => {
+        if (!trip.startDate || trip.startDate < todayIso || !(Number(trip.budget) > 0)) return;
+        if (getPlannedCharges().some(c => c.tripId === trip.id)) return;
+        suggestions.push({
+            kind: 'trip',
+            name: 'Vacances – ' + (trip.name || trip.destination || 'voyage'),
+            amount: Number(trip.budget),
+            categoryId: '',
+            months: [Number(trip.startDate.slice(5, 7))],
+            year: Number(trip.startDate.slice(0, 4)),
+            tripId: trip.id,
+            detail: 'Voyage du ' + fmtShortDate(trip.startDate) + (trip.endDate ? ' au ' + fmtShortDate(trip.endDate) : '') +
+                ' · budget ' + fmtEuro(trip.budget) + ' (à ajuster à votre part)'
+        });
+    });
+
+    return suggestions.slice(0, 8);
+}
+
+function renderPlannedSuggestions() {
+    const box = document.getElementById('planned-suggestions');
+    if (!box) return;
+
+    const suggestions = computePlannedSuggestions();
+    if (suggestions.length === 0) {
+        box.innerHTML = '<div class="feed-empty">Aucune suggestion : vos grosses dépenses ponctuelles sont déjà couvertes.</div>';
+        return;
+    }
+
+    box.innerHTML = suggestions.map((s, i) =>
+        '<div class="sub-card">' +
+            '<div class="sub-icon ' + (s.kind === 'trip' ? 'is-auto' : 'is-planned') + '">' + (s.kind === 'trip' ? '✈' : PLANNED_MONTH_ABBR[s.months[0] - 1]) + '</div>' +
+            '<div class="sub-main">' +
+                '<div class="sub-name">' + tripEscape(s.name) + '</div>' +
+                '<div class="sub-meta" title="' + tripEscape(s.detail) + '">' + tripEscape(s.detail) + '</div>' +
+            '</div>' +
+            '<div class="sub-right"><div class="sub-amount">' + fmtEuro(s.amount) + '</div>' +
+                '<div class="sub-permonth">' + tripEscape(s.year ? plannedMonthsText(s.months) + ' ' + s.year : 'en ' + plannedMonthsText(s.months)) + '</div></div>' +
+            '<div class="sub-actions"><button class="btn btn-secondary btn-small" data-suggestion="' + i + '">Prévoir</button></div>' +
+        '</div>'
+    ).join('');
+
+    box.querySelectorAll('[data-suggestion]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const s = suggestions[Number(btn.getAttribute('data-suggestion'))];
+            if (!s) return;
+            resetPlannedForm();
+            fillPlannedForm(s);
+            document.getElementById('planned-trip-id').value = s.tripId || '';
+            document.getElementById('form-planned').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            document.getElementById(s.categoryId ? 'planned-amount' : 'planned-category').focus({ preventScroll: true });
+        });
+    });
+}
+
+/* ---------- Formulaire ---------- */
+function populatePlannedFormSelects() {
+    const catSelect = document.getElementById('planned-category');
+    const tagSelect = document.getElementById('planned-tag');
+    if (!catSelect || !tagSelect) return;
+
+    const currentCat = catSelect.value;
+    const currentTag = tagSelect.value;
+
+    catSelect.innerHTML = '<option value="">-- Choisir une catégorie --</option>' + appData.categories
+        .filter(c => c.type === 'expense')
+        .map(c => ({ id: c.id, path: getCategoryPath(c.id) }))
+        .sort((a, b) => a.path.localeCompare(b.path))
+        .map(c => '<option value="' + tripEscape(c.id) + '">' + tripEscape(c.path) + '</option>')
+        .join('');
+
+    tagSelect.innerHTML = '<option value="">-- Aucun --</option>' + (appData.tags || [])
+        .map(t => '<option value="' + tripEscape(t.id) + '">' + tripEscape(t.name) + '</option>')
+        .join('');
+
+    catSelect.value = currentCat;
+    tagSelect.value = currentTag;
+}
+
+function getPlannedFormMonths() {
+    return Array.from(document.querySelectorAll('#planned-months input:checked')).map(i => Number(i.value));
+}
+
+function updatePlannedFormSummary() {
+    const out = document.getElementById('planned-summary');
+    if (!out) return;
+
+    const amount = parseFloat(document.getElementById('planned-amount').value);
+    const months = getPlannedFormMonths();
+    const once = document.getElementById('planned-repeat').value === 'once';
+    const year = document.getElementById('planned-year').value;
+
+    if (isNaN(amount) || amount <= 0 || months.length === 0) {
+        out.textContent = 'Choisissez un montant et au moins un mois.';
+        out.classList.remove('is-filled');
+        return;
+    }
+
+    let phrase = fmtEuro(amount) + ' en ' + plannedMonthsText(months);
+    if (once) {
+        phrase += ' ' + (year || '') + ', une seule fois';
+    } else {
+        phrase += ', chaque année';
+        if (months.length > 1) phrase += ' — soit ' + fmtEuro(amount * months.length) + ' par an';
+    }
+    out.textContent = phrase + '. Cette somme ne comptera pas dans l\'objectif mensuel.';
+    out.classList.add('is-filled');
+}
+
+function syncPlannedRepeatField() {
+    const once = document.getElementById('planned-repeat').value === 'once';
+    const yearInput = document.getElementById('planned-year');
+    document.getElementById('planned-year-group').style.display = once ? '' : 'none';
+    yearInput.required = once;
+    if (once && !yearInput.value) yearInput.value = new Date().getFullYear();
+}
+
+function fillPlannedForm(data) {
+    populatePlannedFormSelects();
+    document.getElementById('planned-name').value = data.name || '';
+    document.getElementById('planned-amount').value = data.amount ? Number(data.amount).toFixed(2) : '';
+    document.getElementById('planned-category').value = data.categoryId || '';
+    document.getElementById('planned-tag').value = data.tagId || '';
+    document.getElementById('planned-repeat').value = data.year ? 'once' : 'yearly';
+    document.getElementById('planned-year').value = data.year || '';
+    document.querySelectorAll('#planned-months input').forEach(input => {
+        input.checked = (data.months || []).includes(Number(input.value));
+    });
+    syncPlannedRepeatField();
+    updatePlannedFormSummary();
+}
+
+function resetPlannedForm() {
+    const form = document.getElementById('form-planned');
+    if (!form) return;
+    form.reset();
+    document.getElementById('planned-id').value = '';
+    document.getElementById('planned-trip-id').value = '';
+    document.getElementById('planned-form-title').textContent = 'Nouvelle charge prévue';
+    document.getElementById('btn-submit-planned').textContent = 'Ajouter';
+    document.getElementById('btn-cancel-planned').style.display = 'none';
+    syncPlannedRepeatField();
+    updatePlannedFormSummary();
+}
+
+function editPlannedCharge(id) {
+    const charge = getPlannedCharges().find(c => c.id === id);
+    if (!charge) return;
+    resetPlannedForm();
+    fillPlannedForm(charge);
+    document.getElementById('planned-id').value = charge.id;
+    document.getElementById('planned-trip-id').value = charge.tripId || '';
+    document.getElementById('planned-form-title').textContent = 'Modifier la charge prévue';
+    document.getElementById('btn-submit-planned').textContent = 'Enregistrer';
+    document.getElementById('btn-cancel-planned').style.display = '';
+    document.getElementById('form-planned').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function deletePlannedCharge(id) {
+    const charge = getPlannedCharges().find(c => c.id === id);
+    if (!charge) return;
+    if (!confirm('Supprimer la charge prévue « ' + charge.name + ' » ? Les dépenses déjà saisies ne sont pas touchées.')) return;
+    appData.plannedCharges = getPlannedCharges().filter(c => c.id !== id);
+    if (document.getElementById('planned-id').value === id) resetPlannedForm();
+    await saveData();
+    renderPlannedPage();
+}
+
+function initPlannedChargesModule() {
+    const form = document.getElementById('form-planned');
+    if (!form) return;
+
+    // Les 12 pastilles de mois
+    document.getElementById('planned-months').innerHTML = PLANNED_MONTH_ABBR.map((abbr, i) =>
+        '<label class="month-chip" title="' + MONTH_NAMES_FR[i] + '">' +
+            '<input type="checkbox" value="' + (i + 1) + '"><span>' + abbr + '</span>' +
+        '</label>'
+    ).join('');
+
+    document.getElementById('planned-repeat').addEventListener('change', syncPlannedRepeatField);
+    form.addEventListener('input', updatePlannedFormSummary);
+    form.addEventListener('change', updatePlannedFormSummary);
+    document.getElementById('btn-cancel-planned').addEventListener('click', resetPlannedForm);
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const months = getPlannedFormMonths();
+        if (months.length === 0) {
+            alert('Choisissez au moins un mois.');
+            return;
+        }
+        const once = document.getElementById('planned-repeat').value === 'once';
+        const year = once ? parseInt(document.getElementById('planned-year').value, 10) : null;
+        if (once && !year) {
+            alert('Indiquez l\'année de cette charge.');
+            return;
+        }
+
+        const id = document.getElementById('planned-id').value;
+        const payload = {
+            name: document.getElementById('planned-name').value.trim(),
+            amount: parseFloat(document.getElementById('planned-amount').value) || 0,
+            categoryId: document.getElementById('planned-category').value,
+            tagId: document.getElementById('planned-tag').value || '',
+            months,
+            year,
+            tripId: document.getElementById('planned-trip-id').value || ''
+        };
+
+        if (id) {
+            const charge = getPlannedCharges().find(c => c.id === id);
+            if (charge) Object.assign(charge, payload);
+        } else {
+            getPlannedCharges().push({ id: 'planned-' + generateId(), ...payload });
+        }
+
+        resetPlannedForm();
+        await saveData();
+        renderPlannedPage();
+    });
+
+    document.addEventListener('viewChanged', (e) => {
+        if (e.detail === 'planned') renderPlannedPage();
+    });
+
+    resetPlannedForm();
+}
+
+initPlannedChargesModule();

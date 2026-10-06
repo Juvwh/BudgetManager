@@ -38,7 +38,7 @@
                     </a>
                 </li>
                 <li>
-                    <a href="#" class="nav-link side-link" data-target="transactions" data-group="transactions subscriptions">
+                    <a href="#" class="nav-link side-link" data-target="transactions" data-group="transactions subscriptions planned">
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 6h18"/><path d="m7 22-4-4 4-4"/><path d="M21 18H3"/></svg>
                         <span class="side-label">Transactions</span>
                     </a>
@@ -228,6 +228,21 @@
                     </div>
                 </div>
 
+                <p class="goal-note" id="goal-planned-note" style="display: none;"></p>
+
+            </div>
+
+            <!-- Charges prévues du mois (hors objectif) -->
+            <div class="card" id="dash-card-planned">
+                <div class="card-head">
+                    <h3>Charges prévues du mois</h3>
+                    <a href="#" class="nav-link link-quiet" data-target="planned">Gérer</a>
+                </div>
+                <div id="dash-planned-list" class="feed feed-compact"></div>
+                <div class="card-foot">
+                    <span id="dash-planned-foot-label">Prochain mois chargé</span>
+                    <strong id="dash-planned-foot-value">—</strong>
+                </div>
             </div>
 
             <!-- Évolution du patrimoine -->
@@ -385,6 +400,7 @@
     <nav class="subnav">
         <a href="#" class="nav-link subnav-link active" data-target="transactions">Historique</a>
         <a href="#" class="nav-link subnav-link" data-target="subscriptions">Récurrences</a>
+        <a href="#" class="nav-link subnav-link" data-target="planned">Charges prévues</a>
     </nav>
 
     <div class="split-layout">
@@ -549,6 +565,7 @@
     <nav class="subnav">
         <a href="#" class="nav-link subnav-link" data-target="transactions">Historique</a>
         <a href="#" class="nav-link subnav-link active" data-target="subscriptions">Récurrences</a>
+        <a href="#" class="nav-link subnav-link" data-target="planned">Charges prévues</a>
     </nav>
 
     <div class="split-layout">
@@ -627,6 +644,125 @@
             </div>
             <div id="subscriptions-list" class="sub-list"></div>
         </div>
+    </div>
+</section>
+
+<!-- ============================== CHARGES PRÉVUES ============================== -->
+<!-- Grosses dépenses connues à l'avance (assurance, entretien, vacances…),
+     suivies à part de l'objectif mensuel qui ne couvre que le budget courant. -->
+<section id="planned" class="view-section hidden">
+    <div class="page-head">
+        <div class="page-head-text">
+            <h2>Transactions</h2>
+            <p class="page-sub">Grosses charges connues à l'avance, suivies à part de l'objectif mensuel</p>
+        </div>
+    </div>
+
+    <nav class="subnav">
+        <a href="#" class="nav-link subnav-link" data-target="transactions">Historique</a>
+        <a href="#" class="nav-link subnav-link" data-target="subscriptions">Récurrences</a>
+        <a href="#" class="nav-link subnav-link active" data-target="planned">Charges prévues</a>
+    </nav>
+
+    <div class="summary-cards">
+        <div class="card stat-card">
+            <div class="stat-head"><h3>12 prochains mois</h3></div>
+            <p id="planned-stat-total">0.00 €</p>
+            <span class="stat-delta" id="planned-stat-count">Aucune charge prévue</span>
+        </div>
+        <div class="card stat-card">
+            <div class="stat-head"><h3>Mois le plus chargé</h3></div>
+            <p id="planned-stat-peak">—</p>
+            <span class="stat-delta" id="planned-stat-peak-detail"></span>
+        </div>
+        <div class="card stat-card">
+            <div class="stat-head"><h3>Prochaine charge</h3></div>
+            <p id="planned-stat-next">—</p>
+            <span class="stat-delta" id="planned-stat-next-detail"></span>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head">
+            <h3>Les 12 prochains mois</h3>
+            <div class="chart-legend-inline">
+                <span><i class="legend-swatch swatch-goal"></i>Objectif courant</span>
+                <span><i class="legend-swatch swatch-planned"></i>Charges prévues</span>
+            </div>
+        </div>
+        <div class="canvas-wrap">
+            <canvas id="plannedYearChart"></canvas>
+        </div>
+    </div>
+
+    <div class="split-layout">
+        <div class="form-panel card composer">
+            <div class="card-head">
+                <h3 id="planned-form-title">Nouvelle charge prévue</h3>
+            </div>
+            <form id="form-planned">
+                <div class="composer-grid">
+                    <div class="form-group composer-wide">
+                        <label for="planned-name">Nom</label>
+                        <input type="text" id="planned-name" placeholder="Ex: Entretien voiture" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="planned-amount">Montant estimé (€)</label>
+                        <input type="number" id="planned-amount" step="0.01" min="0" inputmode="decimal" placeholder="0.00" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="planned-repeat">Répétition</label>
+                        <select id="planned-repeat">
+                            <option value="yearly">Chaque année</option>
+                            <option value="once">Une seule fois</option>
+                        </select>
+                    </div>
+                    <div class="form-group composer-wide">
+                        <label>Mois concernés</label>
+                        <div class="month-picker" id="planned-months"></div>
+                    </div>
+                    <div class="form-group" id="planned-year-group" style="display: none;">
+                        <label for="planned-year">Année</label>
+                        <input type="number" id="planned-year" step="1" min="2000" max="2100">
+                    </div>
+                    <div class="form-group composer-wide">
+                        <label for="planned-category">Catégorie</label>
+                        <select id="planned-category" required></select>
+                        <small>Les dépenses de cette catégorie (et de ses sous-catégories) ce mois-là sont comptées comme cette charge.</small>
+                    </div>
+                    <div class="form-group composer-wide">
+                        <label for="planned-tag">Tag (optionnel)</label>
+                        <select id="planned-tag"></select>
+                        <small>Pour ne retenir que les dépenses portant ce tag (utile pour les vacances).</small>
+                    </div>
+                </div>
+
+                <p class="composer-summary" id="planned-summary">Choisissez un montant et au moins un mois.</p>
+
+                <input type="hidden" id="planned-id">
+                <input type="hidden" id="planned-trip-id">
+                <div class="composer-actions">
+                    <button type="submit" id="btn-submit-planned" class="btn btn-primary">Ajouter</button>
+                    <button type="button" id="btn-cancel-planned" class="btn btn-secondary" style="display:none;">Annuler</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="list-panel card">
+            <div class="card-head">
+                <h3>Vos charges prévues</h3>
+                <span class="muted" id="planned-list-summary"></span>
+            </div>
+            <div id="planned-list" class="sub-list"></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head">
+            <h3>Suggestions d'après votre historique</h3>
+            <span class="muted">Grosses dépenses ponctuelles des 24 derniers mois et voyages à venir</span>
+        </div>
+        <div id="planned-suggestions" class="sub-list"></div>
     </div>
 </section>
 
@@ -1457,7 +1593,7 @@
         <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
         <span>Accueil</span>
     </a>
-    <a href="#" class="nav-link" data-target="transactions" data-group="transactions subscriptions" aria-label="Transactions">
+    <a href="#" class="nav-link" data-target="transactions" data-group="transactions subscriptions planned" aria-label="Transactions">
         <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 6h18"/><path d="m7 22-4-4 4-4"/><path d="M21 18H3"/></svg>
         <span>Opérations</span>
     </a>

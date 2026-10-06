@@ -1261,7 +1261,8 @@ main#app-content {
 
 /* Transactions : le composeur est une bande pleine largeur au-dessus de la liste */
 #transactions .split-layout,
-#subscriptions .split-layout { grid-template-columns: minmax(0, 1fr); }
+#subscriptions .split-layout,
+#planned .split-layout { grid-template-columns: minmax(0, 1fr); }
 
 .split-layout > .card { margin-bottom: 0; }
 
@@ -2945,3 +2946,95 @@ tbody td[data-label="Actions"] { white-space: nowrap; }
 }
 
 .qa-mv-actions .form-hint { margin: 0; }
+
+/* -------------------------------------------------------------------------
+   Charges prévues (grosses dépenses connues à l'avance)
+   ------------------------------------------------------------------------- */
+#planned .split-layout { margin-bottom: 1.1rem; }
+
+/* Sélecteur de mois : 12 pastilles à cocher */
+.month-picker {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.35rem;
+}
+
+.month-chip { position: relative; }
+.month-chip input { position: absolute; opacity: 0; pointer-events: none; }
+
+.month-chip span {
+    display: block;
+    padding: 0.42rem 0;
+    text-align: center;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border: 1px solid var(--border-color);
+    border-radius: var(--r-sm);
+    background: var(--input-bg);
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.month-chip span:hover { border-color: var(--border-strong); }
+.month-chip input:focus-visible + span { outline: 2px solid var(--accent-color); outline-offset: 2px; }
+.month-chip input:checked + span {
+    background: var(--warning-soft);
+    border-color: var(--warning-color);
+    color: var(--text-color);
+}
+
+/* Légende du graphique annuel */
+.chart-legend-inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.9rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.chart-legend-inline span { display: inline-flex; align-items: center; gap: 0.35rem; }
+
+.legend-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+}
+
+.swatch-goal { background: var(--accent-color); opacity: 0.35; }
+.swatch-planned { background: var(--warning-color); }
+
+/* Pastille et état d'une charge */
+.sub-icon.is-planned { background: var(--warning-soft); color: var(--warning-color); }
+.sub-icon.is-auto { background: var(--accent-soft); color: var(--accent-color); }
+
+.planned-status {
+    display: inline-block;
+    margin-left: 0.4rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 650;
+    vertical-align: middle;
+    background: var(--surface-2);
+    color: var(--text-muted);
+}
+
+.planned-status.is-paid { background: var(--success-soft); color: var(--success-color); }
+.planned-status.is-over { background: var(--danger-soft); color: var(--danger-color); }
+.planned-status.is-due { background: var(--warning-soft); color: var(--warning-color); }
+
+/* Note sous l'objectif du tableau de bord */
+.goal-note {
+    margin-top: 0.75rem;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.goal-note strong { color: var(--text-color); }
+
+@media (max-width: 560px) {
+    .month-picker { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
